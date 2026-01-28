@@ -1,12 +1,15 @@
 <script setup>
-import { ref } from 'vue'
-import { Head, useForm, router } from '@inertiajs/vue3'
+import { ref, computed } from 'vue'
+import { Head, useForm, router, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { UserIcon } from '@heroicons/vue/24/outline'
+import { UserIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
     user: { type: Object, required: true },
+    twoFactor: { type: Object, default: () => ({ enabled: false, qrCodeSvg: null, secret: null, recoveryCodes: null }) },
 })
+
+const page = usePage()
 
 // Profile form
 const profileForm = useForm({
@@ -86,6 +89,61 @@ const getInitials = () => {
         .toUpperCase()
         .slice(0, 2)
 }
+
+// Two-Factor Authentication
+const showRecoveryCodes = ref(false)
+
+const twoFactorEnableForm = useForm({})
+const twoFactorConfirmForm = useForm({
+    code: '',
+})
+const twoFactorDisableForm = useForm({
+    password: '',
+})
+const regenerateCodesForm = useForm({
+    password: '',
+})
+
+const enableTwoFactor = () => {
+    twoFactorEnableForm.post('/two-factor/enable', {
+        preserveScroll: true,
+    })
+}
+
+const confirmTwoFactor = () => {
+    twoFactorConfirmForm.post('/two-factor/confirm', {
+        preserveScroll: true,
+        onSuccess: () => {
+            twoFactorConfirmForm.reset()
+            showRecoveryCodes.value = true
+        },
+    })
+}
+
+const disableTwoFactor = () => {
+    if (!confirm('Voulez-vous vraiment désactiver l\'authentification à deux facteurs ?')) return
+
+    twoFactorDisableForm.delete('/two-factor/disable', {
+        preserveScroll: true,
+        onSuccess: () => {
+            twoFactorDisableForm.reset()
+            showRecoveryCodes.value = false
+        },
+    })
+}
+
+const regenerateRecoveryCodes = () => {
+    regenerateCodesForm.post('/two-factor/recovery-codes', {
+        preserveScroll: true,
+        onSuccess: () => {
+            regenerateCodesForm.reset()
+        },
+    })
+}
+
+const isSettingUp2FA = computed(() => {
+    return props.twoFactor.qrCodeSvg && !props.twoFactor.enabled
+})
 </script>
 
 <template>
@@ -243,6 +301,140 @@ const getInitials = () => {
                     </button>
                 </div>
             </form>
+
+            <!-- Two-Factor Authentication -->
+            <div class="bg-theme-card border border-theme-border rounded-lg p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <ShieldCheckIcon class="w-5 h-5 text-theme-text-secondary" />
+                    <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Authentification à deux facteurs</h2>
+                </div>
+
+                <!-- Success message -->
+                <div v-if="page.props.flash?.success" class="mb-4 bg-theme-surface border border-green-500/30 text-green-400 rounded-md px-4 py-3 text-sm">
+                    {{ page.props.flash.success }}
+                </div>
+
+                <!-- 2FA Not Enabled -->
+                <div v-if="!twoFactor.enabled && !isSettingUp2FA">
+                    <p class="text-sm text-theme-text-secondary mb-4">
+                        Ajoutez une couche de sécurité supplémentaire à votre compte en activant l'authentification à deux facteurs.
+                    </p>
+                    <button
+                        type="button"
+                        @click="enableTwoFactor"
+                        :disabled="twoFactorEnableForm.processing"
+                        class="px-4 py-2 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
+                    >
+                        Activer
+                    </button>
+                </div>
+
+                <!-- 2FA Setup in Progress -->
+                <div v-else-if="isSettingUp2FA">
+                    <p class="text-sm text-theme-text-secondary mb-4">
+                        Scannez le QR code ci-dessous avec votre application d'authentification (Google Authenticator, Authy, etc.)
+                    </p>
+
+                    <div class="flex flex-col items-center gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-lg" v-html="twoFactor.qrCodeSvg"></div>
+                        <div class="text-center">
+                            <p class="text-xs text-theme-text-muted mb-1">Ou entrez ce code manuellement :</p>
+                            <code class="text-sm text-theme-text-primary bg-theme-surface px-3 py-1 rounded font-mono">{{ twoFactor.secret }}</code>
+                        </div>
+                    </div>
+
+                    <form @submit.prevent="confirmTwoFactor" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">
+                                Code de vérification
+                            </label>
+                            <input
+                                v-model="twoFactorConfirmForm.code"
+                                type="text"
+                                inputmode="numeric"
+                                maxlength="6"
+                                required
+                                class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary text-center tracking-widest font-mono focus:border-theme-text-primary focus:ring-0 outline-none"
+                                placeholder="000000"
+                            />
+                            <p v-if="twoFactorConfirmForm.errors.code" class="text-xs text-danger mt-1">{{ twoFactorConfirmForm.errors.code }}</p>
+                        </div>
+                        <button
+                            type="submit"
+                            :disabled="twoFactorConfirmForm.processing"
+                            class="w-full px-4 py-2 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
+                        >
+                            Confirmer
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 2FA Enabled -->
+                <div v-else-if="twoFactor.enabled">
+                    <div class="flex items-center gap-2 text-green-400 mb-4">
+                        <ShieldCheckIcon class="w-5 h-5" />
+                        <span class="text-sm font-medium">Authentification à deux facteurs activée</span>
+                    </div>
+
+                    <!-- Recovery Codes -->
+                    <div v-if="twoFactor.recoveryCodes && (showRecoveryCodes || page.props.flash?.success?.includes('régénérés'))" class="mb-6">
+                        <p class="text-sm text-theme-text-secondary mb-3">
+                            Conservez ces codes de récupération dans un endroit sûr. Ils vous permettront de vous connecter si vous perdez l'accès à votre appareil.
+                        </p>
+                        <div class="bg-theme-surface border border-theme-border rounded-md p-4 grid grid-cols-2 gap-2">
+                            <code v-for="code in twoFactor.recoveryCodes" :key="code" class="text-sm text-theme-text-primary font-mono">
+                                {{ code }}
+                            </code>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Regenerate Recovery Codes -->
+                        <div>
+                            <p class="text-sm text-theme-text-secondary mb-2">Régénérer les codes de récupération</p>
+                            <div class="flex gap-2">
+                                <input
+                                    v-model="regenerateCodesForm.password"
+                                    type="password"
+                                    placeholder="Mot de passe actuel"
+                                    class="flex-1 bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
+                                />
+                                <button
+                                    type="button"
+                                    @click="regenerateRecoveryCodes"
+                                    :disabled="regenerateCodesForm.processing || !regenerateCodesForm.password"
+                                    class="px-4 py-2 text-sm text-theme-text-secondary hover:text-theme-text-primary border border-theme-border rounded-md transition-colors disabled:opacity-50"
+                                >
+                                    Régénérer
+                                </button>
+                            </div>
+                            <p v-if="regenerateCodesForm.errors.password" class="text-xs text-danger mt-1">{{ regenerateCodesForm.errors.password }}</p>
+                        </div>
+
+                        <!-- Disable 2FA -->
+                        <div>
+                            <p class="text-sm text-theme-text-secondary mb-2">Désactiver l'authentification à deux facteurs</p>
+                            <div class="flex gap-2">
+                                <input
+                                    v-model="twoFactorDisableForm.password"
+                                    type="password"
+                                    placeholder="Mot de passe actuel"
+                                    class="flex-1 bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
+                                />
+                                <button
+                                    type="button"
+                                    @click="disableTwoFactor"
+                                    :disabled="twoFactorDisableForm.processing || !twoFactorDisableForm.password"
+                                    class="px-4 py-2 text-sm text-danger hover:bg-danger/10 border border-danger/30 rounded-md transition-colors disabled:opacity-50"
+                                >
+                                    Désactiver
+                                </button>
+                            </div>
+                            <p v-if="twoFactorDisableForm.errors.password" class="text-xs text-danger mt-1">{{ twoFactorDisableForm.errors.password }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Theme -->
             <div class="bg-theme-card border border-theme-border rounded-lg p-6">

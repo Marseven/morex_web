@@ -24,14 +24,30 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            $request->session()->regenerate();
-            return redirect()->intended('/');
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+            return back()->withErrors([
+                'email' => 'Les identifiants fournis sont incorrects.',
+            ])->onlyInput('email');
         }
 
-        return back()->withErrors([
-            'email' => 'Les identifiants fournis sont incorrects.',
-        ])->onlyInput('email');
+        // Check if 2FA is enabled
+        if ($user->hasTwoFactorEnabled()) {
+            // Store user ID in session for 2FA challenge (no Auth::login yet)
+            session([
+                'login.id' => $user->id,
+                'login.remember' => $request->boolean('remember'),
+            ]);
+
+            return redirect()->route('two-factor.challenge');
+        }
+
+        // No 2FA - proceed with normal login
+        Auth::login($user, $request->boolean('remember'));
+        $request->session()->regenerate();
+
+        return redirect()->intended('/');
     }
 
     public function showRegister(): Response

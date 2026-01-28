@@ -1,38 +1,31 @@
 <script setup>
-import { useForm, Link } from '@inertiajs/vue3'
-import Toast from '@/Components/Toast.vue'
-import { useToast } from '@/Composables/useToast'
+import { Head, useForm, Link } from '@inertiajs/vue3'
 
-const { warning } = useToast()
+const props = defineProps({
+    token: { type: String, required: true },
+    email: { type: String, default: '' },
+})
 
 const form = useForm({
-    email: '',
+    token: props.token,
+    email: props.email,
     password: '',
-    remember: false,
+    password_confirmation: '',
 })
 
 const submit = () => {
-    form.post('/login', {
-        onError: (errors) => {
-            // Handle 419 CSRF token mismatch
-            if (Object.keys(errors).length === 0) {
-                warning('Votre session a expiré. La page va se rafraîchir.')
-                setTimeout(() => {
-                    window.location.reload()
-                }, 1500)
-            }
-        },
-    })
+    form.post('/reset-password')
 }
 </script>
 
 <template>
+    <Head title="Réinitialiser le mot de passe" />
+
     <div class="min-h-screen bg-theme-bg flex items-center justify-center p-4">
-        <Toast />
         <div class="w-full max-w-sm">
             <div class="text-center mb-10">
                 <img src="/images/logo.png" alt="Morex" class="h-10 w-auto mx-auto mb-4" />
-                <p class="text-theme-text-secondary text-sm">Pilotez votre avenir financier</p>
+                <p class="text-theme-text-secondary text-sm">Nouveau mot de passe</p>
             </div>
 
             <form @submit.prevent="submit" class="space-y-5">
@@ -45,7 +38,6 @@ const submit = () => {
                         v-model="form.email"
                         type="email"
                         required
-                        autofocus
                         class="w-full bg-theme-surface border border-theme-border rounded-md px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted focus:border-white focus:ring-0 outline-none transition-colors"
                         placeholder="votre@email.com"
                     />
@@ -56,13 +48,14 @@ const submit = () => {
 
                 <div>
                     <label for="password" class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">
-                        Mot de passe
+                        Nouveau mot de passe
                     </label>
                     <input
                         id="password"
                         v-model="form.password"
                         type="password"
                         required
+                        autofocus
                         class="w-full bg-theme-surface border border-theme-border rounded-md px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted focus:border-white focus:ring-0 outline-none transition-colors"
                         placeholder="••••••••"
                     />
@@ -71,21 +64,18 @@ const submit = () => {
                     </p>
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        <input
-                            id="remember"
-                            v-model="form.remember"
-                            type="checkbox"
-                            class="w-4 h-4 bg-theme-surface border-theme-border rounded text-theme-text-primary focus:ring-0 focus:ring-offset-0"
-                        />
-                        <label for="remember" class="ml-2 text-sm text-theme-text-secondary">
-                            Se souvenir de moi
-                        </label>
-                    </div>
-                    <Link href="/forgot-password" class="text-sm text-theme-text-secondary hover:text-theme-text-primary transition-colors">
-                        Mot de passe oublié ?
-                    </Link>
+                <div>
+                    <label for="password_confirmation" class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">
+                        Confirmer le mot de passe
+                    </label>
+                    <input
+                        id="password_confirmation"
+                        v-model="form.password_confirmation"
+                        type="password"
+                        required
+                        class="w-full bg-theme-surface border border-theme-border rounded-md px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted focus:border-white focus:ring-0 outline-none transition-colors"
+                        placeholder="••••••••"
+                    />
                 </div>
 
                 <button
@@ -93,9 +83,15 @@ const submit = () => {
                     :disabled="form.processing"
                     class="w-full bg-theme-btn-primary-bg text-theme-btn-primary-text font-medium py-3 px-4 rounded-md hover:opacity-90 transition-colors disabled:opacity-50 text-sm"
                 >
-                    <span v-if="form.processing">Connexion...</span>
-                    <span v-else>Se connecter</span>
+                    <span v-if="form.processing">Réinitialisation...</span>
+                    <span v-else>Réinitialiser le mot de passe</span>
                 </button>
+
+                <div class="text-center">
+                    <Link href="/login" class="text-sm text-theme-text-secondary hover:text-theme-text-primary transition-colors">
+                        Retour à la connexion
+                    </Link>
+                </div>
             </form>
         </div>
     </div>

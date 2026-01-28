@@ -2,20 +2,67 @@
 
 namespace App\Http\Controllers;
 
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
+use PragmaRX\Google2FA\Google2FA;
 
 class ProfileController extends Controller
 {
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+        $twoFactorData = $this->getTwoFactorData($user);
+
         return Inertia::render('Profile/Edit', [
-            'user' => $request->user()->only('id', 'name', 'email', 'phone', 'avatar', 'theme'),
+            'user' => $user->only('id', 'name', 'email', 'phone', 'avatar', 'theme'),
+            'twoFactor' => $twoFactorData,
         ]);
+    }
+
+    protected function getTwoFactorData($user): array
+    {
+        $data = [
+            'enabled' => $user->hasTwoFactorEnabled(),
+            'qrCodeSvg' => null,
+            'secret' => null,
+            'recoveryCodes' => null,
+        ];
+
+        // If 2FA is being set up (secret exists but not confirmed)
+        if ($user->two_factor_secret && !$user->two_factor_confirmed_at) {
+            $google2fa = new Google2FA();
+            $secret = decrypt($user->two_factor_secret);
+
+            $qrCodeUrl = $google2fa->getQRCodeUrl(
+                config('app.name'),
+                $user->email,
+                $secret
+            );
+
+            $renderer = new ImageRenderer(
+                new RendererStyle(200),
+                new SvgImageBackEnd()
+            );
+            $writer = new Writer($renderer);
+
+            $data['qrCodeSvg'] = $writer->writeString($qrCodeUrl);
+            $data['secret'] = $secret;
+        }
+
+        // If 2FA is enabled, show recovery codes
+        if ($user->two_factor_confirmed_at && $user->two_factor_recovery_codes) {
+            $data['recoveryCodes'] = json_decode(decrypt($user->two_factor_recovery_codes), true);
+        }
+
+        return $data;
     }
 
     public function update(Request $request)
