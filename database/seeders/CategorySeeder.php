@@ -10,29 +10,27 @@ class CategorySeeder extends Seeder
 {
     public function run(): void
     {
+        // Catégories alignées avec l'app mobile Morex
         $expenseCategories = [
-            ['name' => 'Alimentation', 'icon' => 'shopping-cart', 'color' => '#FF6B6B'],
-            ['name' => 'Transport', 'icon' => 'car', 'color' => '#4ECDC4'],
-            ['name' => 'Logement', 'icon' => 'home', 'color' => '#45B7D1'],
-            ['name' => 'Factures', 'icon' => 'file-text', 'color' => '#96CEB4'],
-            ['name' => 'Santé', 'icon' => 'heart', 'color' => '#FF8C94'],
-            ['name' => 'Loisirs', 'icon' => 'smile', 'color' => '#DDA0DD'],
-            ['name' => 'Shopping', 'icon' => 'shopping-bag', 'color' => '#F7DC6F'],
-            ['name' => 'Restaurants', 'icon' => 'coffee', 'color' => '#E59866'],
-            ['name' => 'Éducation', 'icon' => 'book', 'color' => '#85C1E9'],
-            ['name' => 'Dons', 'icon' => 'gift', 'color' => '#C39BD3'],
-            ['name' => 'Sorties', 'icon' => 'users', 'color' => '#F1948A'],
-            ['name' => 'Abonnements', 'icon' => 'repeat', 'color' => '#7DCEA0'],
-            ['name' => 'Autres dépenses', 'icon' => 'more-horizontal', 'color' => '#AEB6BF'],
+            ['name' => 'Épargne/Investissement', 'icon' => 'piggy-bank', 'color' => '#10B981'],
+            ['name' => 'Logement', 'icon' => 'home', 'color' => '#F59E0B'],
+            ['name' => 'Dîmes', 'icon' => 'heart', 'color' => '#8B5CF6'],
+            ['name' => 'Abonnements', 'icon' => 'repeat', 'color' => '#EC4899'],
+            ['name' => 'Alimentation', 'icon' => 'shopping-cart', 'color' => '#F97316', 'budget_limit' => 150000],
+            ['name' => 'Transport', 'icon' => 'car', 'color' => '#6366F1', 'budget_limit' => 75000],
+            ['name' => 'Sorties/Loisirs', 'icon' => 'smile', 'color' => '#EF4444', 'budget_limit' => 50000],
+            ['name' => 'Fonds d\'Aide/Dons', 'icon' => 'gift', 'color' => '#EC4899', 'budget_limit' => 30000],
+            ['name' => 'Santé', 'icon' => 'heart', 'color' => '#14B8A6'],
+            ['name' => 'Divers', 'icon' => 'more-horizontal', 'color' => '#6B7280'],
+            ['name' => 'Événements', 'icon' => 'calendar', 'color' => '#A855F7'],
+            ['name' => 'Équipement', 'icon' => 'monitor', 'color' => '#0EA5E9'],
         ];
 
         $incomeCategories = [
-            ['name' => 'Salaire', 'icon' => 'briefcase', 'color' => '#27AE60'],
-            ['name' => 'Freelance', 'icon' => 'laptop', 'color' => '#3498DB'],
-            ['name' => 'Investissements', 'icon' => 'trending-up', 'color' => '#9B59B6'],
-            ['name' => 'Cadeaux', 'icon' => 'gift', 'color' => '#E74C3C'],
-            ['name' => 'Remboursements', 'icon' => 'refresh-cw', 'color' => '#1ABC9C'],
-            ['name' => 'Autres revenus', 'icon' => 'plus-circle', 'color' => '#95A5A6'],
+            ['name' => 'Salaire', 'icon' => 'briefcase', 'color' => '#10B981'],
+            ['name' => 'Projets/Freelance', 'icon' => 'laptop', 'color' => '#3B82F6'],
+            ['name' => 'Remboursements', 'icon' => 'refresh-cw', 'color' => '#8B5CF6'],
+            ['name' => 'Autres revenus', 'icon' => 'plus-circle', 'color' => '#6B7280'],
         ];
 
         $orderIndex = 0;
@@ -44,6 +42,7 @@ class CategorySeeder extends Seeder
                     'user_id' => null,
                     'icon' => $category['icon'],
                     'color' => $category['color'],
+                    'budget_limit' => $category['budget_limit'] ?? null,
                     'order_index' => $orderIndex++,
                 ]
             );
