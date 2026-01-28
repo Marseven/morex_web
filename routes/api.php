@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\RecurringTransactionController;
 // Routes publiques
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/two-factor-challenge', [AuthController::class, 'twoFactorChallenge']);
 
 // Routes protégées (nécessitent authentification)
 Route::middleware('auth:sanctum')->group(function () {

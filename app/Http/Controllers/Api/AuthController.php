@@ -108,11 +108,99 @@ class AuthController extends Controller
             ]);
         }
 
+        // Check if 2FA is enabled
+        if ($user->hasTwoFactorEnabled()) {
+            return response()->json([
+                'two_factor_required' => true,
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+        }
+
         $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
             'user' => $user,
             'token' => $token,
+            'two_factor_enabled' => $user->hasTwoFactorEnabled(),
+        ]);
+    }
+
+    #[OA\Post(
+        path: "/two-factor-challenge",
+        summary: "Vérification du code 2FA",
+        tags: ["Auth"],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["user_id"],
+                properties: [
+                    new OA\Property(property: "user_id", type: "integer", example: 1),
+                    new OA\Property(property: "code", type: "string", example: "123456"),
+                    new OA\Property(property: "recovery_code", type: "string", example: "abcd-efgh"),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "2FA validé",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "user", ref: "#/components/schemas/User"),
+                        new OA\Property(property: "token", type: "string"),
+                    ]
+                )
+            ),
+            new OA\Response(response: 422, description: "Code invalide"),
+        ]
+    )]
+    public function twoFactorChallenge(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => ['required', 'exists:users,id'],
+        ]);
+
+        $user = User::findOrFail($request->user_id);
+
+        // Verify with TOTP code
+        if ($request->filled('code')) {
+            $google2fa = new \PragmaRX\Google2FA\Google2FA();
+            $secret = decrypt($user->two_factor_secret);
+
+            if (!$google2fa->verifyKey($secret, $request->code)) {
+                throw ValidationException::withMessages([
+                    'code' => ['Le code est invalide.'],
+                ]);
+            }
+        }
+        // Verify with recovery code
+        elseif ($request->filled('recovery_code')) {
+            $recoveryCodes = json_decode(decrypt($user->two_factor_recovery_codes), true);
+
+            if (!in_array($request->recovery_code, $recoveryCodes)) {
+                throw ValidationException::withMessages([
+                    'recovery_code' => ['Le code de récupération est invalide.'],
+                ]);
+            }
+
+            // Remove used recovery code
+            $recoveryCodes = array_diff($recoveryCodes, [$request->recovery_code]);
+            $user->two_factor_recovery_codes = encrypt(json_encode(array_values($recoveryCodes)));
+            $user->save();
+        }
+        else {
+            throw ValidationException::withMessages([
+                'code' => ['Veuillez fournir un code d\'authentification ou un code de récupération.'],
+            ]);
+        }
+
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+            'two_factor_enabled' => true,
         ]);
     }
 
