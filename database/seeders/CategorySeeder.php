@@ -37,30 +37,30 @@ class CategorySeeder extends Seeder
 
         $orderIndex = 0;
         foreach ($expenseCategories as $category) {
-            Category::create([
-                'id' => Str::uuid(),
-                'user_id' => null,
-                'name' => $category['name'],
-                'type' => 'expense',
-                'icon' => $category['icon'],
-                'color' => $category['color'],
-                'order_index' => $orderIndex++,
-                'is_system' => true,
-            ]);
+            Category::firstOrCreate(
+                ['name' => $category['name'], 'type' => 'expense', 'is_system' => true],
+                [
+                    'id' => Str::uuid(),
+                    'user_id' => null,
+                    'icon' => $category['icon'],
+                    'color' => $category['color'],
+                    'order_index' => $orderIndex++,
+                ]
+            );
         }
 
         $orderIndex = 0;
         foreach ($incomeCategories as $category) {
-            Category::create([
-                'id' => Str::uuid(),
-                'user_id' => null,
-                'name' => $category['name'],
-                'type' => 'income',
-                'icon' => $category['icon'],
-                'color' => $category['color'],
-                'order_index' => $orderIndex++,
-                'is_system' => true,
-            ]);
+            Category::firstOrCreate(
+                ['name' => $category['name'], 'type' => 'income', 'is_system' => true],
+                [
+                    'id' => Str::uuid(),
+                    'user_id' => null,
+                    'icon' => $category['icon'],
+                    'color' => $category['color'],
+                    'order_index' => $orderIndex++,
+                ]
+            );
         }
     }
 }
