@@ -1,10 +1,10 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "morex/web",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
-    "license": "MIT",
+    "description": "Morex - Application de gestion des finances personnelles",
+    "keywords": ["morex", "finance", "laravel"],
+    "license": "proprietary",
     "require": {
         "php": "^8.2",
         "darkaonline/l5-swagger": "^10.1",
