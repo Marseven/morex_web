@@ -33,30 +33,30 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Comptes
-    Route::apiResource('accounts', AccountController::class);
-    Route::post('/accounts/reorder', [AccountController::class, 'reorder']);
+    Route::apiResource('accounts', AccountController::class)->names('api.accounts');
+    Route::post('/accounts/reorder', [AccountController::class, 'reorder'])->name('api.accounts.reorder');
 
     // Catégories
-    Route::apiResource('categories', CategoryController::class);
-    Route::post('/categories/reorder', [CategoryController::class, 'reorder']);
+    Route::apiResource('categories', CategoryController::class)->names('api.categories');
+    Route::post('/categories/reorder', [CategoryController::class, 'reorder'])->name('api.categories.reorder');
 
     // Transactions
-    Route::apiResource('transactions', TransactionController::class);
-    Route::get('/transactions-stats', [TransactionController::class, 'stats']);
+    Route::apiResource('transactions', TransactionController::class)->names('api.transactions');
+    Route::get('/transactions-stats', [TransactionController::class, 'stats'])->name('api.transactions.stats');
 
     // Objectifs
-    Route::apiResource('goals', GoalController::class);
-    Route::post('/goals/{goal}/contribute', [GoalController::class, 'addContribution']);
+    Route::apiResource('goals', GoalController::class)->names('api.goals');
+    Route::post('/goals/{goal}/contribute', [GoalController::class, 'addContribution'])->name('api.goals.contribute');
 
     // Dettes et créances
-    Route::apiResource('debts', DebtController::class);
-    Route::post('/debts/{debt}/payment', [DebtController::class, 'payment']);
-    Route::get('/debts-stats', [DebtController::class, 'stats']);
+    Route::apiResource('debts', DebtController::class)->names('api.debts');
+    Route::post('/debts/{debt}/payment', [DebtController::class, 'payment'])->name('api.debts.payment');
+    Route::get('/debts-stats', [DebtController::class, 'stats'])->name('api.debts.stats');
 
     // Transactions récurrentes
-    Route::apiResource('recurring-transactions', RecurringTransactionController::class);
-    Route::post('/recurring-transactions/{recurring_transaction}/generate', [RecurringTransactionController::class, 'generate']);
-    Route::post('/recurring-transactions-process-due', [RecurringTransactionController::class, 'processDue']);
+    Route::apiResource('recurring-transactions', RecurringTransactionController::class)->names('api.recurring-transactions');
+    Route::post('/recurring-transactions/{recurring_transaction}/generate', [RecurringTransactionController::class, 'generate'])->name('api.recurring-transactions.generate');
+    Route::post('/recurring-transactions-process-due', [RecurringTransactionController::class, 'processDue'])->name('api.recurring-transactions.process-due');
 
     // Statistiques globales (Dashboard mobile)
     Route::get('/stats/dashboard', [StatsController::class, 'dashboard']);
