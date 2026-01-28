@@ -1,0 +1,74 @@
+/* Amazon Ember Display Font */
+@font-face {
+    font-family: 'Amazon Ember';
+    src: url('/fonts/AmazonEmberDisplay_Lt.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Amazon Ember';
+    src: url('/fonts/AmazonEmberDisplay_Rg.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Amazon Ember';
+    src: url('/fonts/AmazonEmberDisplay_Md.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Amazon Ember';
+    src: url('/fonts/AmazonEmberDisplay_Bd.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Amazon Ember';
+    src: url('/fonts/AmazonEmberDisplay_He.ttf') format('truetype');
+    font-weight: 800;
+    font-style: normal;
+    font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme Variables */
+:root {
+    /* Dark theme (default) */
+    --color-bg: #000000;
+    --color-surface: #0A0A0A;
+    --color-surface-light: #141414;
+    --color-card: #111111;
+    --color-border: #1F1F1F;
+    --color-divider: #1A1A1A;
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #71717A;
+    --color-text-muted: #52525B;
+    --color-btn-primary-bg: #FFFFFF;
+    --color-btn-primary-text: #000000;
+}
+
+.light {
+    --color-bg: #FFFFFF;
+    --color-surface: #F9FAFB;
+    --color-surface-light: #F3F4F6;
+    --color-card: #FFFFFF;
+    --color-border: #E5E7EB;
+    --color-divider: #F3F4F6;
+    --color-text-primary: #111827;
+    --color-text-secondary: #6B7280;
+    --color-text-muted: #9CA3AF;
+    --color-btn-primary-bg: #111827;
+    --color-btn-primary-text: #FFFFFF;
+}
