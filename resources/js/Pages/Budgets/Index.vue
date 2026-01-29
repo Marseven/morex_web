@@ -279,20 +279,20 @@ const overBudgetCount = categoriesWithBudget.filter(c => (c.spent_this_month || 
                         class="px-4 py-3 flex items-center justify-between"
                     >
                         <div class="flex items-center gap-3">
-                            <CheckCircleIcon class="w-4 h-4 text-success" />
+                            <CheckCircleIcon class="w-4 h-4" :class="closure.total_saved >= 0 ? 'text-success' : 'text-danger'" />
                             <div>
                                 <p class="text-sm font-medium text-theme-text-primary">{{ getMonthName(closure.month, closure.year) }}</p>
                                 <p class="text-xs text-theme-text-muted">
-                                    Budget: {{ formatAmount(closure.total_budget) }} FCFA
-                                    · Dépensé: {{ formatAmount(closure.total_spent) }} FCFA
+                                    Revenus: {{ formatAmount(closure.total_budget) }} FCFA
+                                    · Dépenses: {{ formatAmount(closure.total_spent) }} FCFA
                                 </p>
                             </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-sm font-semibold" :class="closure.total_saved > 0 ? 'text-success' : 'text-theme-text-primary'">
-                                {{ closure.total_saved > 0 ? '+' : '' }}{{ formatAmount(closure.total_saved) }} FCFA
+                            <p class="text-sm font-semibold" :class="closure.total_saved >= 0 ? 'text-success' : 'text-danger'">
+                                {{ closure.total_saved >= 0 ? '+' : '' }}{{ formatAmount(closure.total_saved) }} FCFA
                             </p>
-                            <p class="text-xs text-theme-text-muted">économisé</p>
+                            <p class="text-xs text-theme-text-muted">{{ closure.total_saved >= 0 ? 'excédent' : 'déficit' }}</p>
                         </div>
                     </div>
                 </div>

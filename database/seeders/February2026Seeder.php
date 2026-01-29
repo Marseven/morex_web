@@ -201,62 +201,63 @@ class February2026Seeder extends Seeder
             ->where('month', 1)
             ->delete();
 
-        // Calculer les totaux de Janvier 2026
-        $januaryExpenses = Transaction::where('user_id', $user->id)
-            ->where('type', 'expense')
+        // Calculer les revenus de Janvier 2026 (transactions avant le 29 janvier)
+        $januaryIncome = Transaction::where('user_id', $user->id)
+            ->where('type', 'income')
+            ->where('date', '<', '2026-01-29')
             ->whereYear('date', 2026)
-            ->whereMonth('date', 1)
             ->sum('amount');
 
-        // Budget total depuis les catégories
-        $totalBudget = Category::where(function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-              ->orWhere('is_system', true);
-        })
-        ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->sum('budget_limit');
+        // Calculer les dépenses de Janvier 2026 (transactions avant le 29 janvier)
+        $januaryExpenses = Transaction::where('user_id', $user->id)
+            ->where('type', 'expense')
+            ->where('date', '<', '2026-01-29')
+            ->whereYear('date', 2026)
+            ->sum('amount');
 
-        $totalSaved = max(0, $totalBudget - $januaryExpenses);
+        // Solde net = revenus - dépenses (peut être négatif)
+        $netBalance = $januaryIncome - $januaryExpenses;
 
         // Détails par catégorie
-        $categoriesWithBudget = Category::where(function ($q) use ($user) {
+        $expenseCategories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
               ->orWhere('is_system', true);
         })
         ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->where('budget_limit', '>', 0)
         ->get();
 
         $details = [];
-        foreach ($categoriesWithBudget as $cat) {
+        foreach ($expenseCategories as $cat) {
             $spent = Transaction::where('user_id', $user->id)
                 ->where('category_id', $cat->id)
                 ->where('type', 'expense')
+                ->where('date', '<', '2026-01-29')
                 ->whereYear('date', 2026)
-                ->whereMonth('date', 1)
                 ->sum('amount');
 
-            $details[] = [
-                'category_id' => $cat->id,
-                'category_name' => $cat->name,
-                'budget' => $cat->budget_limit,
-                'spent' => $spent,
-                'saved' => max(0, $cat->budget_limit - $spent),
-            ];
+            if ($spent > 0) {
+                $details[] = [
+                    'category_id' => $cat->id,
+                    'category_name' => $cat->name,
+                    'budget' => $cat->budget_limit ?? 0,
+                    'spent' => $spent,
+                ];
+            }
         }
 
-        // Créer la clôture
+        // Créer la clôture (total_budget = revenus, total_saved = solde net)
         BudgetClosure::create([
             'user_id' => $user->id,
             'year' => 2026,
             'month' => 1,
-            'total_budget' => $totalBudget,
+            'total_budget' => $januaryIncome,
             'total_spent' => $januaryExpenses,
-            'total_saved' => $totalSaved,
+            'total_saved' => $netBalance,
             'details' => $details,
         ]);
+
+        $status = $netBalance >= 0 ? 'Excédent' : 'Déficit';
+        $this->command->info("Janvier 2026 clôturé - Revenus: " . number_format($januaryIncome, 0, ',', ' ') . " | Dépenses: " . number_format($januaryExpenses, 0, ',', ' ') . " | {$status}: " . number_format($netBalance, 0, ',', ' '));
 
         // Clôturer le cycle actif de Janvier si existant
         $activeCycle = BudgetCycle::where('user_id', $user->id)

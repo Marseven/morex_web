@@ -149,8 +149,27 @@ class CategoryController extends Controller
     public function closeBudget(Request $request)
     {
         $user = $request->user();
-        $year = now()->year;
-        $month = now()->month;
+
+        // Récupérer le cycle budgétaire actif
+        $activeCycle = BudgetCycle::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$activeCycle) {
+            return back()->with('error', 'Aucune période budgétaire active.');
+        }
+
+        $startDate = $activeCycle->start_date->format('Y-m-d');
+        $periodName = $activeCycle->period_name;
+
+        // Extraire mois/année pour la clôture
+        $year = $activeCycle->start_date->year;
+        $month = $activeCycle->start_date->month;
+        // Si le cycle commence en fin de mois précédent, utiliser le mois suivant
+        if ($activeCycle->start_date->day >= 25) {
+            $month = $activeCycle->start_date->addMonth()->month;
+            $year = $activeCycle->start_date->addMonth()->year;
+        }
 
         // Vérifier si déjà clôturé
         $existingClosure = BudgetClosure::where('user_id', $user->id)
@@ -159,106 +178,56 @@ class CategoryController extends Controller
             ->first();
 
         if ($existingClosure) {
-            return back()->with('error', 'Ce mois a déjà été clôturé.');
+            return back()->with('error', 'Cette période a déjà été clôturée.');
         }
 
-        // Récupérer les catégories avec budget et leurs dépenses
-        $categories = Category::where(function ($q) use ($user) {
+        // Calculer les revenus de la période
+        $totalIncome = Transaction::where('user_id', $user->id)
+            ->where('type', 'income')
+            ->where('date', '>=', $startDate)
+            ->sum('amount');
+
+        // Calculer les dépenses de la période
+        $totalExpenses = Transaction::where('user_id', $user->id)
+            ->where('type', 'expense')
+            ->where('date', '>=', $startDate)
+            ->sum('amount');
+
+        // Solde net = revenus - dépenses (peut être négatif)
+        $netBalance = $totalIncome - $totalExpenses;
+
+        // Détails par catégorie de dépenses
+        $expenseCategories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
               ->orWhere('is_system', true);
         })
         ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->where('budget_limit', '>', 0)
-        ->withSum(['transactions as spent' => function ($q) use ($year, $month) {
-            $q->where('type', 'expense')
-              ->whereMonth('date', $month)
-              ->whereYear('date', $year);
-        }], 'amount')
         ->get();
 
-        if ($categories->isEmpty()) {
-            return back()->with('error', 'Aucun budget défini à clôturer.');
+        $details = [];
+        foreach ($expenseCategories as $cat) {
+            $spent = Transaction::where('user_id', $user->id)
+                ->where('category_id', $cat->id)
+                ->where('type', 'expense')
+                ->where('date', '>=', $startDate)
+                ->sum('amount');
+
+            if ($spent > 0) {
+                $details[] = [
+                    'category_id' => $cat->id,
+                    'category_name' => $cat->name,
+                    'budget' => $cat->budget_limit ?? 0,
+                    'spent' => $spent,
+                ];
+            }
         }
 
-        // Calculer les totaux
-        $totalBudget = $categories->sum('budget_limit');
-        $totalSpent = $categories->sum('spent') ?? 0;
-        $totalSaved = max(0, $totalBudget - $totalSpent);
-
-        // Détails par catégorie
-        $details = $categories->map(function ($cat) {
-            return [
-                'category_id' => $cat->id,
-                'category_name' => $cat->name,
-                'budget' => $cat->budget_limit,
-                'spent' => $cat->spent ?? 0,
-                'saved' => max(0, $cat->budget_limit - ($cat->spent ?? 0)),
-            ];
-        })->toArray();
-
-        $transactionId = null;
-
-        // Si il y a des économies, créer la transaction
-        if ($totalSaved > 0) {
-            // Récupérer ou créer le compte "Budget économisé"
-            $savingsAccount = Account::firstOrCreate(
-                [
-                    'user_id' => $user->id,
-                    'name' => 'Budget économisé',
-                ],
-                [
-                    'type' => 'savings',
-                    'initial_balance' => 0,
-                    'balance' => 0,
-                    'color' => '#22C55E',
-                    'icon' => 'piggy-bank',
-                    'is_default' => false,
-                    'order_index' => 999,
-                ]
-            );
-
-            // Récupérer ou créer la catégorie "Épargne budget"
-            $savingsCategory = Category::firstOrCreate(
-                [
-                    'user_id' => $user->id,
-                    'name' => 'Épargne budget',
-                    'type' => 'income',
-                ],
-                [
-                    'icon' => 'savings',
-                    'color' => '#22C55E',
-                    'is_system' => false,
-                    'order_index' => 999,
-                ]
-            );
-
-            // Nom du mois pour la description
-            $months = [
-                1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
-                5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
-                9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
-            ];
-            $monthName = $months[$month];
-
-            // Créer la transaction d'économie
-            $transaction = Transaction::create([
-                'id' => Str::uuid(),
-                'user_id' => $user->id,
-                'account_id' => $savingsAccount->id,
-                'category_id' => $savingsCategory->id,
-                'type' => 'income',
-                'amount' => $totalSaved,
-                'beneficiary' => 'Clôture budget',
-                'description' => "Économies du mois de {$monthName} {$year}",
-                'date' => now(),
-            ]);
-
-            // Mettre à jour le solde du compte
-            $savingsAccount->increment('balance', $totalSaved);
-
-            $transactionId = $transaction->id;
-        }
+        // Clôturer le cycle actif
+        $activeCycle->update([
+            'end_date' => now(),
+            'status' => 'closed',
+            'total_spent' => $totalExpenses,
+        ]);
 
         // Créer l'enregistrement de clôture
         BudgetClosure::create([
@@ -266,22 +235,14 @@ class CategoryController extends Controller
             'user_id' => $user->id,
             'year' => $year,
             'month' => $month,
-            'total_budget' => $totalBudget,
-            'total_spent' => $totalSpent,
-            'total_saved' => $totalSaved,
-            'transaction_id' => $transactionId,
+            'total_budget' => $totalIncome,
+            'total_spent' => $totalExpenses,
+            'total_saved' => $netBalance,
             'details' => $details,
         ]);
 
-        $months = [
-            1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
-            5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
-            9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
-        ];
-
-        $message = $totalSaved > 0
-            ? "Mois de {$months[$month]} clôturé. " . number_format($totalSaved, 0, ',', ' ') . " FCFA transférés vers Budget économisé."
-            : "Mois de {$months[$month]} clôturé. Aucune économie ce mois-ci.";
+        $status = $netBalance >= 0 ? 'Excédent' : 'Déficit';
+        $message = "{$periodName} clôturé. {$status}: " . number_format(abs($netBalance), 0, ',', ' ') . " FCFA";
 
         return back()->with('success', $message);
     }
