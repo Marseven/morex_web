@@ -16,6 +16,7 @@ class CategorySeeder extends Seeder
             ['name' => 'Logement', 'icon' => 'home', 'color' => '#F59E0B'],
             ['name' => 'Dîmes', 'icon' => 'heart', 'color' => '#8B5CF6'],
             ['name' => 'Abonnements', 'icon' => 'repeat', 'color' => '#EC4899'],
+            ['name' => 'Emilie/Courses', 'icon' => 'shopping-bag', 'color' => '#F472B6'],
             ['name' => 'Alimentation', 'icon' => 'shopping-cart', 'color' => '#F97316'],
             ['name' => 'Transport', 'icon' => 'car', 'color' => '#6366F1'],
             ['name' => 'Sorties/Loisirs', 'icon' => 'smile', 'color' => '#EF4444'],
@@ -24,6 +25,9 @@ class CategorySeeder extends Seeder
             ['name' => 'Divers', 'icon' => 'more-horizontal', 'color' => '#6B7280'],
             ['name' => 'Événements', 'icon' => 'calendar', 'color' => '#A855F7'],
             ['name' => 'Équipement', 'icon' => 'monitor', 'color' => '#0EA5E9'],
+            ['name' => 'Factures', 'icon' => 'file-text', 'color' => '#64748B'],
+            ['name' => 'Restaurants', 'icon' => 'coffee', 'color' => '#FB923C'],
+            ['name' => 'Shopping', 'icon' => 'shopping-bag', 'color' => '#A78BFA'],
         ];
 
         $incomeCategories = [
