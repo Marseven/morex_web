@@ -195,16 +195,11 @@ class February2026Seeder extends Seeder
 
     private function closeJanuary2026($user, $categories): void
     {
-        // Vérifier si Janvier est déjà clôturé
-        $existingClosure = BudgetClosure::where('user_id', $user->id)
+        // Supprimer l'ancienne clôture si elle existe pour recalculer
+        BudgetClosure::where('user_id', $user->id)
             ->where('year', 2026)
             ->where('month', 1)
-            ->first();
-
-        if ($existingClosure) {
-            $this->command->info('Janvier 2026 déjà clôturé.');
-            return;
-        }
+            ->delete();
 
         // Calculer les totaux de Janvier 2026
         $januaryExpenses = Transaction::where('user_id', $user->id)

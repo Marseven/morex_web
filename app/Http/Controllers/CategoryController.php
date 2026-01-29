@@ -45,7 +45,12 @@ class CategoryController extends Controller
         }], 'amount')
         ->orderBy('type')
         ->orderBy('order_index')
-        ->get();
+        ->get()
+        ->map(function ($category) {
+            // S'assurer que spent_this_month est un entier (évite la concaténation de strings en JS)
+            $category->spent_this_month = (int) ($category->spent_this_month ?? 0);
+            return $category;
+        });
 
         // Vérifier si la période en cours a déjà été clôturée
         $currentMonthClosed = $activeCycle === null;
