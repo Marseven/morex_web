@@ -23,21 +23,24 @@ class CategoryController extends Controller
             ->where('status', 'active')
             ->first();
 
-        // Dates de la période budgétaire (format date sans timezone pour comparaison fiable)
-        $startDate = $activeCycle?->start_date?->format('Y-m-d') ?? now()->startOfMonth()->format('Y-m-d');
-        // Si le cycle est actif et end_date est null, c'est une période en cours (pas de limite de fin)
-        $endDate = $activeCycle?->end_date?->format('Y-m-d');
+        // Dates de la période budgétaire
+        $startDateCarbon = $activeCycle?->start_date ?? now()->startOfMonth();
+        $endDateCarbon = $activeCycle?->end_date;
+
+        // Format string pour les requêtes SQL (évite les problèmes de timezone)
+        $startDateStr = $startDateCarbon->format('Y-m-d');
+        $endDateStr = $endDateCarbon?->format('Y-m-d');
 
         $categories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
               ->orWhere('is_system', true);
         })
-        ->withSum(['transactions as spent_this_month' => function ($q) use ($user, $startDate, $endDate) {
+        ->withSum(['transactions as spent_this_month' => function ($q) use ($user, $startDateStr, $endDateStr) {
             $q->where('user_id', $user->id)
               ->where('type', 'expense')
-              ->where('date', '>=', $startDate);
-            if ($endDate) {
-                $q->where('date', '<=', $endDate);
+              ->where('date', '>=', $startDateStr);
+            if ($endDateStr) {
+                $q->where('date', '<=', $endDateStr);
             }
         }], 'amount')
         ->orderBy('type')
@@ -62,11 +65,11 @@ class CategoryController extends Controller
             'currentMonthClosed' => $currentMonthClosed,
             'closures' => $closures,
             'currentMonth' => [
-                'year' => $activeCycle?->start_date?->year ?? now()->year,
-                'month' => $activeCycle?->start_date?->month ?? now()->month,
+                'year' => $startDateCarbon->year,
+                'month' => $startDateCarbon->month,
                 'name' => $currentPeriodName,
-                'start_date' => $startDate?->format('d/m/Y'),
-                'end_date' => $endDate?->format('d/m/Y'),
+                'start_date' => $startDateCarbon->format('d/m/Y'),
+                'end_date' => $endDateCarbon?->format('d/m/Y'),
             ],
             'activeCycle' => $activeCycle,
         ]);
