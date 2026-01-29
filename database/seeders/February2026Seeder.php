@@ -283,16 +283,6 @@ class February2026Seeder extends Seeder
 
     private function openFebruary2026($user): void
     {
-        // Vérifier si un cycle Février existe déjà
-        $existingCycle = BudgetCycle::where('user_id', $user->id)
-            ->where('period_name', 'Février 2026')
-            ->first();
-
-        if ($existingCycle) {
-            $this->command->info('Cycle Février 2026 déjà existant.');
-            return;
-        }
-
         // Budget total depuis les catégories
         $totalBudget = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
@@ -302,17 +292,21 @@ class February2026Seeder extends Seeder
         ->whereNotNull('budget_limit')
         ->sum('budget_limit');
 
-        // Créer le nouveau cycle (commence le 29 janvier, jour après réception salaire)
-        BudgetCycle::create([
-            'user_id' => $user->id,
-            'start_date' => Carbon::create(2026, 1, 29),
-            'end_date' => null,
-            'period_name' => 'Février 2026',
-            'total_budget' => $totalBudget,
-            'total_spent' => 0,
-            'status' => 'active',
-        ]);
+        // Créer ou mettre à jour le cycle Février 2026
+        $cycle = BudgetCycle::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'period_name' => 'Février 2026',
+            ],
+            [
+                'start_date' => Carbon::create(2026, 1, 29),
+                'end_date' => null,
+                'total_budget' => $totalBudget,
+                'total_spent' => 0,
+                'status' => 'active',
+            ]
+        );
 
-        $this->command->info("Cycle Février 2026 ouvert - Budget total: " . number_format($totalBudget, 0, ',', ' ') . " FCFA");
+        $this->command->info("Cycle Février 2026 (début: 29/01/2026) - Budget: " . number_format($totalBudget, 0, ',', ' ') . " FCFA");
     }
 }

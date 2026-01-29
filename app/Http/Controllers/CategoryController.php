@@ -25,14 +25,16 @@ class CategoryController extends Controller
 
         // Dates de la période budgétaire
         $startDate = $activeCycle?->start_date ?? now()->startOfMonth();
-        $endDate = $activeCycle?->end_date ?? now()->endOfMonth();
+        // Si le cycle est actif et end_date est null, c'est une période en cours (pas de limite de fin)
+        $endDate = $activeCycle ? $activeCycle->end_date : now()->endOfMonth();
 
         $categories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
               ->orWhere('is_system', true);
         })
-        ->withSum(['transactions as spent_this_month' => function ($q) use ($startDate, $endDate) {
-            $q->where('type', 'expense')
+        ->withSum(['transactions as spent_this_month' => function ($q) use ($user, $startDate, $endDate) {
+            $q->where('user_id', $user->id)
+              ->where('type', 'expense')
               ->where('date', '>=', $startDate);
             if ($endDate) {
                 $q->where('date', '<=', $endDate);
