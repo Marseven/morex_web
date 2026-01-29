@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\BudgetClosure;
+use App\Models\BudgetCycle;
 use App\Models\Category;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
@@ -15,49 +16,57 @@ class CategoryController extends Controller
 {
     public function index(Request $request): Response
     {
-        $categories = Category::where(function ($q) use ($request) {
-            $q->where('user_id', $request->user()->id)
+        $user = $request->user();
+
+        // Récupérer le cycle budgétaire actif
+        $activeCycle = BudgetCycle::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->first();
+
+        // Dates de la période budgétaire
+        $startDate = $activeCycle?->start_date ?? now()->startOfMonth();
+        $endDate = $activeCycle?->end_date ?? now()->endOfMonth();
+
+        $categories = Category::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
               ->orWhere('is_system', true);
         })
-        ->withSum(['transactions as spent_this_month' => function ($q) {
+        ->withSum(['transactions as spent_this_month' => function ($q) use ($startDate, $endDate) {
             $q->where('type', 'expense')
-              ->whereMonth('date', now()->month)
-              ->whereYear('date', now()->year);
+              ->where('date', '>=', $startDate);
+            if ($endDate) {
+                $q->where('date', '<=', $endDate);
+            }
         }], 'amount')
         ->orderBy('type')
         ->orderBy('order_index')
         ->get();
 
-        // Vérifier si le mois en cours a déjà été clôturé
-        $currentMonthClosed = BudgetClosure::where('user_id', $request->user()->id)
-            ->where('year', now()->year)
-            ->where('month', now()->month)
-            ->exists();
+        // Vérifier si la période en cours a déjà été clôturée
+        $currentMonthClosed = $activeCycle === null;
 
         // Historique des clôtures
-        $closures = BudgetClosure::where('user_id', $request->user()->id)
+        $closures = BudgetClosure::where('user_id', $user->id)
             ->orderBy('year', 'desc')
             ->orderBy('month', 'desc')
             ->limit(12)
             ->get();
 
-        // Nom du mois actuel
-        $months = [
-            1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
-            5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
-            9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
-        ];
-        $currentMonthName = $months[now()->month] . ' ' . now()->year;
+        // Nom de la période actuelle
+        $currentPeriodName = $activeCycle?->period_name ?? 'Aucune période active';
 
         return Inertia::render('Budgets/Index', [
             'categories' => $categories,
             'currentMonthClosed' => $currentMonthClosed,
             'closures' => $closures,
             'currentMonth' => [
-                'year' => now()->year,
-                'month' => now()->month,
-                'name' => $currentMonthName,
+                'year' => $activeCycle?->start_date?->year ?? now()->year,
+                'month' => $activeCycle?->start_date?->month ?? now()->month,
+                'name' => $currentPeriodName,
+                'start_date' => $startDate?->format('d/m/Y'),
+                'end_date' => $endDate?->format('d/m/Y'),
             ],
+            'activeCycle' => $activeCycle,
         ]);
     }
 
