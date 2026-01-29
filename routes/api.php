@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DebtController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\RecurringTransactionController;
+use App\Http\Controllers\Api\BudgetCycleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -67,4 +68,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Synchronisation
     Route::get('/sync/pull', [SyncController::class, 'pull']);
     Route::post('/sync/push', [SyncController::class, 'push']);
+
+    // Cycles budgétaires
+    Route::get('/budget-settings', [BudgetCycleController::class, 'getSettings']);
+    Route::put('/budget-settings', [BudgetCycleController::class, 'updateSettings']);
+    Route::get('/budget-cycles', [BudgetCycleController::class, 'index']);
+    Route::get('/budget-cycles/active', [BudgetCycleController::class, 'active']);
+    Route::post('/budget-cycles/start', [BudgetCycleController::class, 'start']);
+    Route::post('/budget-cycles/close', [BudgetCycleController::class, 'close']);
+    Route::post('/budget-cycles/check-salary', [BudgetCycleController::class, 'checkSalaryTrigger']);
 });
