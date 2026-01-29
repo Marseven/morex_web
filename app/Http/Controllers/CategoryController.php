@@ -23,10 +23,10 @@ class CategoryController extends Controller
             ->where('status', 'active')
             ->first();
 
-        // Dates de la période budgétaire
-        $startDate = $activeCycle?->start_date ?? now()->startOfMonth();
+        // Dates de la période budgétaire (format date sans timezone pour comparaison fiable)
+        $startDate = $activeCycle?->start_date?->format('Y-m-d') ?? now()->startOfMonth()->format('Y-m-d');
         // Si le cycle est actif et end_date est null, c'est une période en cours (pas de limite de fin)
-        $endDate = $activeCycle ? $activeCycle->end_date : now()->endOfMonth();
+        $endDate = $activeCycle?->end_date?->format('Y-m-d');
 
         $categories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)

@@ -270,7 +270,7 @@ class February2026Seeder extends Seeder
 
         if ($activeCycle) {
             $activeCycle->update([
-                'end_date' => Carbon::create(2026, 1, 31),
+                'end_date' => '2026-01-28 23:59:59',
                 'status' => 'closed',
                 'total_spent' => $januaryExpenses,
                 'total_budget' => $totalBudget,
@@ -299,7 +299,7 @@ class February2026Seeder extends Seeder
                 'period_name' => 'Février 2026',
             ],
             [
-                'start_date' => Carbon::create(2026, 1, 29),
+                'start_date' => '2026-01-29 00:00:00',
                 'end_date' => null,
                 'total_budget' => $totalBudget,
                 'total_spent' => 0,
