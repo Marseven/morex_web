@@ -56,34 +56,35 @@ class February2026Seeder extends Seeder
         ];
 
         // ===== DEPENSES =====
+        // Toutes les dépenses datées au 29 janvier 2026 (début période Février)
         $expenses = [
             // Transport
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-01-30'],
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-02-03'],
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-02-10'],
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-02-12'],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-01-29'],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-01-29'],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-01-29'],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-01-29'],
 
             // Alimentation (Petit déjeuner, Déjeuner)
-            ['amount' => 1500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-01-30'],
-            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-02-02'],
-            ['amount' => 3000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'date' => '2026-02-05'],
-            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-02-09'],
-            ['amount' => 2000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'date' => '2026-02-14'],
+            ['amount' => 1500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-01-29'],
+            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-01-29'],
+            ['amount' => 3000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'date' => '2026-01-29'],
+            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-01-29'],
+            ['amount' => 2000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'date' => '2026-01-29'],
 
             // Sorties/Loisirs
-            ['amount' => 4000, 'category' => 'Sorties/Loisirs', 'description' => 'Sortie Loisir', 'date' => '2026-02-07'],
+            ['amount' => 4000, 'category' => 'Sorties/Loisirs', 'description' => 'Sortie Loisir', 'date' => '2026-01-29'],
 
             // Dons
-            ['amount' => 5000, 'category' => 'Fonds d\'Aide/Dons', 'description' => 'Don', 'date' => '2026-01-31'],
+            ['amount' => 5000, 'category' => 'Fonds d\'Aide/Dons', 'description' => 'Don', 'date' => '2026-01-29'],
 
             // Événements (Cotisation décès)
-            ['amount' => 20000, 'category' => 'Événements', 'description' => 'Cotisation décès', 'date' => '2026-02-06'],
+            ['amount' => 20000, 'category' => 'Événements', 'description' => 'Cotisation décès', 'date' => '2026-01-29'],
 
             // Santé
-            ['amount' => 60000, 'category' => 'Santé', 'description' => 'Hôpital', 'date' => '2026-02-15'],
+            ['amount' => 60000, 'category' => 'Santé', 'description' => 'Hôpital', 'date' => '2026-01-29'],
 
             // Divers (Dette ITC)
-            ['amount' => 55000, 'category' => 'Divers', 'description' => 'Dette ITC', 'date' => '2026-02-10'],
+            ['amount' => 55000, 'category' => 'Divers', 'description' => 'Dette ITC', 'date' => '2026-01-29'],
         ];
 
         $now = now();
