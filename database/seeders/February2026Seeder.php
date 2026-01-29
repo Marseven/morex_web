@@ -269,12 +269,10 @@ class February2026Seeder extends Seeder
                 'end_date' => '2026-01-28 23:59:59',
                 'status' => 'closed',
                 'total_spent' => $januaryExpenses,
-                'total_budget' => $totalBudget,
+                'total_budget' => $januaryIncome,
             ]);
             $this->command->info('Cycle Janvier 2026 clôturé.');
         }
-
-        $this->command->info("Janvier 2026 clôturé - Budget: " . number_format($totalBudget, 0, ',', ' ') . " | Dépensé: " . number_format($januaryExpenses, 0, ',', ' ') . " | Économisé: " . number_format($totalSaved, 0, ',', ' '));
     }
 
     private function openFebruary2026($user): void
