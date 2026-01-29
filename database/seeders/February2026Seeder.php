@@ -5,9 +5,13 @@ namespace Database\Seeders;
 use App\Models\Category;
 use App\Models\Account;
 use App\Models\User;
+use App\Models\BudgetClosure;
+use App\Models\BudgetCycle;
+use App\Models\Transaction;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class February2026Seeder extends Seeder
 {
@@ -31,6 +35,12 @@ class February2026Seeder extends Seeder
         $categories = Category::where('is_system', true)
             ->orWhere('user_id', $user->id)
             ->pluck('id', 'name');
+
+        // ===== CLÔTURE JANVIER 2026 =====
+        $this->closeJanuary2026($user, $categories);
+
+        // ===== OUVRIR FÉVRIER 2026 =====
+        $this->openFebruary2026($user);
 
         $this->command->info('Import Février 2026...');
 
@@ -129,5 +139,128 @@ class February2026Seeder extends Seeder
         $this->command->info("Dépenses: " . number_format($totalExpense, 0, ',', ' ') . " FCFA");
         $this->command->info("Solde Février: " . number_format($totalIncome - $totalExpense, 0, ',', ' ') . " FCFA");
         $this->command->info('Import Février 2026 terminé (soldes non impactés).');
+    }
+
+    private function closeJanuary2026($user, $categories): void
+    {
+        // Vérifier si Janvier est déjà clôturé
+        $existingClosure = BudgetClosure::where('user_id', $user->id)
+            ->where('year', 2026)
+            ->where('month', 1)
+            ->first();
+
+        if ($existingClosure) {
+            $this->command->info('Janvier 2026 déjà clôturé.');
+            return;
+        }
+
+        // Calculer les totaux de Janvier 2026
+        $januaryExpenses = Transaction::where('user_id', $user->id)
+            ->where('type', 'expense')
+            ->whereYear('date', 2026)
+            ->whereMonth('date', 1)
+            ->sum('amount');
+
+        // Budget total depuis les catégories
+        $totalBudget = Category::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
+              ->orWhere('is_system', true);
+        })
+        ->where('type', 'expense')
+        ->whereNotNull('budget_limit')
+        ->sum('budget_limit');
+
+        $totalSaved = max(0, $totalBudget - $januaryExpenses);
+
+        // Détails par catégorie
+        $categoriesWithBudget = Category::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
+              ->orWhere('is_system', true);
+        })
+        ->where('type', 'expense')
+        ->whereNotNull('budget_limit')
+        ->where('budget_limit', '>', 0)
+        ->get();
+
+        $details = [];
+        foreach ($categoriesWithBudget as $cat) {
+            $spent = Transaction::where('user_id', $user->id)
+                ->where('category_id', $cat->id)
+                ->where('type', 'expense')
+                ->whereYear('date', 2026)
+                ->whereMonth('date', 1)
+                ->sum('amount');
+
+            $details[] = [
+                'category_id' => $cat->id,
+                'category_name' => $cat->name,
+                'budget' => $cat->budget_limit,
+                'spent' => $spent,
+                'saved' => max(0, $cat->budget_limit - $spent),
+            ];
+        }
+
+        // Créer la clôture
+        BudgetClosure::create([
+            'user_id' => $user->id,
+            'year' => 2026,
+            'month' => 1,
+            'total_budget' => $totalBudget,
+            'total_spent' => $januaryExpenses,
+            'total_saved' => $totalSaved,
+            'details' => $details,
+        ]);
+
+        // Clôturer le cycle actif de Janvier si existant
+        $activeCycle = BudgetCycle::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->first();
+
+        if ($activeCycle) {
+            $activeCycle->update([
+                'end_date' => Carbon::create(2026, 1, 31),
+                'status' => 'closed',
+                'total_spent' => $januaryExpenses,
+                'total_budget' => $totalBudget,
+            ]);
+            $this->command->info('Cycle Janvier 2026 clôturé.');
+        }
+
+        $this->command->info("Janvier 2026 clôturé - Budget: " . number_format($totalBudget, 0, ',', ' ') . " | Dépensé: " . number_format($januaryExpenses, 0, ',', ' ') . " | Économisé: " . number_format($totalSaved, 0, ',', ' '));
+    }
+
+    private function openFebruary2026($user): void
+    {
+        // Vérifier si un cycle Février existe déjà
+        $existingCycle = BudgetCycle::where('user_id', $user->id)
+            ->where('period_name', 'Février 2026')
+            ->first();
+
+        if ($existingCycle) {
+            $this->command->info('Cycle Février 2026 déjà existant.');
+            return;
+        }
+
+        // Budget total depuis les catégories
+        $totalBudget = Category::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
+              ->orWhere('is_system', true);
+        })
+        ->where('type', 'expense')
+        ->whereNotNull('budget_limit')
+        ->sum('budget_limit');
+
+        // Créer le nouveau cycle
+        BudgetCycle::create([
+            'user_id' => $user->id,
+            'start_date' => Carbon::create(2026, 2, 1),
+            'end_date' => null,
+            'period_name' => 'Février 2026',
+            'total_budget' => $totalBudget,
+            'total_spent' => 0,
+            'status' => 'active',
+        ]);
+
+        $this->command->info("Cycle Février 2026 ouvert - Budget total: " . number_format($totalBudget, 0, ',', ' ') . " FCFA");
     }
 }
