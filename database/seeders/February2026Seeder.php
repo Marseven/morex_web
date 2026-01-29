@@ -32,6 +32,9 @@ class February2026Seeder extends Seeder
             return;
         }
 
+        // ===== MIGRATION DES TRANSACTIONS PORTEFEUILLE → COMPTE COURANT =====
+        $this->migratePortefeuilleTransactions($user, $account);
+
         // Charger les catégories
         $categories = Category::where('is_system', true)
             ->orWhere('user_id', $user->id)
@@ -141,6 +144,35 @@ class February2026Seeder extends Seeder
         $this->command->info("Dépenses: " . number_format($totalExpense, 0, ',', ' ') . " FCFA");
         $this->command->info("Solde Février: " . number_format($totalIncome - $totalExpense, 0, ',', ' ') . " FCFA");
         $this->command->info('Import Février 2026 terminé (soldes non impactés).');
+    }
+
+    private function migratePortefeuilleTransactions($user, $compteCourant): void
+    {
+        $portefeuille = Account::where('user_id', $user->id)
+            ->where('name', 'Portefeuille')
+            ->first();
+
+        if (!$portefeuille) {
+            $this->command->info('Compte Portefeuille non trouvé, migration ignorée.');
+            return;
+        }
+
+        // Compter les transactions à migrer
+        $count = DB::table('transactions')
+            ->where('account_id', $portefeuille->id)
+            ->count();
+
+        if ($count === 0) {
+            $this->command->info('Aucune transaction à migrer depuis Portefeuille.');
+            return;
+        }
+
+        // Migrer les transactions vers Compte Courant (sans déclencher les events)
+        DB::table('transactions')
+            ->where('account_id', $portefeuille->id)
+            ->update(['account_id' => $compteCourant->id]);
+
+        $this->command->info("Migré {$count} transactions de Portefeuille → Compte Courant");
     }
 
     private function closeJanuary2026($user, $categories): void
