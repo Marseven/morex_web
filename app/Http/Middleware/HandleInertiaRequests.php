@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\BudgetCycle;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
@@ -52,6 +53,21 @@ class HandleInertiaRequests extends Middleware
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
+            'currentDate' => now()->format('d/m/Y'),
+            'currentBudgetPeriod' => fn () => $this->getCurrentBudgetPeriod($request),
         ];
+    }
+
+    private function getCurrentBudgetPeriod(Request $request): ?string
+    {
+        if (!$request->user()) {
+            return null;
+        }
+
+        $activeCycle = BudgetCycle::where('user_id', $request->user()->id)
+            ->where('status', 'active')
+            ->first();
+
+        return $activeCycle?->period_name;
     }
 }

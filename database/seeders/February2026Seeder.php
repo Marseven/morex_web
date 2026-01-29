@@ -24,10 +24,11 @@ class February2026Seeder extends Seeder
             return;
         }
 
-        $account = Account::where('user_id', $user->id)->where('is_default', true)->first();
+        // Utiliser le Compte Courant (où le salaire est reçu)
+        $account = Account::where('user_id', $user->id)->where('name', 'Compte Courant')->first();
 
         if (!$account) {
-            $this->command->error('Compte principal non trouvé.');
+            $this->command->error('Compte Courant non trouvé.');
             return;
         }
 
@@ -45,40 +46,41 @@ class February2026Seeder extends Seeder
         $this->command->info('Import Février 2026...');
 
         // ===== REVENUS =====
+        // La période budgétaire Février commence le 29 janvier (réception salaire le 27)
         $incomes = [
-            ['amount' => 700000, 'category' => 'Salaire', 'description' => 'Salaire Février', 'day' => 1],
-            ['amount' => 50000, 'category' => 'Projets/Freelance', 'description' => 'Mbira', 'beneficiary' => 'Mbira', 'day' => 5],
+            ['amount' => 700000, 'category' => 'Salaire', 'description' => 'Salaire Février', 'date' => '2026-01-29'],
+            ['amount' => 50000, 'category' => 'Projets/Freelance', 'description' => 'Mbira', 'beneficiary' => 'Mbira', 'date' => '2026-02-05'],
         ];
 
         // ===== DEPENSES =====
         $expenses = [
             // Transport
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'day' => 3],
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'day' => 5],
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'day' => 10],
-            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'day' => 12],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-01-30'],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-02-03'],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-02-10'],
+            ['amount' => 500, 'category' => 'Transport', 'description' => 'Transport', 'date' => '2026-02-12'],
 
             // Alimentation (Petit déjeuner, Déjeuner)
-            ['amount' => 1500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'day' => 3],
-            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'day' => 6],
-            ['amount' => 3000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'day' => 7],
-            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'day' => 9],
-            ['amount' => 2000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'day' => 14],
+            ['amount' => 1500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-01-30'],
+            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-02-02'],
+            ['amount' => 3000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'date' => '2026-02-05'],
+            ['amount' => 500, 'category' => 'Alimentation', 'description' => 'Petit Déjeuner', 'date' => '2026-02-09'],
+            ['amount' => 2000, 'category' => 'Alimentation', 'description' => 'Déjeuner', 'date' => '2026-02-14'],
 
             // Sorties/Loisirs
-            ['amount' => 4000, 'category' => 'Sorties/Loisirs', 'description' => 'Sortie Loisir', 'day' => 11],
+            ['amount' => 4000, 'category' => 'Sorties/Loisirs', 'description' => 'Sortie Loisir', 'date' => '2026-02-07'],
 
             // Dons
-            ['amount' => 5000, 'category' => 'Fonds d\'Aide/Dons', 'description' => 'Don', 'day' => 4],
+            ['amount' => 5000, 'category' => 'Fonds d\'Aide/Dons', 'description' => 'Don', 'date' => '2026-01-31'],
 
             // Événements (Cotisation décès)
-            ['amount' => 20000, 'category' => 'Événements', 'description' => 'Cotisation décès', 'day' => 8],
+            ['amount' => 20000, 'category' => 'Événements', 'description' => 'Cotisation décès', 'date' => '2026-02-06'],
 
             // Santé
-            ['amount' => 60000, 'category' => 'Santé', 'description' => 'Hôpital', 'day' => 15],
+            ['amount' => 60000, 'category' => 'Santé', 'description' => 'Hôpital', 'date' => '2026-02-15'],
 
             // Divers (Dette ITC)
-            ['amount' => 55000, 'category' => 'Divers', 'description' => 'Dette ITC', 'day' => 10],
+            ['amount' => 55000, 'category' => 'Divers', 'description' => 'Dette ITC', 'date' => '2026-02-10'],
         ];
 
         $now = now();
@@ -101,7 +103,7 @@ class February2026Seeder extends Seeder
                 'amount' => $income['amount'],
                 'description' => $income['description'],
                 'beneficiary' => $income['beneficiary'] ?? null,
-                'date' => "2026-02-{$income['day']}",
+                'date' => $income['date'],
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -125,7 +127,7 @@ class February2026Seeder extends Seeder
                 'amount' => $expense['amount'],
                 'description' => $expense['description'],
                 'beneficiary' => $expense['beneficiary'] ?? null,
-                'date' => "2026-02-{$expense['day']}",
+                'date' => $expense['date'],
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -250,10 +252,10 @@ class February2026Seeder extends Seeder
         ->whereNotNull('budget_limit')
         ->sum('budget_limit');
 
-        // Créer le nouveau cycle
+        // Créer le nouveau cycle (commence le 29 janvier, jour après réception salaire)
         BudgetCycle::create([
             'user_id' => $user->id,
-            'start_date' => Carbon::create(2026, 2, 1),
+            'start_date' => Carbon::create(2026, 1, 29),
             'end_date' => null,
             'period_name' => 'Février 2026',
             'total_budget' => $totalBudget,

@@ -15,6 +15,8 @@ import Toast from '@/Components/Toast.vue'
 
 const page = usePage()
 const user = computed(() => page.props.auth?.user)
+const currentDate = computed(() => page.props.currentDate)
+const currentBudgetPeriod = computed(() => page.props.currentBudgetPeriod)
 
 const navigation = [
     { name: 'Dashboard', href: '/', icon: HomeIcon },
@@ -198,6 +200,20 @@ const getInitials = (name) => {
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                     </svg>
                 </button>
+
+                <!-- Date et période budgétaire -->
+                <div class="flex items-center gap-4 text-sm">
+                    <div class="hidden sm:flex items-center gap-2 text-theme-text-secondary">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>{{ currentDate }}</span>
+                    </div>
+                    <div v-if="currentBudgetPeriod" class="flex items-center gap-2 px-2 py-1 bg-theme-surface rounded-md">
+                        <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+                        <span class="text-theme-text-primary font-medium">{{ currentBudgetPeriod }}</span>
+                    </div>
+                </div>
 
                 <div class="flex flex-1 items-center justify-end gap-3">
                     <Link
