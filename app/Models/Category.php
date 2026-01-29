@@ -54,20 +54,15 @@ class Category extends Model
         return $this->hasMany(Transaction::class);
     }
 
-    public function getSpentThisMonthAttribute(): int
-    {
-        return $this->transactions()
-            ->where('type', 'expense')
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->sum('amount');
-    }
+    // spent_this_month est calculé via withSum() dans CategoryController
+    // pour respecter les dates du cycle budgétaire actif
 
     public function getBudgetProgressAttribute(): float
     {
         if (!$this->budget_limit || $this->budget_limit === 0) {
             return 0;
         }
-        return min(100, ($this->spent_this_month / $this->budget_limit) * 100);
+        $spent = $this->spent_this_month ?? 0;
+        return min(100, ($spent / $this->budget_limit) * 100);
     }
 }

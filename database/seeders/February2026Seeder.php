@@ -55,7 +55,7 @@ class February2026Seeder extends Seeder
         // La période budgétaire Février commence le 29 janvier (réception salaire le 27)
         $incomes = [
             ['amount' => 700000, 'category' => 'Salaire', 'description' => 'Salaire Février', 'date' => '2026-01-29'],
-            ['amount' => 50000, 'category' => 'Projets/Freelance', 'description' => 'Mbira', 'beneficiary' => 'Mbira', 'date' => '2026-02-05'],
+            ['amount' => 50000, 'category' => 'Projets/Freelance', 'description' => 'Mbira', 'beneficiary' => 'Mbira', 'date' => '2026-01-29'],
         ];
 
         // ===== DEPENSES =====
