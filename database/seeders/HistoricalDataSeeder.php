@@ -300,7 +300,6 @@ class HistoricalDataSeeder extends Seeder
                 'account_id' => $this->accountId,
                 'category_id' => $categoryId,
                 'beneficiary' => $beneficiary,
-                'sync_status' => 'synced',
             ]
         );
     }
