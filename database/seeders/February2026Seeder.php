@@ -46,6 +46,9 @@ class February2026Seeder extends Seeder
         // ===== OUVRIR FÉVRIER 2026 =====
         $this->openFebruary2026($user);
 
+        // ===== SUPPRIMER LES TRANSACTIONS FÉVRIER EXISTANTES =====
+        $this->cleanupFebruaryTransactions($user);
+
         $this->command->info('Import Février 2026...');
 
         // ===== REVENUS =====
@@ -145,6 +148,20 @@ class February2026Seeder extends Seeder
         $this->command->info("Dépenses: " . number_format($totalExpense, 0, ',', ' ') . " FCFA");
         $this->command->info("Solde Février: " . number_format($totalIncome - $totalExpense, 0, ',', ' ') . " FCFA");
         $this->command->info('Import Février 2026 terminé (soldes non impactés).');
+    }
+
+    private function cleanupFebruaryTransactions($user): void
+    {
+        // Supprimer toutes les transactions de la période Février 2026 (29 jan - 28 fév)
+        $deleted = DB::table('transactions')
+            ->where('user_id', $user->id)
+            ->where('date', '>=', '2026-01-29')
+            ->where('date', '<=', '2026-02-28')
+            ->delete();
+
+        if ($deleted > 0) {
+            $this->command->info("Supprimé {$deleted} transactions existantes de Février 2026.");
+        }
     }
 
     private function migratePortefeuilleTransactions($user, $compteCourant): void
