@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
@@ -7,11 +8,38 @@ import {
     CurrencyDollarIcon,
     CalculatorIcon,
     ExclamationTriangleIcon,
+    LockClosedIcon,
+    ClockIcon,
+    CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
     categories: { type: Array, default: () => [] },
+    currentMonthClosed: { type: Boolean, default: false },
+    closures: { type: Array, default: () => [] },
+    currentMonth: { type: Object, default: () => ({}) },
 })
+
+const isClosing = ref(false)
+const showConfirmModal = ref(false)
+
+const closeMonth = () => {
+    isClosing.value = true
+    router.post('/budgets/close-month', {}, {
+        onFinish: () => {
+            isClosing.value = false
+            showConfirmModal.value = false
+        }
+    })
+}
+
+const getMonthName = (month, year) => {
+    const months = [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ]
+    return months[month - 1] + ' ' + year
+}
 
 const formatAmount = (amount) => {
     return new Intl.NumberFormat('fr-FR').format(amount || 0)
@@ -57,6 +85,32 @@ const overBudgetCount = categoriesWithBudget.filter(c => (c.spent_this_month || 
                 >
                     + Nouvelle catégorie
                 </Link>
+            </div>
+
+            <!-- Current Month Info & Close Button -->
+            <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <ClockIcon class="w-5 h-5 text-theme-text-secondary" />
+                        <div>
+                            <p class="text-sm font-medium text-theme-text-primary">{{ currentMonth.name }}</p>
+                            <p class="text-xs text-theme-text-muted">Période budgétaire en cours</p>
+                        </div>
+                    </div>
+                    <div v-if="currentMonthClosed" class="flex items-center gap-2 text-success">
+                        <CheckCircleIcon class="w-5 h-5" />
+                        <span class="text-sm font-medium">Clôturé</span>
+                    </div>
+                    <button
+                        v-else
+                        @click="showConfirmModal = true"
+                        :disabled="categoriesWithBudget.length === 0"
+                        class="px-4 py-2 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        <LockClosedIcon class="w-4 h-4" />
+                        Clôturer le mois
+                    </button>
+                </div>
             </div>
 
             <!-- Analytics -->
@@ -214,6 +268,103 @@ const overBudgetCount = categoriesWithBudget.filter(c => (c.spent_this_month || 
                     </table>
                 </div>
             </div>
+
+            <!-- Historique des clôtures -->
+            <div v-if="closures.length > 0">
+                <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Historique des clôtures</h2>
+                <div class="bg-theme-card border border-theme-border rounded-lg divide-y divide-theme-border">
+                    <div
+                        v-for="closure in closures"
+                        :key="closure.id"
+                        class="px-4 py-3 flex items-center justify-between"
+                    >
+                        <div class="flex items-center gap-3">
+                            <CheckCircleIcon class="w-4 h-4 text-success" />
+                            <div>
+                                <p class="text-sm font-medium text-theme-text-primary">{{ getMonthName(closure.month, closure.year) }}</p>
+                                <p class="text-xs text-theme-text-muted">
+                                    Budget: {{ formatAmount(closure.total_budget) }} FCFA
+                                    · Dépensé: {{ formatAmount(closure.total_spent) }} FCFA
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-semibold" :class="closure.total_saved > 0 ? 'text-success' : 'text-theme-text-primary'">
+                                {{ closure.total_saved > 0 ? '+' : '' }}{{ formatAmount(closure.total_saved) }} FCFA
+                            </p>
+                            <p class="text-xs text-theme-text-muted">économisé</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- Confirmation Modal -->
+        <Teleport to="body">
+            <div
+                v-if="showConfirmModal"
+                class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                @click.self="showConfirmModal = false"
+            >
+                <div class="bg-theme-card border border-theme-border rounded-xl max-w-md w-full p-6 space-y-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+                            <ExclamationTriangleIcon class="w-5 h-5 text-warning" />
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-theme-text-primary">Clôturer le mois</h3>
+                            <p class="text-sm text-theme-text-secondary">{{ currentMonth.name }}</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <p class="text-sm text-theme-text-secondary">
+                            Cette action va calculer vos économies du mois et les transférer vers le compte "Budget économisé".
+                        </p>
+
+                        <div class="bg-theme-surface rounded-lg p-3 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-theme-text-secondary">Budget total</span>
+                                <span class="text-theme-text-primary font-medium">{{ formatAmount(totalBudget) }} FCFA</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-theme-text-secondary">Dépensé</span>
+                                <span class="text-theme-text-primary font-medium">{{ formatAmount(totalSpent) }} FCFA</span>
+                            </div>
+                            <div class="border-t border-theme-border pt-2 flex justify-between text-sm">
+                                <span class="text-theme-text-secondary font-medium">Économies</span>
+                                <span class="font-semibold" :class="totalBudget - totalSpent >= 0 ? 'text-success' : 'text-danger'">
+                                    {{ formatAmount(Math.max(0, totalBudget - totalSpent)) }} FCFA
+                                </span>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-theme-text-muted">
+                            Cette action est irréversible pour ce mois.
+                        </p>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button
+                            @click="showConfirmModal = false"
+                            class="flex-1 px-4 py-2 border border-theme-border text-theme-text-primary text-sm font-medium rounded-md hover:bg-theme-surface transition-colors"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            @click="closeMonth"
+                            :disabled="isClosing"
+                            class="flex-1 px-4 py-2 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            <svg v-if="isClosing" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            {{ isClosing ? 'Clôture...' : 'Confirmer' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>

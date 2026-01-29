@@ -153,32 +153,32 @@ class SyncController extends Controller
         if (!$modelClass) {
             return [
                 'local_id' => $localId,
+                'type' => $type,
                 'status' => 'error',
                 'message' => "Type inconnu: $type",
             ];
         }
 
         try {
-            switch ($action) {
-                case 'create':
-                    return $this->handleCreate($user, $modelClass, $localId, $data);
+            $result = match ($action) {
+                'create' => $this->handleCreate($user, $modelClass, $localId, $data),
+                'update' => $this->handleUpdate($user, $modelClass, $serverId, $localId, $data, $clientUpdatedAt),
+                'delete' => $this->handleDelete($user, $modelClass, $serverId, $localId, $clientUpdatedAt),
+                default => [
+                    'local_id' => $localId,
+                    'status' => 'error',
+                    'message' => "Action inconnue: $action",
+                ],
+            };
 
-                case 'update':
-                    return $this->handleUpdate($user, $modelClass, $serverId, $localId, $data, $clientUpdatedAt);
+            // Ajouter le type à la réponse pour que le mobile puisse identifier la table
+            $result['type'] = $type;
 
-                case 'delete':
-                    return $this->handleDelete($user, $modelClass, $serverId, $localId, $clientUpdatedAt);
-
-                default:
-                    return [
-                        'local_id' => $localId,
-                        'status' => 'error',
-                        'message' => "Action inconnue: $action",
-                    ];
-            }
+            return $result;
         } catch (\Exception $e) {
             return [
                 'local_id' => $localId,
+                'type' => $type,
                 'status' => 'error',
                 'message' => $e->getMessage(),
             ];

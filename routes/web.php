@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('budgets', CategoryController::class)->parameters([
         'budgets' => 'category',
     ]);
+    Route::post('/budgets/close-month', [CategoryController::class, 'closeBudget'])->name('budgets.close');
 
     // Objectifs
     Route::resource('goals', GoalController::class);

@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
+use App\Models\BudgetClosure;
 use App\Models\Category;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,8 +28,36 @@ class CategoryController extends Controller
         ->orderBy('order_index')
         ->get();
 
+        // Vérifier si le mois en cours a déjà été clôturé
+        $currentMonthClosed = BudgetClosure::where('user_id', $request->user()->id)
+            ->where('year', now()->year)
+            ->where('month', now()->month)
+            ->exists();
+
+        // Historique des clôtures
+        $closures = BudgetClosure::where('user_id', $request->user()->id)
+            ->orderBy('year', 'desc')
+            ->orderBy('month', 'desc')
+            ->limit(12)
+            ->get();
+
+        // Nom du mois actuel
+        $months = [
+            1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
+            5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
+            9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+        ];
+        $currentMonthName = $months[now()->month] . ' ' . now()->year;
+
         return Inertia::render('Budgets/Index', [
             'categories' => $categories,
+            'currentMonthClosed' => $currentMonthClosed,
+            'closures' => $closures,
+            'currentMonth' => [
+                'year' => now()->year,
+                'month' => now()->month,
+                'name' => $currentMonthName,
+            ],
         ]);
     }
 
@@ -90,5 +122,148 @@ class CategoryController extends Controller
 
         return redirect()->route('budgets.index')
             ->with('success', 'Catégorie supprimée avec succès.');
+    }
+
+    /**
+     * Clôture le budget du mois en cours
+     */
+    public function closeBudget(Request $request)
+    {
+        $user = $request->user();
+        $year = now()->year;
+        $month = now()->month;
+
+        // Vérifier si déjà clôturé
+        $existingClosure = BudgetClosure::where('user_id', $user->id)
+            ->where('year', $year)
+            ->where('month', $month)
+            ->first();
+
+        if ($existingClosure) {
+            return back()->with('error', 'Ce mois a déjà été clôturé.');
+        }
+
+        // Récupérer les catégories avec budget et leurs dépenses
+        $categories = Category::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
+              ->orWhere('is_system', true);
+        })
+        ->where('type', 'expense')
+        ->whereNotNull('budget_limit')
+        ->where('budget_limit', '>', 0)
+        ->withSum(['transactions as spent' => function ($q) use ($year, $month) {
+            $q->where('type', 'expense')
+              ->whereMonth('date', $month)
+              ->whereYear('date', $year);
+        }], 'amount')
+        ->get();
+
+        if ($categories->isEmpty()) {
+            return back()->with('error', 'Aucun budget défini à clôturer.');
+        }
+
+        // Calculer les totaux
+        $totalBudget = $categories->sum('budget_limit');
+        $totalSpent = $categories->sum('spent') ?? 0;
+        $totalSaved = max(0, $totalBudget - $totalSpent);
+
+        // Détails par catégorie
+        $details = $categories->map(function ($cat) {
+            return [
+                'category_id' => $cat->id,
+                'category_name' => $cat->name,
+                'budget' => $cat->budget_limit,
+                'spent' => $cat->spent ?? 0,
+                'saved' => max(0, $cat->budget_limit - ($cat->spent ?? 0)),
+            ];
+        })->toArray();
+
+        $transactionId = null;
+
+        // Si il y a des économies, créer la transaction
+        if ($totalSaved > 0) {
+            // Récupérer ou créer le compte "Budget économisé"
+            $savingsAccount = Account::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'name' => 'Budget économisé',
+                ],
+                [
+                    'type' => 'savings',
+                    'initial_balance' => 0,
+                    'balance' => 0,
+                    'color' => '#22C55E',
+                    'icon' => 'piggy-bank',
+                    'is_default' => false,
+                    'order_index' => 999,
+                ]
+            );
+
+            // Récupérer ou créer la catégorie "Épargne budget"
+            $savingsCategory = Category::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'name' => 'Épargne budget',
+                    'type' => 'income',
+                ],
+                [
+                    'icon' => 'savings',
+                    'color' => '#22C55E',
+                    'is_system' => false,
+                    'order_index' => 999,
+                ]
+            );
+
+            // Nom du mois pour la description
+            $months = [
+                1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
+                5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
+                9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+            ];
+            $monthName = $months[$month];
+
+            // Créer la transaction d'économie
+            $transaction = Transaction::create([
+                'id' => Str::uuid(),
+                'user_id' => $user->id,
+                'account_id' => $savingsAccount->id,
+                'category_id' => $savingsCategory->id,
+                'type' => 'income',
+                'amount' => $totalSaved,
+                'beneficiary' => 'Clôture budget',
+                'description' => "Économies du mois de {$monthName} {$year}",
+                'date' => now(),
+            ]);
+
+            // Mettre à jour le solde du compte
+            $savingsAccount->increment('balance', $totalSaved);
+
+            $transactionId = $transaction->id;
+        }
+
+        // Créer l'enregistrement de clôture
+        BudgetClosure::create([
+            'id' => Str::uuid(),
+            'user_id' => $user->id,
+            'year' => $year,
+            'month' => $month,
+            'total_budget' => $totalBudget,
+            'total_spent' => $totalSpent,
+            'total_saved' => $totalSaved,
+            'transaction_id' => $transactionId,
+            'details' => $details,
+        ]);
+
+        $months = [
+            1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
+            5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
+            9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+        ];
+
+        $message = $totalSaved > 0
+            ? "Mois de {$months[$month]} clôturé. " . number_format($totalSaved, 0, ',', ' ') . " FCFA transférés vers Budget économisé."
+            : "Mois de {$months[$month]} clôturé. Aucune économie ce mois-ci.";
+
+        return back()->with('success', $message);
     }
 }
