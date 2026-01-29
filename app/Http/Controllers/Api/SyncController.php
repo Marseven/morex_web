@@ -212,6 +212,23 @@ class SyncController extends Controller
         // Ajouter user_id
         $data['user_id'] = $user->id;
 
+        // Vérifier si un élément similaire existe déjà pour éviter les doublons
+        $existingModel = $this->findExistingModel($user, $modelClass, $data);
+
+        if ($existingModel) {
+            // Mettre à jour l'existant au lieu de créer un doublon
+            unset($data['user_id']);
+            $existingModel->fill($data);
+            $existingModel->save();
+
+            return [
+                'local_id' => $localId,
+                'server_id' => $existingModel->id,
+                'status' => 'success',
+                'action' => 'linked', // Indique qu'on a lié à un existant
+            ];
+        }
+
         $model = $modelClass::create($data);
 
         return [
@@ -220,6 +237,73 @@ class SyncController extends Controller
             'status' => 'success',
             'action' => 'created',
         ];
+    }
+
+    /**
+     * Cherche un modèle existant qui correspondrait aux données
+     */
+    private function findExistingModel($user, string $modelClass, array $data)
+    {
+        $query = $modelClass::where('user_id', $user->id);
+
+        // Critères de correspondance selon le type de modèle
+        switch ($modelClass) {
+            case Account::class:
+                // Un compte avec le même nom
+                if (!empty($data['name'])) {
+                    return $query->where('name', $data['name'])->first();
+                }
+                break;
+
+            case Category::class:
+                // Une catégorie avec le même nom et type
+                if (!empty($data['name']) && !empty($data['type'])) {
+                    return $query->where('name', $data['name'])
+                                ->where('type', $data['type'])
+                                ->first();
+                }
+                break;
+
+            case Goal::class:
+                // Un objectif avec le même nom
+                if (!empty($data['name'])) {
+                    return $query->where('name', $data['name'])->first();
+                }
+                break;
+
+            case Debt::class:
+                // Une dette avec le même nom
+                if (!empty($data['name'])) {
+                    return $query->where('name', $data['name'])->first();
+                }
+                break;
+
+            case RecurringTransaction::class:
+                // Transaction récurrente avec même montant, compte, catégorie et fréquence
+                if (!empty($data['amount']) && !empty($data['account_id']) && !empty($data['frequency'])) {
+                    return $query->where('amount', $data['amount'])
+                                ->where('account_id', $data['account_id'])
+                                ->where('frequency', $data['frequency'])
+                                ->first();
+                }
+                break;
+
+            case Transaction::class:
+                // Les transactions normales peuvent être dupliquées (même montant, même jour = possible)
+                // On ne déduplique pas les transactions sauf si elles ont exactement les mêmes données
+                if (!empty($data['amount']) && !empty($data['date']) && !empty($data['account_id'])) {
+                    return $query->where('amount', $data['amount'])
+                                ->where('date', $data['date'])
+                                ->where('account_id', $data['account_id'])
+                                ->where('category_id', $data['category_id'] ?? null)
+                                ->where('beneficiary', $data['beneficiary'] ?? null)
+                                ->where('description', $data['description'] ?? null)
+                                ->first();
+                }
+                break;
+        }
+
+        return null;
     }
 
     /**
