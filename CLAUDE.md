@@ -121,29 +121,62 @@ Scope: mobile, api, web, docs
 - Ne JAMAIS ajouter `Co-Authored-By:` dans les commits
 - Ne JAMAIS signer les commits (pas de --gpg-sign)
 
-## Architecture Sync (Important)
+## Architecture Sync (IMPORTANT)
 
-**Le Web est la source principale, le Mobile est un client.**
+**Le Web est la SOURCE PRINCIPALE, le Mobile est un CLIENT/CACHE.**
 
-### Principes
-1. **Web = Master** : La base de données web (MySQL) est la source de vérité
-2. **Mobile = Client** : Le mobile synchronise avec le web, pas l'inverse
-3. **Offline-First** : Le mobile fonctionne hors ligne avec SQLite, puis sync quand connecté
+### Principe fondamental
+```
+WEB (MySQL) = Source de vérité, toutes les données vivent ici
+MOBILE (SQLite) = Cache local + stockage temporaire offline
+```
 
-### Catégories
-- **Catégories système** : `user_id = NULL`, partagées par tous, créées via seeder
-- **Catégories utilisateur** : `user_id = X`, spécifiques à un utilisateur
-- Le mobile doit utiliser les catégories du serveur (pas créer de doublons)
-- Les catégories système sont en lecture seule
+### Mode ONLINE (connecté)
+- Mobile AFFICHE les données du web (via cache local)
+- Les calculs/traitements d'affichage peuvent être faits localement
+- Si une donnée est déjà traitée et stockée en ligne → juste l'afficher
+- **TOUTES les opérations CRUD vont DIRECTEMENT au serveur :**
+  ```
+  CREATE  → POST API   → succès → ajouter au cache local
+  UPDATE  → PUT API    → succès → mettre à jour cache local
+  DELETE  → DELETE API → succès → supprimer du cache local
+  ```
+- Le cache local est mis à jour APRÈS confirmation du serveur
+- Pas de stockage local préalable en mode online
 
-### Flux de sync
-1. **Pull** : Mobile récupère les données du serveur (categories système + user)
-2. **Push** : Mobile envoie ses changements locaux
-3. **Matching** : Éviter les doublons par matching nom/type
-4. **Last-write-wins** : En cas de conflit, la version la plus récente gagne
+### Mode OFFLINE
+- La BD locale sert de **CACHE** pour afficher les données
+- Les nouvelles données sont stockées temporairement en local
+- Marquées avec `syncStatus = pending` (en attente d'envoi)
+- Aucune modification des données venues du web (read-only en cache)
+
+### Reconnexion (Sync)
+1. **Push** : Envoie UNIQUEMENT les données créées/modifiées localement
+   - Données avec `syncStatus = pending`
+   - Données SANS `server_id` (jamais envoyées au web)
+2. **Pull** : Récupère les mises à jour du web → met à jour le cache local
+
+### Catégories (cas spécial)
+- **Catégories système** : Définies sur le web (`user_id = NULL`)
+- Le mobile NE DOIT PAS créer de catégories → utiliser celles du serveur
+- À la première connexion, pull les catégories et les cache localement
+- Les catégories sont en lecture seule côté mobile
 
 ### Entités synchronisées
-- Accounts, Categories, Transactions, Goals, Debts, RecurringTransactions, BudgetCycles
+| Entité | Créable sur mobile | Notes |
+|--------|-------------------|-------|
+| Categories | ❌ NON | Viennent du web uniquement |
+| Accounts | ✅ OUI | Sync bidirectionnelle |
+| Transactions | ✅ OUI | Sync bidirectionnelle |
+| Goals | ✅ OUI | Sync bidirectionnelle |
+| Debts | ✅ OUI | Sync bidirectionnelle |
+| RecurringTransactions | ✅ OUI | Sync bidirectionnelle |
+| BudgetCycles | ❌ NON | Calculés sur le web |
+
+### SyncStatus (mobile)
+- `synced` (0) : Donnée venue du web, en cache, ne pas pusher
+- `pending` (1) : Donnée créée/modifiée localement, à envoyer au web
+- `conflict` (2) : Conflit détecté (rare)
 
 ## Points Critiques ⚠️
 
