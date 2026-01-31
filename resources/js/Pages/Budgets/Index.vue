@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
@@ -45,8 +45,8 @@ const formatAmount = (amount) => {
     return new Intl.NumberFormat('fr-FR').format(amount || 0)
 }
 
-const expenseCategories = props.categories.filter(c => c.type === 'expense')
-const incomeCategories = props.categories.filter(c => c.type === 'income')
+const expenseCategories = computed(() => props.categories.filter(c => c.type === 'expense'))
+const incomeCategories = computed(() => props.categories.filter(c => c.type === 'income'))
 
 const deleteCategory = (cat) => {
     if (cat.is_system) {
@@ -63,10 +63,10 @@ const getBudgetProgress = (cat) => {
     return Math.min(100, ((cat.spent_this_month || 0) / cat.budget_limit) * 100)
 }
 
-const totalBudget = expenseCategories.reduce((sum, c) => sum + (c.budget_limit || 0), 0)
-const totalSpent = expenseCategories.reduce((sum, c) => sum + (c.spent_this_month || 0), 0)
-const categoriesWithBudget = expenseCategories.filter(c => c.budget_limit > 0)
-const overBudgetCount = categoriesWithBudget.filter(c => (c.spent_this_month || 0) > c.budget_limit).length
+const totalBudget = computed(() => expenseCategories.value.reduce((sum, c) => sum + (c.budget_limit || 0), 0))
+const totalSpent = computed(() => expenseCategories.value.reduce((sum, c) => sum + (c.spent_this_month || 0), 0))
+const categoriesWithBudget = computed(() => expenseCategories.value.filter(c => c.budget_limit > 0))
+const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c.spent_this_month || 0) > c.budget_limit).length)
 </script>
 
 <template>

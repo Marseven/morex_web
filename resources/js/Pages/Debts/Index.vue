@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
@@ -22,9 +22,9 @@ const formatDate = (date) => {
     return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const activeDebts = props.debts.filter(d => d.status === 'active' && d.type === 'debt')
-const activeCredits = props.debts.filter(d => d.status === 'active' && d.type === 'credit')
-const paidDebts = props.debts.filter(d => d.status === 'paid')
+const activeDebts = computed(() => props.debts.filter(d => d.status === 'active' && d.type === 'debt'))
+const activeCredits = computed(() => props.debts.filter(d => d.status === 'active' && d.type === 'credit'))
+const paidDebts = computed(() => props.debts.filter(d => d.status === 'paid'))
 
 const deleteDebt = (debt) => {
     if (confirm('Supprimer cette entrée ?')) {

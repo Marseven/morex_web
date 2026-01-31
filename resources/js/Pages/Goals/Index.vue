@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
@@ -55,8 +55,8 @@ const submitContribute = (goal) => {
     })
 }
 
-const activeGoals = props.goals.filter(g => g.status === 'active')
-const completedGoals = props.goals.filter(g => g.status === 'completed')
+const activeGoals = computed(() => props.goals.filter(g => g.status === 'active'))
+const completedGoals = computed(() => props.goals.filter(g => g.status === 'completed'))
 
 const getTypeLabel = (type) => {
     const labels = {

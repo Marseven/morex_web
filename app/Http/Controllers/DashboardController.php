@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BudgetCycle;
 use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -19,6 +20,15 @@ class DashboardController extends Controller
         $dateRange = $this->getDateRange($period);
         $startDate = $dateRange['start'];
         $endDate = $dateRange['end'];
+
+        // Récupérer le cycle budgétaire actif pour les budgets
+        $activeCycle = BudgetCycle::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->first();
+
+        // Dates de la période budgétaire
+        $budgetStartDate = $activeCycle?->start_date ?? now()->startOfMonth();
+        $budgetEndDate = $activeCycle?->end_date;
 
         $accounts = $user->accounts()->orderBy('order_index')->get();
         $totalBalance = $accounts->sum('balance');
@@ -49,7 +59,10 @@ class DashboardController extends Controller
             ->take(3)
             ->get();
 
-        // Catégories avec budget pour le mois
+        // Catégories avec budget pour la période budgétaire active
+        $budgetStartStr = $budgetStartDate->format('Y-m-d');
+        $budgetEndStr = $budgetEndDate?->format('Y-m-d');
+
         $budgetCategories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
               ->orWhere('is_system', true);
@@ -57,13 +70,17 @@ class DashboardController extends Controller
         ->whereNotNull('budget_limit')
         ->where('budget_limit', '>', 0)
         ->get()
-        ->map(function ($category) use ($user) {
-            $spent = $user->transactions()
+        ->map(function ($category) use ($user, $budgetStartStr, $budgetEndStr) {
+            $query = $user->transactions()
                 ->where('category_id', $category->id)
                 ->where('type', 'expense')
-                ->whereMonth('date', now()->month)
-                ->whereYear('date', now()->year)
-                ->sum('amount');
+                ->where('date', '>=', $budgetStartStr);
+
+            if ($budgetEndStr) {
+                $query->where('date', '<=', $budgetEndStr);
+            }
+
+            $spent = (int) $query->sum('amount');
 
             return [
                 'id' => $category->id,
