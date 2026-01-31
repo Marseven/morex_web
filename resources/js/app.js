@@ -10,10 +10,41 @@ import { useToast } from './Composables/useToast';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Morex';
 
+// Track last activity time for session refresh
+let lastActivityTime = Date.now();
+const SESSION_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+
+// Update last activity time on user interaction
+['click', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+    document.addEventListener(event, () => {
+        lastActivityTime = Date.now();
+    }, { passive: true });
+});
+
+// Refresh page when tab becomes visible after being idle
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        const idleTime = Date.now() - lastActivityTime;
+        if (idleTime > SESSION_REFRESH_THRESHOLD) {
+            // Page was idle for too long, refresh to ensure fresh data
+            window.location.reload();
+        }
+    }
+});
+
 // Handle global Inertia errors (4XX, 5XX)
 router.on('invalid', (event) => {
     const { error, warning } = useToast();
-    const status = event.detail.response?.status;
+    const response = event.detail.response;
+    const status = response?.status;
+
+    // If the response is a full Inertia response (200 OK but displayed as JSON),
+    // it means the X-Inertia header was lost. Force a full page reload.
+    if (status === 200) {
+        event.preventDefault();
+        window.location.reload();
+        return;
+    }
 
     switch (status) {
         case 401:
@@ -30,6 +61,11 @@ router.on('invalid', (event) => {
         case 404:
             event.preventDefault();
             error('Ressource introuvable.');
+            break;
+        case 409:
+            // Inertia version mismatch - assets have changed
+            event.preventDefault();
+            window.location.reload();
             break;
         case 419:
             event.preventDefault();
@@ -59,6 +95,10 @@ router.on('invalid', (event) => {
             if (status >= 400) {
                 event.preventDefault();
                 error(`Erreur ${status}. Veuillez réessayer.`);
+            } else {
+                // Unknown response, force reload
+                event.preventDefault();
+                window.location.reload();
             }
     }
 });
