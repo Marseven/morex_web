@@ -37,11 +37,10 @@ class SyncController extends Controller
             ->where('updated_at', '>', $since)
             ->get();
 
+        // Ne pas synchroniser les catégories système (user_id = NULL)
+        // Le mobile a ses propres catégories par défaut seedées localement
         $categories = Category::withTrashed()
-            ->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)
-                  ->orWhereNull('user_id'); // Catégories système
-            })
+            ->where('user_id', $user->id)
             ->where('updated_at', '>', $since)
             ->get();
 
