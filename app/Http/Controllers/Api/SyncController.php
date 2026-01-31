@@ -37,10 +37,13 @@ class SyncController extends Controller
             ->where('updated_at', '>', $since)
             ->get();
 
-        // Ne pas synchroniser les catégories système (user_id = NULL)
-        // Le mobile a ses propres catégories par défaut seedées localement
+        // Synchroniser les catégories système ET les catégories utilisateur
+        // Le mobile doit utiliser les catégories du serveur comme référence
         $categories = Category::withTrashed()
-            ->where('user_id', $user->id)
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                  ->orWhereNull('user_id'); // Catégories système
+            })
             ->where('updated_at', '>', $since)
             ->get();
 
@@ -283,9 +286,22 @@ class SyncController extends Controller
             case Category::class:
                 // Une catégorie avec le même nom et type
                 if (!empty($data['name']) && !empty($data['type'])) {
-                    return $query->where('name', $data['name'])
+                    // D'abord chercher dans les catégories de l'utilisateur
+                    $userCategory = $query->where('name', $data['name'])
                                 ->where('type', $data['type'])
                                 ->first();
+                    if ($userCategory) {
+                        return $userCategory;
+                    }
+
+                    // Ensuite chercher dans les catégories système (user_id = NULL)
+                    // Utiliser LOWER/TRIM pour matching insensible à la casse
+                    $systemCategory = Category::whereNull('user_id')
+                                ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$data['name']])
+                                ->where('type', $data['type'])
+                                ->first();
+
+                    return $systemCategory;
                 }
                 break;
 
@@ -344,10 +360,29 @@ class SyncController extends Controller
             ];
         }
 
+        // Chercher d'abord dans les données de l'utilisateur
         $model = $modelClass::withTrashed()
             ->where('id', $serverId)
             ->where('user_id', $user->id)
             ->first();
+
+        // Pour les catégories, vérifier aussi les catégories système
+        if (!$model && $modelClass === Category::class) {
+            $systemCategory = Category::where('id', $serverId)
+                ->whereNull('user_id')
+                ->first();
+
+            if ($systemCategory) {
+                // Les catégories système sont en lecture seule
+                // Retourner succès sans modification (le mobile a déjà les bonnes données)
+                return [
+                    'local_id' => $localId,
+                    'server_id' => $serverId,
+                    'status' => 'success',
+                    'action' => 'unchanged', // Catégorie système non modifiable
+                ];
+            }
+        }
 
         if (!$model) {
             return [
