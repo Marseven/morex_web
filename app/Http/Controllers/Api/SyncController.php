@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\BudgetCycle;
 use App\Models\Category;
 use App\Models\Debt;
 use App\Models\Goal;
@@ -64,6 +65,10 @@ class SyncController extends Controller
             ->where('updated_at', '>', $since)
             ->get();
 
+        $budgetCycles = BudgetCycle::where('user_id', $user->id)
+            ->where('updated_at', '>', $since)
+            ->get();
+
         return response()->json([
             'accounts' => $accounts->map(fn($a) => $this->formatForSync($a)),
             'categories' => $categories->map(fn($c) => $this->formatForSync($c)),
@@ -71,6 +76,7 @@ class SyncController extends Controller
             'goals' => $goals->map(fn($g) => $this->formatForSync($g)),
             'debts' => $debts->map(fn($d) => $this->formatForSync($d)),
             'recurring_transactions' => $recurringTransactions->map(fn($r) => $this->formatForSync($r)),
+            'budget_cycles' => $budgetCycles->map(fn($b) => $this->formatBudgetCycleForSync($b)),
             'sync_timestamp' => now()->toIso8601String(),
         ]);
     }
@@ -132,6 +138,26 @@ class SyncController extends Controller
         $data = $model->toArray();
         $data['is_deleted'] = $model->trashed();
         return $data;
+    }
+
+    /**
+     * Formate un cycle budgétaire pour la sync (dates en ISO)
+     */
+    private function formatBudgetCycleForSync(BudgetCycle $cycle): array
+    {
+        return [
+            'id' => $cycle->id,
+            'start_date' => $cycle->start_date?->toIso8601String(),
+            'end_date' => $cycle->end_date?->toIso8601String(),
+            'period_name' => $cycle->period_name,
+            'total_budget' => $cycle->total_budget,
+            'total_spent' => $cycle->total_spent,
+            'status' => $cycle->status,
+            'trigger_transaction_id' => $cycle->trigger_transaction_id,
+            'created_at' => $cycle->created_at?->toIso8601String(),
+            'updated_at' => $cycle->updated_at?->toIso8601String(),
+            'is_deleted' => false,
+        ];
     }
 
     /**
