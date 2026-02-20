@@ -85,10 +85,12 @@ class RecurringTransactionController extends Controller
     )]
     public function store(Request $request): JsonResponse
     {
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'type' => ['required', 'in:income,expense'],
             'amount' => ['required', 'integer', 'min:1'],
-            'account_id' => ['required', 'uuid', 'exists:accounts,id'],
+            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'category_id' => ['required', 'uuid', 'exists:categories,id'],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -169,10 +171,12 @@ class RecurringTransactionController extends Controller
     {
         $this->authorize('update', $recurringTransaction);
 
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'type' => ['sometimes', 'in:income,expense'],
             'amount' => ['sometimes', 'integer', 'min:1'],
-            'account_id' => ['sometimes', 'uuid', 'exists:accounts,id'],
+            'account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'category_id' => ['sometimes', 'uuid', 'exists:categories,id'],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],

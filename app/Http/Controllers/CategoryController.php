@@ -8,7 +8,7 @@ use App\Models\BudgetCycle;
 use App\Models\Category;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -230,9 +230,7 @@ class CategoryController extends Controller
         ]);
 
         // Créer l'enregistrement de clôture
-        BudgetClosure::create([
-            'id' => Str::uuid(),
-            'user_id' => $user->id,
+        $closure = new BudgetClosure([
             'year' => $year,
             'month' => $month,
             'total_budget' => $totalIncome,
@@ -240,6 +238,8 @@ class CategoryController extends Controller
             'total_saved' => $netBalance,
             'details' => $details,
         ]);
+        $closure->user_id = $user->id;
+        $closure->save();
 
         $status = $netBalance >= 0 ? 'Excédent' : 'Déficit';
         $message = "{$periodName} clôturé. {$status}: " . number_format(abs($netBalance), 0, ',', ' ') . " FCFA";

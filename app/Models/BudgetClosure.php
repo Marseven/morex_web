@@ -11,7 +11,6 @@ class BudgetClosure extends Model
     use HasUuids;
 
     protected $fillable = [
-        'user_id',
         'year',
         'month',
         'total_budget',

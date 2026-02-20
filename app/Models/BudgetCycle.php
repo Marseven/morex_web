@@ -13,7 +13,6 @@ class BudgetCycle extends Model
     use HasUuids;
 
     protected $fillable = [
-        'user_id',
         'start_date',
         'end_date',
         'period_name',
@@ -41,9 +40,9 @@ class BudgetCycle extends Model
     }
 
     /**
-     * Récupère les transactions de ce cycle
+     * Récupère les transactions de ce cycle (retourne un Builder)
      */
-    public function getTransactions()
+    public function transactions()
     {
         $query = Transaction::where('user_id', $this->user_id)
             ->where('date', '>=', $this->start_date);
@@ -60,7 +59,7 @@ class BudgetCycle extends Model
      */
     public function calculateTotalSpent(): int
     {
-        return $this->getTransactions()
+        return $this->transactions()
             ->where('type', 'expense')
             ->sum('amount');
     }
@@ -70,7 +69,7 @@ class BudgetCycle extends Model
      */
     public function calculateTotalIncome(): int
     {
-        return $this->getTransactions()
+        return $this->transactions()
             ->where('type', 'income')
             ->sum('amount');
     }

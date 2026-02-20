@@ -13,7 +13,6 @@ class Debt extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'user_id',
         'name',
         'type',
         'initial_amount',

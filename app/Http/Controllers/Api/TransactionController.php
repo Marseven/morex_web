@@ -100,15 +100,17 @@ class TransactionController extends Controller
     )]
     public function store(Request $request): JsonResponse
     {
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
             'type' => ['required', 'in:expense,income,transfer'],
-            'category_id' => ['nullable', 'uuid', 'exists:categories,id'],
-            'account_id' => ['required', 'uuid', 'exists:accounts,id'],
+            'category_id' => ['nullable', 'uuid', "exists:categories,id"],
+            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['required', 'date'],
-            'transfer_to_account_id' => ['nullable', 'uuid', 'exists:accounts,id', 'different:account_id'],
+            'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:account_id'],
         ]);
 
         if ($validated['type'] === 'transfer' && !isset($validated['transfer_to_account_id'])) {
@@ -180,15 +182,17 @@ class TransactionController extends Controller
     {
         $this->authorize('update', $transaction);
 
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'amount' => ['sometimes', 'integer', 'min:1'],
             'type' => ['sometimes', 'in:expense,income,transfer'],
             'category_id' => ['nullable', 'uuid', 'exists:categories,id'],
-            'account_id' => ['sometimes', 'uuid', 'exists:accounts,id'],
+            'account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['sometimes', 'date'],
-            'transfer_to_account_id' => ['nullable', 'uuid', 'exists:accounts,id'],
+            'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}"],
         ]);
 
         $transaction->update($validated);

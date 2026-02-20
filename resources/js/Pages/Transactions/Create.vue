@@ -49,6 +49,14 @@ const submit = () => {
                 <h1 class="text-lg font-semibold text-theme-text-primary">Nouvelle transaction</h1>
             </div>
 
+            <!-- Validation Errors -->
+            <div v-if="Object.keys(form.errors).length > 0" class="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <p class="text-sm text-red-400 font-medium mb-2">Erreurs de validation :</p>
+                <ul class="list-disc list-inside text-sm text-red-400 space-y-1">
+                    <li v-for="(error, field) in form.errors" :key="field">{{ error }}</li>
+                </ul>
+            </div>
+
             <form @submit.prevent="submit" class="space-y-6">
                 <!-- Type -->
                 <div class="flex gap-1 p-1 bg-theme-card border border-theme-border rounded-md">

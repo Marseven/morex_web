@@ -89,8 +89,23 @@ class SyncController extends Controller
      * POST /api/sync/push
      * Body: { changes: [...], last_sync: "..." }
      */
+    /**
+     * IDs de comptes à recalculer à la fin du push (évite les recalculs redondants)
+     */
+    private array $accountIdsToRecalculate = [];
+
     public function push(Request $request): JsonResponse
     {
+        $request->validate([
+            'changes' => ['required', 'array'],
+            'changes.*.type' => ['required', 'string', 'in:account,category,transaction,goal,debt,recurring_transaction'],
+            'changes.*.action' => ['required', 'string', 'in:create,update,delete'],
+            'changes.*.local_id' => ['nullable', 'string'],
+            'changes.*.server_id' => ['nullable', 'string'],
+            'changes.*.data' => ['nullable', 'array'],
+            'changes.*.updated_at' => ['nullable', 'string'],
+        ]);
+
         $user = $request->user();
         $changes = $request->input('changes', []);
 
@@ -100,19 +115,31 @@ class SyncController extends Controller
             'errors' => [],
         ];
 
+        $this->accountIdsToRecalculate = [];
+
         DB::beginTransaction();
 
         try {
-            foreach ($changes as $change) {
-                $result = $this->processChange($user, $change);
+            // Désactiver les events de Transaction pendant le push
+            // pour éviter les recalculs redondants (N recalculs pour N transactions)
+            Transaction::withoutEvents(function () use ($changes, $user, &$results) {
+                foreach ($changes as $change) {
+                    $result = $this->processChange($user, $change);
 
-                if ($result['status'] === 'success') {
-                    $results['processed'][] = $result;
-                } elseif ($result['status'] === 'conflict') {
-                    $results['conflicts'][] = $result;
-                } else {
-                    $results['errors'][] = $result;
+                    if ($result['status'] === 'success') {
+                        $results['processed'][] = $result;
+                    } elseif ($result['status'] === 'conflict') {
+                        $results['conflicts'][] = $result;
+                    } else {
+                        $results['errors'][] = $result;
+                    }
                 }
+            });
+
+            // Recalculer tous les comptes affectés une seule fois
+            $uniqueAccountIds = array_unique($this->accountIdsToRecalculate);
+            foreach ($uniqueAccountIds as $accountId) {
+                Account::find($accountId)?->recalculateBalance();
             }
 
             DB::commit();
@@ -199,6 +226,11 @@ class SyncController extends Controller
                 ],
             };
 
+            // Collecter les comptes à recalculer pour les transactions
+            if ($type === 'transaction' && $result['status'] === 'success') {
+                $this->collectAccountIds($data, $result['server_id'] ?? null);
+            }
+
             // Ajouter le type à la réponse pour que le mobile puisse identifier la table
             $result['type'] = $type;
 
@@ -210,6 +242,32 @@ class SyncController extends Controller
                 'status' => 'error',
                 'message' => $e->getMessage(),
             ];
+        }
+    }
+
+    /**
+     * Collecte les IDs de comptes affectés par une transaction pour recalcul ultérieur
+     */
+    private function collectAccountIds(array $data, ?string $serverId): void
+    {
+        // Depuis les données du push
+        if (!empty($data['account_id'])) {
+            $this->accountIdsToRecalculate[] = $data['account_id'];
+        }
+        if (!empty($data['transfer_to_account_id'])) {
+            $this->accountIdsToRecalculate[] = $data['transfer_to_account_id'];
+        }
+
+        // Si on a un server_id, récupérer aussi depuis la transaction en BD
+        // (utile pour les updates/deletes où les données peuvent être partielles)
+        if ($serverId) {
+            $transaction = Transaction::withTrashed()->find($serverId);
+            if ($transaction) {
+                $this->accountIdsToRecalculate[] = $transaction->account_id;
+                if ($transaction->transfer_to_account_id) {
+                    $this->accountIdsToRecalculate[] = $transaction->transfer_to_account_id;
+                }
+            }
         }
     }
 
@@ -235,17 +293,20 @@ class SyncController extends Controller
     private function handleCreate($user, string $modelClass, ?string $localId, array $data): array
     {
         // Retirer les champs non-fillable
-        unset($data['id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
+        unset($data['id'], $data['user_id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
 
-        // Ajouter user_id
-        $data['user_id'] = $user->id;
+        // Pour les comptes, s'assurer que balance = initial_balance si non fourni
+        if ($modelClass === Account::class) {
+            if (!isset($data['balance']) && isset($data['initial_balance'])) {
+                $data['balance'] = $data['initial_balance'];
+            }
+        }
 
         // Vérifier si un élément similaire existe déjà pour éviter les doublons
         $existingModel = $this->findExistingModel($user, $modelClass, $data);
 
         if ($existingModel) {
             // Mettre à jour l'existant au lieu de créer un doublon
-            unset($data['user_id']);
             $existingModel->fill($data);
             $existingModel->save();
 
@@ -257,7 +318,9 @@ class SyncController extends Controller
             ];
         }
 
-        $model = $modelClass::create($data);
+        $model = new $modelClass($data);
+        $model->user_id = $user->id;
+        $model->save();
 
         return [
             'local_id' => $localId,

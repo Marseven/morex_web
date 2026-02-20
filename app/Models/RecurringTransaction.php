@@ -13,7 +13,6 @@ class RecurringTransaction extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'user_id',
         'account_id',
         'category_id',
         'type',
@@ -96,8 +95,7 @@ class RecurringTransaction extends Model
      */
     public function generateTransaction(): Transaction
     {
-        return Transaction::create([
-            'user_id' => $this->user_id,
+        $transaction = new Transaction([
             'account_id' => $this->account_id,
             'category_id' => $this->category_id,
             'type' => $this->type,
@@ -106,6 +104,10 @@ class RecurringTransaction extends Model
             'description' => $this->description ?? "Transaction récurrente: {$this->frequency_label}",
             'date' => $this->next_due_date,
         ]);
+        $transaction->user_id = $this->user_id;
+        $transaction->save();
+
+        return $transaction;
     }
 
     /**
@@ -113,16 +115,16 @@ class RecurringTransaction extends Model
      */
     public function updateNextDueDate(): void
     {
-        $this->last_generated_date = $this->next_due_date;
+        $this->last_generated_date = $this->next_due_date->copy();
 
         $nextDate = match ($this->frequency) {
-            'daily' => $this->next_due_date->addDay(),
-            'weekly' => $this->next_due_date->addWeek(),
-            'biweekly' => $this->next_due_date->addWeeks(2),
+            'daily' => $this->next_due_date->copy()->addDay(),
+            'weekly' => $this->next_due_date->copy()->addWeek(),
+            'biweekly' => $this->next_due_date->copy()->addWeeks(2),
             'monthly' => $this->calculateNextMonthlyDate(),
-            'quarterly' => $this->next_due_date->addMonths(3),
-            'yearly' => $this->next_due_date->addYear(),
-            default => $this->next_due_date->addMonth(),
+            'quarterly' => $this->next_due_date->copy()->addMonths(3),
+            'yearly' => $this->next_due_date->copy()->addYear(),
+            default => $this->next_due_date->copy()->addMonth(),
         };
 
         $this->next_due_date = $nextDate;

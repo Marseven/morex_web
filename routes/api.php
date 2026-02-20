@@ -23,13 +23,15 @@ use App\Http\Controllers\Api\BudgetCycleController;
 |
 */
 
-// Routes publiques
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/two-factor-challenge', [AuthController::class, 'twoFactorChallenge']);
+// Routes publiques (rate limited)
+Route::middleware('throttle:5,1')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/two-factor-challenge', [AuthController::class, 'twoFactorChallenge']);
+});
 
 // Routes protégées (nécessitent authentification)
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Utilisateur
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);

@@ -51,7 +51,7 @@ class AccountController extends Controller
                 required: ["name", "type", "initial_balance"],
                 properties: [
                     new OA\Property(property: "name", type: "string", example: "Compte épargne"),
-                    new OA\Property(property: "type", type: "string", enum: ["checking", "savings", "cash", "credit", "investment"]),
+                    new OA\Property(property: "type", type: "string", enum: ["current", "checking", "savings", "cash", "credit", "investment"]),
                     new OA\Property(property: "initial_balance", type: "integer", example: 100000),
                     new OA\Property(property: "color", type: "string", example: "#3B82F6"),
                     new OA\Property(property: "icon", type: "string", example: "wallet"),
@@ -69,7 +69,7 @@ class AccountController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:checking,savings,cash,credit,investment'],
+            'type' => ['required', 'in:current,checking,savings,cash,credit,investment'],
             'initial_balance' => ['required', 'integer'],
             'color' => ['nullable', 'string', 'max:7'],
             'icon' => ['nullable', 'string', 'max:50'],
@@ -126,7 +126,7 @@ class AccountController extends Controller
             content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: "name", type: "string"),
-                    new OA\Property(property: "type", type: "string", enum: ["checking", "savings", "cash", "credit", "investment"]),
+                    new OA\Property(property: "type", type: "string", enum: ["current", "checking", "savings", "cash", "credit", "investment"]),
                     new OA\Property(property: "initial_balance", type: "integer"),
                     new OA\Property(property: "color", type: "string"),
                     new OA\Property(property: "icon", type: "string"),
@@ -148,7 +148,7 @@ class AccountController extends Controller
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'type' => ['sometimes', 'in:checking,savings,cash,credit,investment'],
+            'type' => ['sometimes', 'in:current,checking,savings,cash,credit,investment'],
             'initial_balance' => ['sometimes', 'integer'],
             'color' => ['nullable', 'string', 'max:7'],
             'icon' => ['nullable', 'string', 'max:50'],
@@ -164,9 +164,7 @@ class AccountController extends Controller
                 ->update(['is_default' => false]);
         }
 
-        if (isset($validated['initial_balance'])) {
-            $account->recalculateBalance();
-        }
+        $account->recalculateBalance();
 
         return new AccountResource($account->fresh());
     }

@@ -158,8 +158,7 @@ class BudgetCycleController extends Controller
         ->whereNotNull('budget_limit')
         ->sum('budget_limit');
 
-        $newCycle = BudgetCycle::create([
-            'user_id' => $user->id,
+        $newCycle = new BudgetCycle([
             'start_date' => $startDate,
             'period_name' => $periodName,
             'total_budget' => $totalBudget,
@@ -167,6 +166,8 @@ class BudgetCycleController extends Controller
             'status' => 'active',
             'trigger_transaction_id' => $validated['trigger_transaction_id'] ?? null,
         ]);
+        $newCycle->user_id = $user->id;
+        $newCycle->save();
 
         return response()->json([
             'cycle' => $newCycle,
@@ -277,14 +278,17 @@ class BudgetCycleController extends Controller
         ->whereNotNull('budget_limit')
         ->sum('budget_limit');
 
-        return BudgetCycle::create([
-            'user_id' => $user->id,
+        $cycle = new BudgetCycle([
             'start_date' => $startDate,
             'period_name' => BudgetCycle::generatePeriodName($startDate),
             'total_budget' => $totalBudget,
             'total_spent' => 0,
             'status' => 'active',
         ]);
+        $cycle->user_id = $user->id;
+        $cycle->save();
+
+        return $cycle;
     }
 
     /**

@@ -13,7 +13,6 @@ class Goal extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'user_id',
         'name',
         'type',
         'target_amount',

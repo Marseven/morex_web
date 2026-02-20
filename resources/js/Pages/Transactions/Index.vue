@@ -138,9 +138,14 @@ const deleteTransaction = (tx) => {
                             <td class="px-4 py-3 text-right">
                                 <span
                                     class="text-sm font-medium"
-                                    :class="tx.type === 'income' ? 'text-success' : 'text-theme-text-primary'"
+                                    :class="{
+                                        'text-success': tx.type === 'income',
+                                        'text-blue-400': tx.type === 'transfer',
+                                        'text-theme-text-primary': tx.type === 'expense',
+                                    }"
                                 >
-                                    {{ tx.type === 'income' ? '+' : '-' }}{{ formatAmount(tx.amount) }}
+                                    {{ tx.type === 'income' ? '+' : tx.type === 'transfer' ? '' : '-' }}{{ formatAmount(tx.amount) }}
+                                    <span v-if="tx.type === 'transfer'" class="text-xs text-theme-text-muted block">transfert</span>
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-right">
@@ -163,7 +168,7 @@ const deleteTransaction = (tx) => {
                 <Link
                     v-for="page in transactions.last_page"
                     :key="page"
-                    :href="`/transactions?page=${page}`"
+                    :href="`/transactions?page=${page}${localFilters.type ? '&type=' + localFilters.type : ''}${localFilters.account_id ? '&account_id=' + localFilters.account_id : ''}`"
                     class="px-3 py-1 text-sm rounded-md transition-colors"
                     :class="page === transactions.current_page ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text' : 'text-theme-text-secondary hover:text-theme-text-primary'"
                     preserve-scroll

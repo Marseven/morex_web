@@ -14,9 +14,11 @@ class CategoryPolicy
 
     public function update(User $user, Category $category): bool
     {
-        // Allow updating system categories (name, budget, color, icon)
-        // but they still belong to user through user_id or are shared (is_system)
-        return $category->is_system || $user->id === $category->user_id;
+        // System categories are read-only (only budget_limit can be customized via BudgetSettings)
+        if ($category->is_system) {
+            return false;
+        }
+        return $user->id === $category->user_id;
     }
 
     public function delete(User $user, Category $category): bool

@@ -204,18 +204,24 @@ class HistoricalDataSeeder extends Seeder
 
     private function createAccountIfNeeded(): void
     {
-        $account = Account::firstOrCreate(
-            ['user_id' => $this->userId, 'is_default' => true],
-            [
-                'id' => Str::uuid(),
+        $account = Account::where('user_id', $this->userId)
+            ->where('is_default', true)
+            ->first();
+
+        if (!$account) {
+            $account = new Account([
                 'name' => 'Compte Principal',
                 'type' => 'checking',
                 'balance' => 0,
+                'initial_balance' => 0,
                 'color' => '#6366F1',
                 'icon' => 'wallet',
-                'display_order' => 0,
-            ]
-        );
+                'order_index' => 0,
+                'is_default' => true,
+            ]);
+            $account->user_id = $this->userId;
+            $account->save();
+        }
 
         $this->accountId = $account->id;
         $this->command->info('Compte: ' . $account->name);
@@ -287,21 +293,26 @@ class HistoricalDataSeeder extends Seeder
         $desc = ucfirst(trim($description));
 
         // Éviter les doublons en vérifiant si la transaction existe déjà
-        Transaction::firstOrCreate(
-            [
-                'user_id' => $this->userId,
+        $existing = Transaction::where('user_id', $this->userId)
+            ->where('date', $date)
+            ->where('amount', $amount)
+            ->where('type', $type)
+            ->where('description', $desc)
+            ->first();
+
+        if (!$existing) {
+            $transaction = new Transaction([
                 'date' => $date,
                 'amount' => $amount,
                 'type' => $type,
                 'description' => $desc,
-            ],
-            [
-                'id' => Str::uuid(),
                 'account_id' => $this->accountId,
                 'category_id' => $categoryId,
                 'beneficiary' => $beneficiary,
-            ]
-        );
+            ]);
+            $transaction->user_id = $this->userId;
+            $transaction->save();
+        }
     }
 
     private function extractBeneficiary(string $description): ?string

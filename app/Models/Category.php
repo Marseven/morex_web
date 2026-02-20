@@ -14,14 +14,12 @@ class Category extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'user_id',
         'name',
         'type',
         'icon',
         'color',
         'parent_id',
         'order_index',
-        'is_system',
         'budget_limit',
     ];
 

@@ -75,13 +75,15 @@ class GoalController extends Controller
     )]
     public function store(Request $request): JsonResponse
     {
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:savings,debt,investment,custom'],
+            'type' => ['required', 'in:emergency_fund,savings,debt,investment,custom'],
             'target_amount' => ['required', 'integer', 'min:1'],
             'current_amount' => ['nullable', 'integer', 'min:0'],
             'target_date' => ['nullable', 'date', 'after:today'],
-            'account_id' => ['nullable', 'uuid', 'exists:accounts,id'],
+            'account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'color' => ['nullable', 'string', 'max:7'],
             'icon' => ['nullable', 'string', 'max:50'],
         ]);
@@ -150,13 +152,15 @@ class GoalController extends Controller
     {
         $this->authorize('update', $goal);
 
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'type' => ['sometimes', 'in:savings,debt,investment,custom'],
+            'type' => ['sometimes', 'in:emergency_fund,savings,debt,investment,custom'],
             'target_amount' => ['sometimes', 'integer', 'min:1'],
             'current_amount' => ['sometimes', 'integer', 'min:0'],
             'target_date' => ['nullable', 'date'],
-            'account_id' => ['nullable', 'uuid', 'exists:accounts,id'],
+            'account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'status' => ['sometimes', 'in:active,completed,cancelled'],
             'color' => ['nullable', 'string', 'max:7'],
             'icon' => ['nullable', 'string', 'max:50'],

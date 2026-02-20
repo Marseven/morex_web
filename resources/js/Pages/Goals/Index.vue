@@ -60,6 +60,7 @@ const completedGoals = computed(() => props.goals.filter(g => g.status === 'comp
 
 const getTypeLabel = (type) => {
     const labels = {
+        emergency_fund: 'Fonds d\'urgence',
         savings: 'Épargne',
         debt: 'Remboursement',
         investment: 'Investissement',
