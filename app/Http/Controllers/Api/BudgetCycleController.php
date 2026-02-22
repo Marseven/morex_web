@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
+use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\BudgetSettings;
 use App\Models\Category;
@@ -145,6 +147,12 @@ class BudgetCycleController extends Controller
 
         if ($activeCycle) {
             $activeCycle->close($startDate->copy()->subDay());
+            $activeCycle->createClosure();
+
+            // Recalculer les soldes de tous les comptes
+            Account::where('user_id', $user->id)
+                ->whereNull('deleted_at')
+                ->each(fn ($account) => $account->recalculateBalance());
         }
 
         // Créer le nouveau cycle
@@ -199,10 +207,32 @@ class BudgetCycleController extends Controller
             : now();
 
         $cycle->close($endDate);
+        $closure = $cycle->createClosure();
+
+        // Recalculer les soldes de tous les comptes
+        Account::where('user_id', $request->user()->id)
+            ->whereNull('deleted_at')
+            ->each(fn ($account) => $account->recalculateBalance());
 
         return response()->json([
             'cycle' => $cycle,
+            'closure' => $closure,
             'message' => "Cycle '{$cycle->period_name}' clôturé avec succès.",
+        ]);
+    }
+
+    /**
+     * Liste les bilans mensuels (BudgetClosures) de l'utilisateur
+     */
+    public function closures(Request $request): JsonResponse
+    {
+        $closures = BudgetClosure::where('user_id', $request->user()->id)
+            ->orderBy('year', 'desc')
+            ->orderBy('month', 'desc')
+            ->get();
+
+        return response()->json([
+            'closures' => $closures,
         ]);
     }
 

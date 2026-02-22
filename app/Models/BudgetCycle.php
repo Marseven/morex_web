@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
 
 class BudgetCycle extends Model
@@ -109,6 +108,87 @@ class BudgetCycle extends Model
         $this->end_date = $endDate ?? now()->subDay();
         $this->status = 'closed';
         $this->updateTotals();
+    }
+
+    /**
+     * Crée un snapshot (BudgetClosure) pour ce cycle clôturé
+     */
+    public function createClosure(): BudgetClosure
+    {
+        $totalIncome = $this->calculateTotalIncome();
+        $totalSpent = $this->calculateTotalSpent();
+        $totalSaved = $totalIncome - $totalSpent;
+
+        $totalBudget = Category::where(function ($q) {
+            $q->where('user_id', $this->user_id)
+              ->orWhereNull('user_id');
+        })
+        ->where('type', 'expense')
+        ->whereNotNull('budget_limit')
+        ->sum('budget_limit');
+
+        // Détails par catégorie
+        $categories = Category::where(function ($q) {
+            $q->where('user_id', $this->user_id)
+              ->orWhereNull('user_id');
+        })
+        ->where('type', 'expense')
+        ->get()
+        ->map(function ($category) {
+            $spent = $this->transactions()
+                ->where('type', 'expense')
+                ->where('category_id', $category->id)
+                ->sum('amount');
+
+            return [
+                'id' => $category->id,
+                'name' => $category->name,
+                'budget_limit' => $category->budget_limit ?? 0,
+                'spent' => (int) $spent,
+            ];
+        })
+        ->filter(fn ($cat) => $cat['spent'] > 0 || $cat['budget_limit'] > 0)
+        ->values()
+        ->toArray();
+
+        // Snapshot des soldes de comptes
+        $accountsSnapshot = Account::where('user_id', $this->user_id)
+            ->whereNull('deleted_at')
+            ->get()
+            ->map(fn ($account) => [
+                'id' => $account->id,
+                'name' => $account->name,
+                'balance' => $account->balance,
+            ])
+            ->toArray();
+
+        $details = [
+            'categories' => $categories,
+            'accounts_snapshot' => $accountsSnapshot,
+        ];
+
+        // Déterminer l'année et le mois du cycle
+        $periodDate = $this->start_date;
+        if ($periodDate->day > 15) {
+            $periodDate = $periodDate->copy()->addMonth();
+        }
+
+        $closure = BudgetClosure::updateOrCreate(
+            [
+                'user_id' => $this->user_id,
+                'year' => $periodDate->year,
+                'month' => $periodDate->month,
+            ],
+            [
+                'total_income' => $totalIncome,
+                'total_budget' => $totalBudget,
+                'total_spent' => $totalSpent,
+                'total_saved' => $totalSaved,
+                'details' => $details,
+            ]
+        );
+
+        return $closure;
     }
 
     /**

@@ -79,4 +79,5 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/budget-cycles/start', [BudgetCycleController::class, 'start']);
     Route::post('/budget-cycles/close', [BudgetCycleController::class, 'close']);
     Route::post('/budget-cycles/check-salary', [BudgetCycleController::class, 'checkSalaryTrigger']);
+    Route::get('/budget-closures', [BudgetCycleController::class, 'closures']);
 });

@@ -13,6 +13,7 @@ class BudgetClosure extends Model
     protected $fillable = [
         'year',
         'month',
+        'total_income',
         'total_budget',
         'total_spent',
         'total_saved',
@@ -22,6 +23,7 @@ class BudgetClosure extends Model
 
     protected $casts = [
         'details' => 'array',
+        'total_income' => 'integer',
         'total_budget' => 'integer',
         'total_spent' => 'integer',
         'total_saved' => 'integer',

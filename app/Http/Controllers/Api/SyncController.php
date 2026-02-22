@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\Category;
 use App\Models\Debt;
@@ -71,6 +72,10 @@ class SyncController extends Controller
             ->where('updated_at', '>', $since)
             ->get();
 
+        $budgetClosures = BudgetClosure::where('user_id', $user->id)
+            ->where('updated_at', '>', $since)
+            ->get();
+
         return response()->json([
             'accounts' => $accounts->map(fn($a) => $this->formatForSync($a)),
             'categories' => $categories->map(fn($c) => $this->formatForSync($c)),
@@ -79,6 +84,7 @@ class SyncController extends Controller
             'debts' => $debts->map(fn($d) => $this->formatForSync($d)),
             'recurring_transactions' => $recurringTransactions->map(fn($r) => $this->formatForSync($r)),
             'budget_cycles' => $budgetCycles->map(fn($b) => $this->formatBudgetCycleForSync($b)),
+            'budget_closures' => $budgetClosures,
             'sync_timestamp' => now()->toIso8601String(),
         ]);
     }
