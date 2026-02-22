@@ -164,17 +164,22 @@ const deleteTransaction = (tx) => {
             </div>
 
             <!-- Pagination -->
-            <div v-if="transactions.last_page > 1" class="flex justify-center gap-1">
-                <Link
-                    v-for="page in transactions.last_page"
-                    :key="page"
-                    :href="`/transactions?page=${page}${localFilters.type ? '&type=' + localFilters.type : ''}${localFilters.account_id ? '&account_id=' + localFilters.account_id : ''}`"
-                    class="px-3 py-1 text-sm rounded-md transition-colors"
-                    :class="page === transactions.current_page ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text' : 'text-theme-text-secondary hover:text-theme-text-primary'"
-                    preserve-scroll
-                >
-                    {{ page }}
-                </Link>
+            <div v-if="transactions.last_page > 1" class="flex items-center justify-center gap-1">
+                <template v-for="(link, index) in transactions.links" :key="index">
+                    <Link
+                        v-if="link.url"
+                        :href="link.url"
+                        class="px-3 py-1 text-sm rounded-md transition-colors"
+                        :class="link.active ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text' : 'text-theme-text-secondary hover:text-theme-text-primary'"
+                        preserve-scroll
+                        v-html="link.label"
+                    />
+                    <span
+                        v-else
+                        class="px-3 py-1 text-sm text-theme-text-muted"
+                        v-html="link.label"
+                    />
+                </template>
             </div>
         </div>
     </AppLayout>
