@@ -50,8 +50,9 @@ class SyncAccountBalances extends Command
             return;
         }
 
-        $headers = ['Compte', 'Solde Initial', 'Solde Calculé', 'Écart'];
+        $headers = ['Compte', 'Solde Initial', 'Revenus', 'Dépenses', 'Transf. ↑', 'Transf. ↓', 'Solde Calculé', 'Solde DB', 'Écart'];
         $rows = [];
+        $fmt = fn($v) => number_format($v, 0, ',', ' ');
 
         foreach ($accounts as $account) {
             // Calculer le solde basé sur les transactions
@@ -65,13 +66,20 @@ class SyncAccountBalances extends Command
 
             $rows[] = [
                 $account->name,
-                number_format($account->initial_balance, 0, ',', ' '),
-                number_format($calculatedBalance, 0, ',', ' '),
-                $ecart != 0 ? number_format($ecart, 0, ',', ' ') : '✓',
+                $fmt($account->initial_balance),
+                $income ? '+' . $fmt($income) : '0',
+                $expense ? '-' . $fmt($expense) : '0',
+                $transfersIn ? '+' . $fmt($transfersIn) : '0',
+                $transfersOut ? '-' . $fmt($transfersOut) : '0',
+                $fmt($calculatedBalance),
+                $fmt($account->balance),
+                $ecart != 0 ? $fmt($ecart) : '✓',
             ];
         }
 
         $this->table($headers, $rows);
+        $this->line('  Solde Calculé = Initial + Revenus - Dépenses + Transf.↑ - Transf.↓');
+        $this->line('  Écart = Solde DB - Solde Calculé');
 
         if ($this->option('show')) {
             return;

@@ -66,17 +66,12 @@ class Account extends Model
     }
 
     /**
-     * Adjust initial_balance so that calculated balance equals the desired real balance.
-     * Formula: new_initial = desired - income + expense + transfersOut - transfersIn
+     * Set the real balance directly in DB. No recalculation.
+     * The calculated balance (from transactions) is for analysis only.
      */
     public function adjustToBalance(int $desiredBalance): void
     {
-        $income = $this->transactions()->where('type', 'income')->sum('amount');
-        $expense = $this->transactions()->where('type', 'expense')->sum('amount');
-        $transfersOut = $this->transactions()->where('type', 'transfer')->sum('amount');
-        $transfersIn = $this->incomingTransfers()->sum('amount');
-
-        $this->initial_balance = $desiredBalance - $income + $expense + $transfersOut - $transfersIn;
+        $this->initial_balance = $desiredBalance;
         $this->balance = $desiredBalance;
         $this->save();
     }
