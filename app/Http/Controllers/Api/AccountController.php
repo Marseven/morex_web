@@ -193,6 +193,43 @@ class AccountController extends Controller
     }
 
     #[OA\Post(
+        path: "/accounts/{id}/adjust-balance",
+        summary: "Ajuster le solde réel d'un compte",
+        tags: ["Accounts"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["balance"],
+                properties: [
+                    new OA\Property(property: "balance", type: "integer", example: 500000, description: "Le solde réel du compte"),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Solde ajusté", content: new OA\JsonContent(ref: "#/components/schemas/Account")),
+            new OA\Response(response: 422, description: "Erreur de validation"),
+            new OA\Response(response: 404, description: "Compte non trouvé"),
+            new OA\Response(response: 401, description: "Non authentifié"),
+        ]
+    )]
+    public function adjustBalance(Request $request, Account $account): AccountResource
+    {
+        $this->authorize('update', $account);
+
+        $validated = $request->validate([
+            'balance' => ['required', 'integer'],
+        ]);
+
+        $account->adjustToBalance($validated['balance']);
+
+        return new AccountResource($account->fresh());
+    }
+
+    #[OA\Post(
         path: "/accounts/reorder",
         summary: "Réordonner les comptes",
         tags: ["Accounts"],

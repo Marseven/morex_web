@@ -80,24 +80,42 @@ class SyncAccountBalances extends Command
         if ($this->option('reset')) {
             $this->newLine();
             $this->warn('Mode RESET: Les soldes initiaux vont être mis à jour.');
+            $this->line('  Entrez un montant absolu (ex: 500000) ou relatif (ex: +5000, -3000)');
             $this->newLine();
 
             foreach ($accounts as $account) {
-                $this->line("  Compte: {$account->name}");
-                $newInitialBalance = $this->ask(
-                    "    Nouveau solde réel pour '{$account->name}' (actuel: " . number_format($account->balance, 0, ',', ' ') . ")",
-                    $account->balance
+                $currentBalance = $account->balance;
+                $this->line("  Compte: {$account->name} (solde actuel: " . number_format($currentBalance, 0, ',', ' ') . " FCFA)");
+
+                $input = $this->ask(
+                    "    Nouveau solde réel (ou +/- pour ajuster)",
+                    (string) $currentBalance
                 );
 
+                $trimmed = trim((string) $input);
+
+                if (!is_numeric($trimmed)) {
+                    $this->error("    ✗ Valeur invalide: {$trimmed} (ignoré)");
+                    continue;
+                }
+
+                // Relative adjustment (+5000 or -3000) vs absolute value
+                if (str_starts_with($trimmed, '+') || str_starts_with($trimmed, '-')) {
+                    $newBalance = $currentBalance + (int) $trimmed;
+                    $this->line("    Ajustement: " . number_format($currentBalance, 0, ',', ' ') . " " . ($trimmed[0] === '+' ? '+' : '') . number_format((int) $trimmed, 0, ',', ' '));
+                } else {
+                    $newBalance = (int) $trimmed;
+                }
+
                 $account->update([
-                    'initial_balance' => (int) $newInitialBalance,
-                    'balance' => (int) $newInitialBalance,
+                    'initial_balance' => $newBalance,
+                    'balance' => $newBalance,
                 ]);
 
-                $this->info("    → Solde mis à jour: " . number_format($newInitialBalance, 0, ',', ' ') . " FCFA");
+                $this->info("    → Solde mis à jour: " . number_format($newBalance, 0, ',', ' ') . " FCFA");
+                $this->newLine();
             }
 
-            $this->newLine();
             $this->info('Soldes synchronisés avec succès.');
         } else {
             $this->newLine();

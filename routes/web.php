@@ -40,6 +40,7 @@ Route::middleware('auth')->group(function () {
 
     // Comptes
     Route::resource('accounts', AccountController::class);
+    Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('accounts.adjust-balance');
 
     // Transactions
     Route::resource('transactions', TransactionController::class);

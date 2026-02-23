@@ -38,6 +38,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Comptes
     Route::apiResource('accounts', AccountController::class)->names('api.accounts');
+    Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('api.accounts.adjust-balance');
     Route::post('/accounts/reorder', [AccountController::class, 'reorder'])->name('api.accounts.reorder');
 
     // Catégories

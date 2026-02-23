@@ -15,8 +15,20 @@ class AccountController extends Controller
             ->accounts()
             ->withSum(['transactions as income_total' => fn($q) => $q->where('type', 'income')], 'amount')
             ->withSum(['transactions as expense_total' => fn($q) => $q->where('type', 'expense')], 'amount')
+            ->withSum(['transactions as transfers_out_total' => fn($q) => $q->where('type', 'transfer')], 'amount')
+            ->withSum(['incomingTransfers as transfers_in_total'], 'amount')
             ->orderBy('order_index')
-            ->get();
+            ->get()
+            ->map(function ($account) {
+                $calculated = $account->initial_balance
+                    + ($account->income_total ?? 0)
+                    - ($account->expense_total ?? 0)
+                    - ($account->transfers_out_total ?? 0)
+                    + ($account->transfers_in_total ?? 0);
+                $account->calculated_balance = $calculated;
+                $account->ecart = $account->balance - $calculated;
+                return $account;
+            });
 
         return Inertia::render('Accounts/Index', [
             'accounts' => $accounts,
@@ -102,5 +114,19 @@ class AccountController extends Controller
 
         return redirect()->route('accounts.index')
             ->with('success', 'Compte supprimé avec succès.');
+    }
+
+    public function adjustBalance(Request $request, Account $account)
+    {
+        $this->authorize('update', $account);
+
+        $validated = $request->validate([
+            'balance' => ['required', 'integer'],
+        ]);
+
+        $account->adjustToBalance($validated['balance']);
+
+        return redirect()->route('accounts.index')
+            ->with('success', "Solde de \"{$account->name}\" ajusté avec succès.");
     }
 }
