@@ -35,19 +35,32 @@ class DiagnoseBudgetCycles extends Command
             $this->line("  Start: {$cycle->start_date->format('Y-m-d')}");
             $this->line("  End:   {$cycle->end_date->format('Y-m-d')}");
 
-            // Vérifier si end_date pointe sur le mois suivant
-            $expectedEndMonth = $cycle->start_date->month;
-            $actualEndMonth = $cycle->end_date->month;
+            // Vérifier si end_date est cohérent avec period_name
+            // Ex: "Février 2026" doit avoir end_date en février
+            if (preg_match('/(\w+)\s+(\d{4})/', $cycle->period_name, $matches)) {
+                $monthName = $matches[1];
+                $yearName = (int) $matches[2];
 
-            if ($actualEndMonth != $expectedEndMonth && $actualEndMonth == $cycle->start_date->copy()->addMonth()->month) {
-                $this->warn("  ⚠️  end_date pointe sur le mois suivant !");
-                $correctEndDate = $cycle->end_date->copy()->subDay();
-                $this->line("  → Devrait être: {$correctEndDate->format('Y-m-d')}");
-
-                $problems[] = [
-                    'cycle' => $cycle,
-                    'correct_end_date' => $correctEndDate,
+                $monthMap = [
+                    'Janvier' => 1, 'Février' => 2, 'Mars' => 3, 'Avril' => 4,
+                    'Mai' => 5, 'Juin' => 6, 'Juillet' => 7, 'Août' => 8,
+                    'Septembre' => 9, 'Octobre' => 10, 'Novembre' => 11, 'Décembre' => 12,
                 ];
+
+                $expectedMonth = $monthMap[$monthName] ?? null;
+
+                if ($expectedMonth && $cycle->end_date->month !== $expectedMonth) {
+                    $this->warn("  ⚠️  end_date ({$cycle->end_date->format('Y-m-d')}) ne correspond pas au nom '{$cycle->period_name}' !");
+
+                    // Calculer le dernier jour du mois attendu
+                    $correctEndDate = \Carbon\Carbon::create($yearName, $expectedMonth, 1)->endOfMonth();
+                    $this->line("  → Devrait être: {$correctEndDate->format('Y-m-d')} (dernier jour de {$monthName})");
+
+                    $problems[] = [
+                        'cycle' => $cycle,
+                        'correct_end_date' => $correctEndDate,
+                    ];
+                }
             }
 
             // Compter les transactions du cycle
