@@ -181,7 +181,6 @@ class BudgetCycle extends Model
                 'month' => $lastDayOfCycle->month,
             ],
             [
-                'user_id' => $this->user_id, // Nécessaire pour l'insertion
                 'total_income' => $totalIncome,
                 'total_budget' => $totalBudget,
                 'total_spent' => $totalSpent,
@@ -189,6 +188,13 @@ class BudgetCycle extends Model
                 'details' => $details,
             ]
         );
+
+        // user_id n'est pas dans fillable (mass assignment protection)
+        // On l'assigne manuellement pour les nouvelles insertions
+        if ($closure->wasRecentlyCreated) {
+            $closure->user_id = $this->user_id;
+            $closure->save();
+        }
 
         return $closure;
     }
