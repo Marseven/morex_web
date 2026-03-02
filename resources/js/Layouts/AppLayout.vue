@@ -9,6 +9,7 @@ import {
     FlagIcon,
     CreditCardIcon,
     ChartBarIcon,
+    CalendarIcon,
     ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 import Toast from '@/Components/Toast.vue'
@@ -23,6 +24,7 @@ const navigation = [
     { name: 'Transactions', href: '/transactions', icon: ArrowsRightLeftIcon },
     { name: 'Comptes', href: '/accounts', icon: WalletIcon },
     { name: 'Budgets', href: '/budgets', icon: ChartPieIcon },
+    { name: 'Cycles', href: '/budget-cycles', icon: CalendarIcon },
     { name: 'Objectifs', href: '/goals', icon: FlagIcon },
     { name: 'Dettes', href: '/debts', icon: CreditCardIcon },
     { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },

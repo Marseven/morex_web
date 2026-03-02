@@ -11,6 +11,7 @@ use App\Http\Controllers\DebtController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\TwoFactorAuthController;
+use App\Http\Controllers\BudgetCycleController;
 use Illuminate\Support\Facades\Route;
 
 // Routes d'authentification (publiques)
@@ -50,6 +51,11 @@ Route::middleware('auth')->group(function () {
         'budgets' => 'category',
     ]);
     Route::post('/budgets/close-month', [CategoryController::class, 'closeBudget'])->name('budgets.close');
+
+    // Cycles budgétaires
+    Route::get('/budget-cycles', [BudgetCycleController::class, 'index'])->name('budget-cycles.index');
+    Route::post('/budget-cycles/start', [BudgetCycleController::class, 'start'])->name('budget-cycles.start');
+    Route::post('/budget-cycles/close', [BudgetCycleController::class, 'close'])->name('budget-cycles.close');
 
     // Objectifs
     Route::resource('goals', GoalController::class);

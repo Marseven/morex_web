@@ -167,17 +167,15 @@ class BudgetCycle extends Model
             'accounts_snapshot' => $accountsSnapshot,
         ];
 
-        // Déterminer l'année et le mois du cycle
-        $periodDate = $this->start_date;
-        if ($periodDate->day > 15) {
-            $periodDate = $periodDate->copy()->addMonth();
-        }
+        // Déterminer l'année et le mois du cycle basé sur la date de FIN
+        // Un cycle qui se termine le 28/02/2026 doit créer un closure pour "Février 2026"
+        $closureDate = $this->end_date ?? now();
 
         $closure = BudgetClosure::updateOrCreate(
             [
                 'user_id' => $this->user_id,
-                'year' => $periodDate->year,
-                'month' => $periodDate->month,
+                'year' => $closureDate->year,
+                'month' => $closureDate->month,
             ],
             [
                 'total_income' => $totalIncome,
