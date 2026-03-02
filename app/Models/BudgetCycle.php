@@ -181,6 +181,7 @@ class BudgetCycle extends Model
                 'month' => $lastDayOfCycle->month,
             ],
             [
+                'user_id' => $this->user_id, // Nécessaire pour l'insertion
                 'total_income' => $totalIncome,
                 'total_budget' => $totalBudget,
                 'total_spent' => $totalSpent,
