@@ -11,6 +11,7 @@ class BudgetClosure extends Model
     use HasUuids;
 
     protected $fillable = [
+        'user_id', // Nécessaire pour updateOrCreate (lookup key)
         'year',
         'month',
         'total_income',
