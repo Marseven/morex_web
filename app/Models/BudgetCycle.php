@@ -167,15 +167,16 @@ class BudgetCycle extends Model
             'accounts_snapshot' => $accountsSnapshot,
         ];
 
-        // Déterminer l'année et le mois du cycle basé sur la date de FIN
-        // Un cycle qui se termine le 28/02/2026 doit créer un closure pour "Février 2026"
-        $closureDate = $this->end_date ?? now();
+        // Déterminer l'année et le mois du cycle basé sur le DERNIER JOUR du cycle
+        // end_date est le jour APRÈS la fin (ex: cycle Février terminé le 01/03 → closure pour Février)
+        // Donc on prend end_date - 1 jour pour avoir le vrai dernier jour du cycle
+        $lastDayOfCycle = $this->end_date ? $this->end_date->copy()->subDay() : now();
 
         $closure = BudgetClosure::updateOrCreate(
             [
                 'user_id' => $this->user_id,
-                'year' => $closureDate->year,
-                'month' => $closureDate->month,
+                'year' => $lastDayOfCycle->year,
+                'month' => $lastDayOfCycle->month,
             ],
             [
                 'total_income' => $totalIncome,
