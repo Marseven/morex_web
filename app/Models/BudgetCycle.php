@@ -47,6 +47,8 @@ class BudgetCycle extends Model
             ->where('date', '>=', $this->start_date);
 
         if ($this->end_date) {
+            // end_date stocke le dernier jour INCLUS du cycle
+            // Donc on utilise <= pour l'inclure
             $query->where('date', '<=', $this->end_date);
         }
 
