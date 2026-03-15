@@ -21,6 +21,7 @@ class Transaction extends Model
         'description',
         'date',
         'transfer_to_account_id',
+        'status',
     ];
 
     protected function casts(): array
@@ -61,51 +62,48 @@ class Transaction extends Model
         return match ($this->type) {
             'income' => $this->amount,
             'expense' => -$this->amount,
-            'transfer' => -$this->amount,
             default => $this->amount,
         };
     }
 
     protected static function booted(): void
     {
-        static::created(function (Transaction $transaction) {
-            $transaction->account->recalculateBalance();
-            if ($transaction->transfer_to_account_id) {
-                $transaction->transferToAccount->recalculateBalance();
+        $updateBudgetCycle = function (Transaction $transaction) {
+            if (in_array($transaction->type, ['expense', 'income'])) {
+                $activeCycle = BudgetCycle::where('user_id', $transaction->user_id)
+                    ->where('status', 'active')
+                    ->whereDate('start_date', '<=', $transaction->date)
+                    ->where(function ($q) use ($transaction) {
+                        $q->whereNull('end_date')
+                          ->orWhereDate('end_date', '>=', $transaction->date);
+                    })
+                    ->first();
+                $activeCycle?->updateTotals();
             }
+        };
+
+        static::created(function (Transaction $transaction) use ($updateBudgetCycle) {
+            $transaction->account->recalculateBalance();
+            $updateBudgetCycle($transaction);
         });
 
-        static::updated(function (Transaction $transaction) {
+        static::updated(function (Transaction $transaction) use ($updateBudgetCycle) {
             $transaction->account->recalculateBalance();
-            if ($transaction->transfer_to_account_id) {
-                $transaction->transferToAccount->recalculateBalance();
-            }
-            // Recalculer l'ancien compte source si changé
             if ($transaction->wasChanged('account_id')) {
                 $originalAccountId = $transaction->getOriginal('account_id');
                 Account::find($originalAccountId)?->recalculateBalance();
             }
-            // Recalculer l'ancien compte destination si changé
-            if ($transaction->wasChanged('transfer_to_account_id')) {
-                $originalTransferAccountId = $transaction->getOriginal('transfer_to_account_id');
-                if ($originalTransferAccountId) {
-                    Account::find($originalTransferAccountId)?->recalculateBalance();
-                }
-            }
+            $updateBudgetCycle($transaction);
         });
 
-        static::deleted(function (Transaction $transaction) {
+        static::deleted(function (Transaction $transaction) use ($updateBudgetCycle) {
             $transaction->account->recalculateBalance();
-            if ($transaction->transfer_to_account_id) {
-                $transaction->transferToAccount->recalculateBalance();
-            }
+            $updateBudgetCycle($transaction);
         });
 
-        static::restored(function (Transaction $transaction) {
+        static::restored(function (Transaction $transaction) use ($updateBudgetCycle) {
             $transaction->account->recalculateBalance();
-            if ($transaction->transfer_to_account_id) {
-                $transaction->transferToAccount->recalculateBalance();
-            }
+            $updateBudgetCycle($transaction);
         });
     }
 }

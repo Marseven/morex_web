@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DebtResource;
 use App\Models\Debt;
+use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class DebtController extends Controller
@@ -85,6 +87,8 @@ class DebtController extends Controller
     )]
     public function store(Request $request): JsonResponse
     {
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:debt,credit'],
@@ -95,13 +99,38 @@ class DebtController extends Controller
             'contact_name' => ['nullable', 'string', 'max:255'],
             'contact_phone' => ['nullable', 'string', 'max:20'],
             'color' => ['nullable', 'string', 'max:7'],
+            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
         ]);
 
-        $debt = $request->user()->debts()->create([
-            ...$validated,
-            'current_amount' => $validated['current_amount'] ?? $validated['initial_amount'],
-            'status' => 'active',
-        ]);
+        $debt = null;
+
+        DB::transaction(function () use ($request, $validated, &$debt) {
+            $debt = $request->user()->debts()->create([
+                ...$validated,
+                'current_amount' => $validated['current_amount'] ?? $validated['initial_amount'],
+                'status' => 'active',
+            ]);
+
+            // Create initial transaction reflecting the debt
+            // credit (on me doit / j'ai prete) -> expense from my account (money goes out)
+            // debt (je dois / j'ai emprunte) -> income to my account (money comes in)
+            $transactionType = $validated['type'] === 'credit' ? 'expense' : 'income';
+            $beneficiary = $validated['contact_name'] ?? $validated['name'];
+            $description = $validated['type'] === 'credit'
+                ? "Pret accorde: {$validated['name']}"
+                : "Emprunt recu: {$validated['name']}";
+
+            $transaction = new Transaction([
+                'amount' => $validated['initial_amount'],
+                'type' => $transactionType,
+                'account_id' => $validated['account_id'],
+                'beneficiary' => $beneficiary,
+                'description' => $description,
+                'date' => now()->toDateString(),
+            ]);
+            $transaction->user_id = $request->user()->id;
+            $transaction->save();
+        });
 
         return response()->json(new DebtResource($debt), 201);
     }
@@ -227,17 +256,29 @@ class DebtController extends Controller
             new OA\Response(response: 401, description: "Non authentifié"),
         ]
     )]
-    public function payment(Request $request, Debt $debt): DebtResource
+    public function payment(Request $request, Debt $debt): JsonResponse
     {
         $this->authorize('update', $debt);
 
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
+            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
+            'date' => ['nullable', 'date'],
         ]);
 
-        $debt->addPayment($validated['amount']);
+        $payment = $debt->addPayment(
+            $validated['amount'],
+            $validated['account_id'],
+            $validated['date'] ?? null
+        );
 
-        return new DebtResource($debt->fresh());
+        return response()->json([
+            'debt' => new DebtResource($debt->fresh()),
+            'payment_id' => $payment->id,
+            'transaction_id' => $payment->transaction_id,
+        ]);
     }
 
     #[OA\Get(

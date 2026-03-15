@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Debt extends Model
@@ -23,6 +24,7 @@ class Debt extends Model
         'contact_phone',
         'status',
         'color',
+        'account_id',
     ];
 
     protected function casts(): array
@@ -37,6 +39,16 @@ class Debt extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(DebtPayment::class);
     }
 
     public function getProgressPercentageAttribute(): float
@@ -74,12 +86,49 @@ class Debt extends Model
         return $this->due_date->isPast() && $this->status === 'active';
     }
 
-    public function addPayment(int $amount): void
+    public function addPayment(int $amount, string $accountId, ?string $date = null): DebtPayment
     {
+        $paymentDate = $date ?? now()->toDateString();
+
+        // Create a transaction to reflect the financial impact
+        // debt (je dois) -> paying = expense from my account
+        // credit (on me doit) -> receiving payment = income to my account
+        $transactionType = $this->type === 'debt' ? 'expense' : 'income';
+        $beneficiary = $this->contact_name ?? $this->name;
+        $description = $this->type === 'debt'
+            ? "Remboursement: {$this->name}"
+            : "Recu: {$this->name}";
+
+        $transaction = new Transaction([
+            'amount' => $amount,
+            'type' => $transactionType,
+            'account_id' => $accountId,
+            'beneficiary' => $beneficiary,
+            'description' => $description,
+            'date' => $paymentDate,
+        ]);
+        $transaction->user_id = $this->user_id;
+        $transaction->save();
+
+        // Create the debt payment record
+        $payment = new DebtPayment([
+            'debt_id' => $this->id,
+            'account_id' => $accountId,
+            'transaction_id' => $transaction->id,
+            'amount' => $amount,
+            'date' => $paymentDate,
+            'description' => $description,
+        ]);
+        $payment->user_id = $this->user_id;
+        $payment->save();
+
+        // Update debt amount
         $this->current_amount = max(0, $this->current_amount - $amount);
         if ($this->current_amount <= 0) {
             $this->status = 'paid';
         }
         $this->save();
+
+        return $payment;
     }
 }

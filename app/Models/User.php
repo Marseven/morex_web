@@ -76,6 +76,11 @@ class User extends Authenticatable
         return $this->hasMany(Debt::class);
     }
 
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(Transfer::class)->orderByDesc('date');
+    }
+
     public function recurringTransactions(): HasMany
     {
         return $this->hasMany(RecurringTransaction::class);

@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AccountResource;
 use App\Models\Account;
+use App\Models\BalanceReset;
+use App\Models\Transfer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class AccountController extends Controller
@@ -257,6 +260,69 @@ class AccountController extends Controller
             new OA\Response(response: 401, description: "Non authentifié"),
         ]
     )]
+    public function balanceReset(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'accounts' => ['required', 'array', 'min:1'],
+            'accounts.*.id' => ['required', 'uuid'],
+            'accounts.*.real_balance' => ['required', 'integer'],
+        ]);
+
+        $user = $request->user();
+        $results = [];
+
+        DB::transaction(function () use ($user, $validated, &$results) {
+            foreach ($validated['accounts'] as $item) {
+                $account = $user->accounts()->where('id', $item['id'])->first();
+                if (!$account) {
+                    continue;
+                }
+
+                $oldBalance = $account->balance;
+                $oldInitialBalance = $account->initial_balance;
+                $realBalance = $item['real_balance'];
+
+                // Calculate what initial_balance should be so recalculateBalance() gives the real_balance
+                $income = $account->transactions()->where('type', 'income')->sum('amount');
+                $expense = $account->transactions()->where('type', 'expense')->sum('amount');
+                $transfersOut = $account->outgoingTransfers()->sum('amount');
+                $transfersIn = $account->incomingTransfers()->sum('amount');
+
+                $txBalance = $income - $expense - $transfersOut + $transfersIn;
+                $newInitialBalance = $realBalance - $txBalance;
+
+                // Update initial_balance so recalculateBalance() matches
+                $account->initial_balance = $newInitialBalance;
+                $account->balance = $realBalance;
+                $account->save();
+
+                // Audit trail
+                $reset = new BalanceReset([
+                    'account_id' => $account->id,
+                    'old_balance' => $oldBalance,
+                    'new_balance' => $realBalance,
+                    'old_initial_balance' => $oldInitialBalance,
+                    'reset_date' => now(),
+                ]);
+                $reset->user_id = $user->id;
+                $reset->save();
+
+                $results[] = [
+                    'id' => $account->id,
+                    'name' => $account->name,
+                    'old_balance' => $oldBalance,
+                    'new_balance' => $realBalance,
+                    'initial_balance_adjusted' => $newInitialBalance,
+                ];
+            }
+        });
+
+        return response()->json([
+            'message' => count($results) . ' compte(s) reajuste(s).',
+            'accounts' => $results,
+        ]);
+    }
+
     public function reorder(Request $request): JsonResponse
     {
         $validated = $request->validate([

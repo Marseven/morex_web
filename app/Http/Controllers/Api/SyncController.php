@@ -8,9 +8,11 @@ use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\Category;
 use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\Goal;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
+use App\Models\Transfer;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +65,16 @@ class SyncController extends Controller
             ->where('updated_at', '>', $since)
             ->get();
 
+        $transfers = Transfer::withTrashed()
+            ->where('user_id', $user->id)
+            ->where('updated_at', '>', $since)
+            ->get();
+
+        $debtPayments = DebtPayment::withTrashed()
+            ->where('user_id', $user->id)
+            ->where('updated_at', '>', $since)
+            ->get();
+
         $recurringTransactions = RecurringTransaction::withTrashed()
             ->where('user_id', $user->id)
             ->where('updated_at', '>', $since)
@@ -82,6 +94,8 @@ class SyncController extends Controller
             'transactions' => $transactions->map(fn($t) => $this->formatForSync($t)),
             'goals' => $goals->map(fn($g) => $this->formatForSync($g)),
             'debts' => $debts->map(fn($d) => $this->formatForSync($d)),
+            'transfers' => $transfers->map(fn($t) => $this->formatForSync($t)),
+            'debt_payments' => $debtPayments->map(fn($dp) => $this->formatForSync($dp)),
             'recurring_transactions' => $recurringTransactions->map(fn($r) => $this->formatForSync($r)),
             'budget_cycles' => $budgetCycles->map(fn($b) => $this->formatBudgetCycleForSync($b)),
             'budget_closures' => $budgetClosures,
@@ -104,7 +118,7 @@ class SyncController extends Controller
     {
         $request->validate([
             'changes' => ['required', 'array'],
-            'changes.*.type' => ['required', 'string', 'in:account,category,transaction,goal,debt,recurring_transaction'],
+            'changes.*.type' => ['required', 'string', 'in:account,category,transaction,goal,debt,recurring_transaction,transfer,debt_payment'],
             'changes.*.action' => ['required', 'string', 'in:create,update,delete'],
             'changes.*.local_id' => ['nullable', 'string'],
             'changes.*.server_id' => ['nullable', 'string'],
@@ -126,20 +140,22 @@ class SyncController extends Controller
         DB::beginTransaction();
 
         try {
-            // Désactiver les events de Transaction pendant le push
-            // pour éviter les recalculs redondants (N recalculs pour N transactions)
+            // Désactiver les events de Transaction et Transfer pendant le push
+            // pour éviter les recalculs redondants (N recalculs pour N entités)
             Transaction::withoutEvents(function () use ($changes, $user, &$results) {
-                foreach ($changes as $change) {
-                    $result = $this->processChange($user, $change);
+                Transfer::withoutEvents(function () use ($changes, $user, &$results) {
+                    foreach ($changes as $change) {
+                        $result = $this->processChange($user, $change);
 
-                    if ($result['status'] === 'success') {
-                        $results['processed'][] = $result;
-                    } elseif ($result['status'] === 'conflict') {
-                        $results['conflicts'][] = $result;
-                    } else {
-                        $results['errors'][] = $result;
+                        if ($result['status'] === 'success') {
+                            $results['processed'][] = $result;
+                        } elseif ($result['status'] === 'conflict') {
+                            $results['conflicts'][] = $result;
+                        } else {
+                            $results['errors'][] = $result;
+                        }
                     }
-                }
+                });
             });
 
             // Recalculer tous les comptes affectés une seule fois
@@ -232,9 +248,9 @@ class SyncController extends Controller
                 ],
             };
 
-            // Collecter les comptes à recalculer pour les transactions
-            if ($type === 'transaction' && $result['status'] === 'success') {
-                $this->collectAccountIds($data, $result['server_id'] ?? null);
+            // Collecter les comptes à recalculer pour les transactions et transferts
+            if (in_array($type, ['transaction', 'transfer', 'debt_payment']) && $result['status'] === 'success') {
+                $this->collectAccountIds($data, $result['server_id'] ?? null, $type);
             }
 
             // Ajouter le type à la réponse pour que le mobile puisse identifier la table
@@ -254,24 +270,35 @@ class SyncController extends Controller
     /**
      * Collecte les IDs de comptes affectés par une transaction pour recalcul ultérieur
      */
-    private function collectAccountIds(array $data, ?string $serverId): void
+    private function collectAccountIds(array $data, ?string $serverId, string $type = 'transaction'): void
     {
         // Depuis les données du push
         if (!empty($data['account_id'])) {
             $this->accountIdsToRecalculate[] = $data['account_id'];
         }
-        if (!empty($data['transfer_to_account_id'])) {
-            $this->accountIdsToRecalculate[] = $data['transfer_to_account_id'];
+        if (!empty($data['from_account_id'])) {
+            $this->accountIdsToRecalculate[] = $data['from_account_id'];
+        }
+        if (!empty($data['to_account_id'])) {
+            $this->accountIdsToRecalculate[] = $data['to_account_id'];
         }
 
-        // Si on a un server_id, récupérer aussi depuis la transaction en BD
-        // (utile pour les updates/deletes où les données peuvent être partielles)
         if ($serverId) {
-            $transaction = Transaction::withTrashed()->find($serverId);
-            if ($transaction) {
-                $this->accountIdsToRecalculate[] = $transaction->account_id;
-                if ($transaction->transfer_to_account_id) {
-                    $this->accountIdsToRecalculate[] = $transaction->transfer_to_account_id;
+            if ($type === 'transfer') {
+                $transfer = Transfer::withTrashed()->find($serverId);
+                if ($transfer) {
+                    $this->accountIdsToRecalculate[] = $transfer->from_account_id;
+                    $this->accountIdsToRecalculate[] = $transfer->to_account_id;
+                }
+            } elseif ($type === 'debt_payment') {
+                $payment = DebtPayment::withTrashed()->find($serverId);
+                if ($payment) {
+                    $this->accountIdsToRecalculate[] = $payment->account_id;
+                }
+            } else {
+                $transaction = Transaction::withTrashed()->find($serverId);
+                if ($transaction) {
+                    $this->accountIdsToRecalculate[] = $transaction->account_id;
                 }
             }
         }
@@ -289,6 +316,8 @@ class SyncController extends Controller
             'goal' => Goal::class,
             'debt' => Debt::class,
             'recurring_transaction' => RecurringTransaction::class,
+            'transfer' => Transfer::class,
+            'debt_payment' => DebtPayment::class,
             default => null,
         };
     }
@@ -408,6 +437,26 @@ class SyncController extends Controller
                                 ->where('category_id', $data['category_id'] ?? null)
                                 ->where('beneficiary', $data['beneficiary'] ?? null)
                                 ->where('description', $data['description'] ?? null)
+                                ->first();
+                }
+                break;
+
+            case Transfer::class:
+                if (!empty($data['amount']) && !empty($data['date']) && !empty($data['from_account_id']) && !empty($data['to_account_id'])) {
+                    return $query->where('amount', $data['amount'])
+                                ->where('date', $data['date'])
+                                ->where('from_account_id', $data['from_account_id'])
+                                ->where('to_account_id', $data['to_account_id'])
+                                ->first();
+                }
+                break;
+
+            case DebtPayment::class:
+                if (!empty($data['amount']) && !empty($data['date']) && !empty($data['debt_id'])) {
+                    return $query->where('amount', $data['amount'])
+                                ->where('date', $data['date'])
+                                ->where('debt_id', $data['debt_id'])
+                                ->where('account_id', $data['account_id'] ?? null)
                                 ->first();
                 }
                 break;

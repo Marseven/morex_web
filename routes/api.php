@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\RecurringTransactionController;
 use App\Http\Controllers\Api\BudgetCycleController;
+use App\Http\Controllers\Api\TransferController;
+use App\Http\Controllers\Api\WebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -58,6 +60,13 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/debts/{debt}/payment', [DebtController::class, 'payment'])->name('api.debts.payment');
     Route::get('/debts-stats', [DebtController::class, 'stats'])->name('api.debts.stats');
 
+    // Transferts
+    Route::apiResource('transfers', TransferController::class)->names('api.transfers');
+    Route::post('/transfers/multi-hop', [TransferController::class, 'storeMultiHop'])->name('api.transfers.multi-hop');
+
+    // Balance Reset
+    Route::post('/accounts/balance-reset', [AccountController::class, 'balanceReset'])->name('api.accounts.balance-reset');
+
     // Transactions récurrentes
     Route::apiResource('recurring-transactions', RecurringTransactionController::class)->names('api.recurring-transactions');
     Route::post('/recurring-transactions/{recurring_transaction}/generate', [RecurringTransactionController::class, 'generate'])->name('api.recurring-transactions.generate');
@@ -71,6 +80,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Synchronisation
     Route::get('/sync/pull', [SyncController::class, 'pull']);
     Route::post('/sync/push', [SyncController::class, 'push']);
+
+    // Webhook SMS
+    Route::post('/webhook/sms', [WebhookController::class, 'sms'])->name('api.webhook.sms');
 
     // Cycles budgétaires
     Route::get('/budget-settings', [BudgetCycleController::class, 'getSettings']);

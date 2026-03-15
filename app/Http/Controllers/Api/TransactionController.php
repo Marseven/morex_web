@@ -104,7 +104,7 @@ class TransactionController extends Controller
 
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
-            'type' => ['required', 'in:expense,income,transfer'],
+            'type' => ['required', 'in:expense,income'],
             'category_id' => ['nullable', 'uuid', "exists:categories,id"],
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
@@ -112,13 +112,6 @@ class TransactionController extends Controller
             'date' => ['required', 'date'],
             'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:account_id'],
         ]);
-
-        if ($validated['type'] === 'transfer' && !isset($validated['transfer_to_account_id'])) {
-            return response()->json([
-                'message' => 'Le compte de destination est requis pour un transfert.',
-                'errors' => ['transfer_to_account_id' => ['Ce champ est requis pour un transfert.']],
-            ], 422);
-        }
 
         $transaction = $request->user()->transactions()->create($validated);
 
@@ -186,7 +179,7 @@ class TransactionController extends Controller
 
         $validated = $request->validate([
             'amount' => ['sometimes', 'integer', 'min:1'],
-            'type' => ['sometimes', 'in:expense,income,transfer'],
+            'type' => ['sometimes', 'in:expense,income'],
             'category_id' => ['nullable', 'uuid', 'exists:categories,id'],
             'account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],

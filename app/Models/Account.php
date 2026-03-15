@@ -44,9 +44,14 @@ class Account extends Model
         return $this->hasMany(Transaction::class);
     }
 
+    public function outgoingTransfers(): HasMany
+    {
+        return $this->hasMany(Transfer::class, 'from_account_id');
+    }
+
     public function incomingTransfers(): HasMany
     {
-        return $this->hasMany(Transaction::class, 'transfer_to_account_id');
+        return $this->hasMany(Transfer::class, 'to_account_id');
     }
 
     public function goals(): HasMany
@@ -56,9 +61,10 @@ class Account extends Model
 
     public function recalculateBalance(): void
     {
-        $income = $this->transactions()->where('type', 'income')->sum('amount');
-        $expense = $this->transactions()->where('type', 'expense')->sum('amount');
-        $transfersOut = $this->transactions()->where('type', 'transfer')->sum('amount');
+        $confirmedTransactions = $this->transactions()->where('status', 'confirmed');
+        $income = (clone $confirmedTransactions)->where('type', 'income')->sum('amount');
+        $expense = (clone $confirmedTransactions)->where('type', 'expense')->sum('amount');
+        $transfersOut = $this->outgoingTransfers()->sum('amount');
         $transfersIn = $this->incomingTransfers()->sum('amount');
 
         $this->balance = $this->initial_balance + $income - $expense - $transfersOut + $transfersIn;
