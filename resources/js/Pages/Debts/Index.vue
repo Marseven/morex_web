@@ -13,6 +13,7 @@ import {
 const props = defineProps({
     debts: { type: Array, default: () => [] },
     stats: { type: Object, default: () => ({}) },
+    accounts: { type: Array, default: () => [] },
 })
 
 const formatAmount = (amount) => new Intl.NumberFormat('fr-FR').format(amount || 0)
@@ -33,11 +34,13 @@ const deleteDebt = (debt) => {
 }
 
 const showPayment = ref(null)
-const paymentForm = useForm({ amount: '' })
+const paymentForm = useForm({ amount: '', account_id: '' })
 
 const openPayment = (debt) => {
     showPayment.value = debt.id
     paymentForm.amount = ''
+    // Pre-select the debt's account, or the first account
+    paymentForm.account_id = debt.account_id || (props.accounts.length > 0 ? props.accounts[0].id : '')
 }
 
 const submitPayment = (debt) => {
@@ -123,10 +126,16 @@ const getProgress = (debt) => {
                                 <button @click="deleteDebt(debt)" class="text-xs text-theme-text-secondary hover:text-danger">Supprimer</button>
                             </div>
                         </div>
-                        <div v-if="showPayment === debt.id" class="mb-3 flex gap-2">
-                            <input v-model.number="paymentForm.amount" type="number" min="1" placeholder="Montant" class="flex-1 bg-theme-surface border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none" />
-                            <button @click="submitPayment(debt)" :disabled="paymentForm.processing || !paymentForm.amount" class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">Payer</button>
-                            <button @click="showPayment = null" class="px-3 py-1.5 text-sm text-theme-text-secondary hover:text-theme-text-primary border border-theme-border rounded-md">Annuler</button>
+                        <div v-if="showPayment === debt.id" class="mb-3 space-y-2">
+                            <select v-model="paymentForm.account_id" class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none">
+                                <option value="" disabled>Choisir un compte</option>
+                                <option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option>
+                            </select>
+                            <div class="flex gap-2">
+                                <input v-model.number="paymentForm.amount" type="number" min="1" placeholder="Montant" class="flex-1 bg-theme-surface border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none" />
+                                <button @click="submitPayment(debt)" :disabled="paymentForm.processing || !paymentForm.amount || !paymentForm.account_id" class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">Payer</button>
+                                <button @click="showPayment = null" class="px-3 py-1.5 text-sm text-theme-text-secondary hover:text-theme-text-primary border border-theme-border rounded-md">Annuler</button>
+                            </div>
                         </div>
                         <div class="flex items-center justify-between text-xs mb-2">
                             <span class="text-theme-text-secondary">{{ formatAmount(debt.initial_amount - debt.current_amount) }} payé / {{ formatAmount(debt.initial_amount) }}</span>
@@ -158,10 +167,16 @@ const getProgress = (debt) => {
                                 <button @click="deleteDebt(credit)" class="text-xs text-theme-text-secondary hover:text-danger">Supprimer</button>
                             </div>
                         </div>
-                        <div v-if="showPayment === credit.id" class="mb-3 flex gap-2">
-                            <input v-model.number="paymentForm.amount" type="number" min="1" placeholder="Montant reçu" class="flex-1 bg-theme-surface border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none" />
-                            <button @click="submitPayment(credit)" :disabled="paymentForm.processing || !paymentForm.amount" class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">Enregistrer</button>
-                            <button @click="showPayment = null" class="px-3 py-1.5 text-sm text-theme-text-secondary hover:text-theme-text-primary border border-theme-border rounded-md">Annuler</button>
+                        <div v-if="showPayment === credit.id" class="mb-3 space-y-2">
+                            <select v-model="paymentForm.account_id" class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none">
+                                <option value="" disabled>Choisir un compte</option>
+                                <option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option>
+                            </select>
+                            <div class="flex gap-2">
+                                <input v-model.number="paymentForm.amount" type="number" min="1" placeholder="Montant reçu" class="flex-1 bg-theme-surface border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none" />
+                                <button @click="submitPayment(credit)" :disabled="paymentForm.processing || !paymentForm.amount || !paymentForm.account_id" class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">Enregistrer</button>
+                                <button @click="showPayment = null" class="px-3 py-1.5 text-sm text-theme-text-secondary hover:text-theme-text-primary border border-theme-border rounded-md">Annuler</button>
+                            </div>
                         </div>
                         <div class="flex items-center justify-between text-xs mb-2">
                             <span class="text-theme-text-secondary">{{ formatAmount(credit.initial_amount - credit.current_amount) }} reçu / {{ formatAmount(credit.initial_amount) }}</span>

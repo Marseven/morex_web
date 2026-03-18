@@ -25,9 +25,12 @@ class DebtController extends Controller
             'overdue_count' => $debts->where('status', 'active')->filter(fn($d) => $d->is_overdue)->count(),
         ];
 
+        $accounts = $request->user()->accounts()->orderBy('order_index')->get();
+
         return Inertia::render('Debts/Index', [
             'debts' => $debts,
             'stats' => $stats,
+            'accounts' => $accounts,
         ]);
     }
 
@@ -106,11 +109,14 @@ class DebtController extends Controller
     {
         $this->authorize('update', $debt);
 
+        $userId = $request->user()->id;
+
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
+            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
         ]);
 
-        $debt->addPayment($validated['amount']);
+        $debt->addPayment($validated['amount'], $validated['account_id']);
 
         return back()->with('success', 'Paiement enregistré.');
     }
