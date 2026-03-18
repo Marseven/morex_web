@@ -11,7 +11,8 @@ class SyncAccountBalances extends Command
     protected $signature = 'accounts:sync-balances
                             {--user= : ID ou email de l\'utilisateur}
                             {--show : Afficher les soldes sans modifier}
-                            {--reset : Mettre initial_balance = balance actuel (figer les soldes)}';
+                            {--reset : Mettre initial_balance = balance actuel (figer les soldes)}
+                            {--recalculate : Recalculer automatiquement tous les soldes}';
 
     protected $description = 'Synchroniser les soldes des comptes';
 
@@ -55,10 +56,13 @@ class SyncAccountBalances extends Command
         $fmt = fn($v) => number_format($v, 0, ',', ' ');
 
         foreach ($accounts as $account) {
-            // Calculer le solde basé sur les transactions
-            $income = $account->transactions()->where('type', 'income')->sum('amount');
-            $expense = $account->transactions()->where('type', 'expense')->sum('amount');
-            $transfersOut = $account->transactions()->where('type', 'transfer')->sum('amount');
+            // Calculer le solde basé sur les transactions (income/expense uniquement)
+            $confirmedTransactions = $account->transactions()->where('status', 'confirmed');
+            $income = (clone $confirmedTransactions)->where('type', 'income')->sum('amount');
+            $expense = (clone $confirmedTransactions)->where('type', 'expense')->sum('amount');
+
+            // Transferts depuis la table transfers
+            $transfersOut = $account->outgoingTransfers()->sum('amount');
             $transfersIn = $account->incomingTransfers()->sum('amount');
 
             $calculatedBalance = $account->initial_balance + $income - $expense - $transfersOut + $transfersIn;
@@ -82,6 +86,29 @@ class SyncAccountBalances extends Command
         $this->line('  Écart = Solde DB - Solde Calculé');
 
         if ($this->option('show')) {
+            return;
+        }
+
+        if ($this->option('recalculate')) {
+            $this->newLine();
+            $this->info('Mode RECALCULATE: Recalcul automatique de tous les soldes...');
+            $this->newLine();
+
+            foreach ($accounts as $account) {
+                $oldBalance = $account->balance;
+                $account->recalculateBalance();
+                $account->refresh();
+                $delta = $account->balance - $oldBalance;
+
+                $status = $delta === 0
+                    ? '✓ inchangé'
+                    : ($delta > 0 ? '+' : '') . $fmt($delta) . ' FCFA';
+
+                $this->line("  {$account->name}: {$fmt($oldBalance)} → {$fmt($account->balance)} ({$status})");
+            }
+
+            $this->newLine();
+            $this->info('Soldes recalculés avec succès.');
             return;
         }
 
@@ -128,8 +155,9 @@ class SyncAccountBalances extends Command
         } else {
             $this->newLine();
             $this->line('Options disponibles:');
-            $this->line('  --show   : Afficher seulement (aucune modification)');
-            $this->line('  --reset  : Entrer manuellement les vrais soldes');
+            $this->line('  --show        : Afficher seulement (aucune modification)');
+            $this->line('  --recalculate : Recalculer automatiquement depuis les transactions');
+            $this->line('  --reset       : Entrer manuellement les vrais soldes');
             $this->newLine();
         }
     }

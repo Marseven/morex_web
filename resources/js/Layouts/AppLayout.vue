@@ -11,6 +11,7 @@ import {
     ChartBarIcon,
     CalendarIcon,
     ArrowRightOnRectangleIcon,
+    BanknotesIcon,
 } from '@heroicons/vue/24/outline'
 import Toast from '@/Components/Toast.vue'
 
@@ -25,6 +26,7 @@ const navigation = [
     { name: 'Comptes', href: '/accounts', icon: WalletIcon },
     { name: 'Budgets', href: '/budgets', icon: ChartPieIcon },
     { name: 'Cycles', href: '/budget-cycles', icon: CalendarIcon },
+    { name: 'Transferts', href: '/transfers', icon: BanknotesIcon },
     { name: 'Objectifs', href: '/goals', icon: FlagIcon },
     { name: 'Dettes', href: '/debts', icon: CreditCardIcon },
     { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },

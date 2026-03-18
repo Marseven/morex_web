@@ -12,6 +12,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\TwoFactorAuthController;
 use App\Http\Controllers\BudgetCycleController;
+use App\Http\Controllers\TransferController;
 use Illuminate\Support\Facades\Route;
 
 // Routes d'authentification (publiques)
@@ -60,6 +61,9 @@ Route::middleware('auth')->group(function () {
     // Objectifs
     Route::resource('goals', GoalController::class);
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'contribute'])->name('goals.contribute');
+
+    // Transferts
+    Route::resource('transfers', TransferController::class);
 
     // Dettes & Créances
     Route::resource('debts', DebtController::class);
