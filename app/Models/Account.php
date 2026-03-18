@@ -59,26 +59,50 @@ class Account extends Model
         return $this->hasMany(Goal::class);
     }
 
-    public function recalculateBalance(): void
+    public function balanceHistory(): HasMany
     {
-        $confirmedTransactions = $this->transactions()->where('status', 'confirmed');
-        $income = (clone $confirmedTransactions)->where('type', 'income')->sum('amount');
-        $expense = (clone $confirmedTransactions)->where('type', 'expense')->sum('amount');
-        $transfersOut = $this->outgoingTransfers()->sum('amount');
-        $transfersIn = $this->incomingTransfers()->sum('amount');
+        return $this->hasMany(BalanceHistory::class);
+    }
 
-        $this->balance = $this->initial_balance + $income - $expense - $transfersOut + $transfersIn;
+    /**
+     * Ajuste le solde du compte de manière incrémentale et crée une entrée dans le journal.
+     *
+     * @param int $delta Montant à ajouter (positif) ou soustraire (négatif)
+     * @param string $type Type d'opération (income, expense, transfer_in, transfer_out, adjustment, creation)
+     * @param string|null $refType Type de référence (transaction, transfer, manual)
+     * @param string|null $refId UUID de la transaction/transfert source
+     * @param string|null $desc Description optionnelle
+     */
+    public function adjustBalance(int $delta, string $type, ?string $refType = null, ?string $refId = null, ?string $desc = null): void
+    {
+        $balanceBefore = $this->balance;
+        $newBalance = $this->balance + $delta;
+
+        BalanceHistory::create([
+            'account_id' => $this->id,
+            'type' => $type,
+            'amount' => abs($delta),
+            'balance_before' => $balanceBefore,
+            'balance_after' => $newBalance,
+            'reference_type' => $refType,
+            'reference_id' => $refId,
+            'description' => $desc,
+        ]);
+
+        $this->balance = $newBalance;
         $this->save();
     }
 
     /**
-     * Set the real balance directly in DB. No recalculation.
-     * The calculated balance (from transactions) is for analysis only.
+     * Ajuste le solde réel du compte directement (ajustement manuel).
+     * Crée une entrée d'ajustement dans le journal.
      */
     public function adjustToBalance(int $desiredBalance): void
     {
-        $this->initial_balance = $desiredBalance;
-        $this->balance = $desiredBalance;
-        $this->save();
+        $delta = $desiredBalance - $this->balance;
+
+        if ($delta !== 0) {
+            $this->adjustBalance($delta, 'adjustment', 'manual', null, 'Ajustement manuel du solde');
+        }
     }
 }

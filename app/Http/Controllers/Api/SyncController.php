@@ -110,9 +110,10 @@ class SyncController extends Controller
      * Body: { changes: [...], last_sync: "..." }
      */
     /**
-     * IDs de comptes à recalculer à la fin du push (évite les recalculs redondants)
+     * Ajustements de solde à appliquer à la fin du push.
+     * Clé = account_id, valeur = tableau d'ajustements [{delta, type, refType, refId}]
      */
-    private array $accountIdsToRecalculate = [];
+    private array $pendingAdjustments = [];
 
     public function push(Request $request): JsonResponse
     {
@@ -135,13 +136,13 @@ class SyncController extends Controller
             'errors' => [],
         ];
 
-        $this->accountIdsToRecalculate = [];
+        $this->pendingAdjustments = [];
 
         DB::beginTransaction();
 
         try {
             // Désactiver les events de Transaction et Transfer pendant le push
-            // pour éviter les recalculs redondants (N recalculs pour N entités)
+            // pour éviter les ajustements redondants (N ajustements pour N entités)
             Transaction::withoutEvents(function () use ($changes, $user, &$results) {
                 Transfer::withoutEvents(function () use ($changes, $user, &$results) {
                     foreach ($changes as $change) {
@@ -158,10 +159,14 @@ class SyncController extends Controller
                 });
             });
 
-            // Recalculer tous les comptes affectés une seule fois
-            $uniqueAccountIds = array_unique($this->accountIdsToRecalculate);
-            foreach ($uniqueAccountIds as $accountId) {
-                Account::find($accountId)?->recalculateBalance();
+            // Appliquer tous les ajustements de solde accumulés
+            foreach ($this->pendingAdjustments as $accountId => $adjustments) {
+                $account = Account::find($accountId);
+                if (!$account) continue;
+
+                foreach ($adjustments as $adj) {
+                    $account->adjustBalance($adj['delta'], $adj['type'], $adj['refType'] ?? null, $adj['refId'] ?? null, $adj['desc'] ?? null);
+                }
             }
 
             DB::commit();
@@ -248,9 +253,9 @@ class SyncController extends Controller
                 ],
             };
 
-            // Collecter les comptes à recalculer pour les transactions et transferts
+            // Collecter les ajustements de solde pour les transactions et transferts
             if (in_array($type, ['transaction', 'transfer', 'debt_payment']) && $result['status'] === 'success') {
-                $this->collectAccountIds($data, $result['server_id'] ?? null, $type);
+                $this->collectAdjustments($action, $data, $result['server_id'] ?? null, $type);
             }
 
             // Ajouter le type à la réponse pour que le mobile puisse identifier la table
@@ -268,40 +273,90 @@ class SyncController extends Controller
     }
 
     /**
-     * Collecte les IDs de comptes affectés par une transaction pour recalcul ultérieur
+     * Collecte les ajustements de solde pour les transactions/transferts créés pendant le push.
+     * Ces ajustements seront appliqués en batch à la fin.
      */
-    private function collectAccountIds(array $data, ?string $serverId, string $type = 'transaction'): void
+    private function collectAdjustments(string $action, array $data, ?string $serverId, string $type): void
     {
-        // Depuis les données du push
-        if (!empty($data['account_id'])) {
-            $this->accountIdsToRecalculate[] = $data['account_id'];
-        }
-        if (!empty($data['from_account_id'])) {
-            $this->accountIdsToRecalculate[] = $data['from_account_id'];
-        }
-        if (!empty($data['to_account_id'])) {
-            $this->accountIdsToRecalculate[] = $data['to_account_id'];
+        if ($action === 'delete') {
+            // Pour les suppressions, reverser le mouvement
+            $this->collectDeleteAdjustments($serverId, $type);
+            return;
         }
 
-        if ($serverId) {
-            if ($type === 'transfer') {
-                $transfer = Transfer::withTrashed()->find($serverId);
-                if ($transfer) {
-                    $this->accountIdsToRecalculate[] = $transfer->from_account_id;
-                    $this->accountIdsToRecalculate[] = $transfer->to_account_id;
-                }
-            } elseif ($type === 'debt_payment') {
-                $payment = DebtPayment::withTrashed()->find($serverId);
-                if ($payment) {
-                    $this->accountIdsToRecalculate[] = $payment->account_id;
-                }
-            } else {
-                $transaction = Transaction::withTrashed()->find($serverId);
-                if ($transaction) {
-                    $this->accountIdsToRecalculate[] = $transaction->account_id;
+        // Pour create/update, appliquer le mouvement basé sur les données
+        if ($type === 'transaction' && $serverId) {
+            $transaction = Transaction::withTrashed()->find($serverId);
+            if ($transaction) {
+                $delta = match ($transaction->type) {
+                    'income' => $transaction->amount,
+                    'expense' => -$transaction->amount,
+                    default => 0,
+                };
+                $historyType = match ($transaction->type) {
+                    'income' => 'income',
+                    'expense' => 'expense',
+                    default => 'adjustment',
+                };
+                if ($delta !== 0) {
+                    $this->addPendingAdjustment($transaction->account_id, $delta, $historyType, 'transaction', $serverId);
                 }
             }
+        } elseif ($type === 'transfer' && $serverId) {
+            $transfer = Transfer::withTrashed()->find($serverId);
+            if ($transfer) {
+                $this->addPendingAdjustment($transfer->from_account_id, -$transfer->amount, 'transfer_out', 'transfer', $serverId);
+                $this->addPendingAdjustment($transfer->to_account_id, $transfer->amount, 'transfer_in', 'transfer', $serverId);
+            }
         }
+    }
+
+    /**
+     * Collecte les ajustements de reversal pour les suppressions.
+     */
+    private function collectDeleteAdjustments(?string $serverId, string $type): void
+    {
+        if (!$serverId) return;
+
+        if ($type === 'transaction') {
+            $transaction = Transaction::withTrashed()->find($serverId);
+            if ($transaction) {
+                $delta = match ($transaction->type) {
+                    'income' => -$transaction->amount,
+                    'expense' => $transaction->amount,
+                    default => 0,
+                };
+                $historyType = match ($transaction->type) {
+                    'income' => 'expense',
+                    'expense' => 'income',
+                    default => 'adjustment',
+                };
+                if ($delta !== 0) {
+                    $this->addPendingAdjustment($transaction->account_id, $delta, $historyType, 'transaction', $serverId, 'Suppression sync');
+                }
+            }
+        } elseif ($type === 'transfer') {
+            $transfer = Transfer::withTrashed()->find($serverId);
+            if ($transfer) {
+                $this->addPendingAdjustment($transfer->from_account_id, $transfer->amount, 'transfer_in', 'transfer', $serverId, 'Suppression sync');
+                $this->addPendingAdjustment($transfer->to_account_id, -$transfer->amount, 'transfer_out', 'transfer', $serverId, 'Suppression sync');
+            }
+        }
+    }
+
+    /**
+     * Ajoute un ajustement en attente pour un compte.
+     */
+    private function addPendingAdjustment(string $accountId, int $delta, string $type, ?string $refType = null, ?string $refId = null, ?string $desc = null): void
+    {
+        $this->pendingAdjustments[$accountId] ??= [];
+        $this->pendingAdjustments[$accountId][] = [
+            'delta' => $delta,
+            'type' => $type,
+            'refType' => $refType,
+            'refId' => $refId,
+            'desc' => $desc,
+        ];
     }
 
     /**

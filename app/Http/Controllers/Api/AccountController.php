@@ -167,8 +167,6 @@ class AccountController extends Controller
                 ->update(['is_default' => false]);
         }
 
-        $account->recalculateBalance();
-
         return new AccountResource($account->fresh());
     }
 
@@ -282,7 +280,7 @@ class AccountController extends Controller
                 $oldInitialBalance = $account->initial_balance;
                 $realBalance = $item['real_balance'];
 
-                // Calculate what initial_balance should be so recalculateBalance() gives the real_balance
+                // Calculate the transaction balance (for reference only)
                 $income = $account->transactions()->where('type', 'income')->sum('amount');
                 $expense = $account->transactions()->where('type', 'expense')->sum('amount');
                 $transfersOut = $account->outgoingTransfers()->sum('amount');
@@ -291,7 +289,7 @@ class AccountController extends Controller
                 $txBalance = $income - $expense - $transfersOut + $transfersIn;
                 $newInitialBalance = $realBalance - $txBalance;
 
-                // Update initial_balance so recalculateBalance() matches
+                // Update initial_balance and set balance directly
                 $account->initial_balance = $newInitialBalance;
                 $account->balance = $realBalance;
                 $account->save();

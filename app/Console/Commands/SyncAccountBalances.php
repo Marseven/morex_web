@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Account;
+use App\Models\BalanceHistory;
 use App\Models\User;
 use Illuminate\Console\Command;
 
@@ -10,11 +11,11 @@ class SyncAccountBalances extends Command
 {
     protected $signature = 'accounts:sync-balances
                             {--user= : ID ou email de l\'utilisateur}
-                            {--show : Afficher les soldes sans modifier}
+                            {--show : Afficher les soldes et le dernier mouvement}
                             {--reset : Mettre initial_balance = balance actuel (figer les soldes)}
-                            {--recalculate : Recalculer automatiquement tous les soldes}';
+                            {--verify : Comparer le solde du compte avec le dernier balance_after du journal}';
 
-    protected $description = 'Synchroniser les soldes des comptes';
+    protected $description = 'Synchroniser et vérifier les soldes des comptes';
 
     public function handle(): int
     {
@@ -51,64 +52,38 @@ class SyncAccountBalances extends Command
             return;
         }
 
-        $headers = ['Compte', 'Solde Initial', 'Revenus', 'Dépenses', 'Transf. ↑', 'Transf. ↓', 'Solde Calculé', 'Solde DB', 'Écart'];
-        $rows = [];
         $fmt = fn($v) => number_format($v, 0, ',', ' ');
 
+        if ($this->option('verify')) {
+            $this->verifyBalances($accounts, $fmt);
+            return;
+        }
+
+        $headers = ['Compte', 'Solde DB', 'Dernier mouvement', 'Date'];
+        $rows = [];
+
         foreach ($accounts as $account) {
-            // Calculer le solde basé sur les transactions (income/expense uniquement)
-            $confirmedTransactions = $account->transactions()->where('status', 'confirmed');
-            $income = (clone $confirmedTransactions)->where('type', 'income')->sum('amount');
-            $expense = (clone $confirmedTransactions)->where('type', 'expense')->sum('amount');
+            $lastEntry = BalanceHistory::where('account_id', $account->id)
+                ->orderByDesc('created_at')
+                ->first();
 
-            // Transferts depuis la table transfers
-            $transfersOut = $account->outgoingTransfers()->sum('amount');
-            $transfersIn = $account->incomingTransfers()->sum('amount');
-
-            $calculatedBalance = $account->initial_balance + $income - $expense - $transfersOut + $transfersIn;
-            $ecart = $account->balance - $calculatedBalance;
+            $lastMovement = $lastEntry
+                ? "{$lastEntry->type} ({$fmt($lastEntry->amount)})"
+                : 'Aucun';
+            $lastDate = $lastEntry?->created_at?->format('d/m/Y H:i') ?? '-';
 
             $rows[] = [
                 $account->name,
-                $fmt($account->initial_balance),
-                $income ? '+' . $fmt($income) : '0',
-                $expense ? '-' . $fmt($expense) : '0',
-                $transfersIn ? '+' . $fmt($transfersIn) : '0',
-                $transfersOut ? '-' . $fmt($transfersOut) : '0',
-                $fmt($calculatedBalance),
                 $fmt($account->balance),
-                $ecart != 0 ? $fmt($ecart) : '✓',
+                $lastMovement,
+                $lastDate,
             ];
         }
 
         $this->table($headers, $rows);
-        $this->line('  Solde Calculé = Initial + Revenus - Dépenses + Transf.↑ - Transf.↓');
-        $this->line('  Écart = Solde DB - Solde Calculé');
+        $this->line("  Total: {$fmt($accounts->sum('balance'))} FCFA");
 
         if ($this->option('show')) {
-            return;
-        }
-
-        if ($this->option('recalculate')) {
-            $this->newLine();
-            $this->info('Mode RECALCULATE: Recalcul automatique de tous les soldes...');
-            $this->newLine();
-
-            foreach ($accounts as $account) {
-                $oldBalance = $account->balance;
-                $account->recalculateBalance();
-                $account->refresh();
-                $delta = $account->balance - $oldBalance;
-
-                $status = $delta === 0
-                    ? '✓ inchangé'
-                    : ($delta > 0 ? '+' : '') . $fmt($delta) . ' FCFA';
-
-                $this->line("  {$account->name}: {$fmt($oldBalance)} → {$fmt($account->balance)} ({$status})");
-            }
-
-            $this->newLine();
-            $this->info('Soldes recalculés avec succès.');
             return;
         }
 
@@ -142,10 +117,7 @@ class SyncAccountBalances extends Command
                     $newBalance = (int) $trimmed;
                 }
 
-                $account->update([
-                    'initial_balance' => $newBalance,
-                    'balance' => $newBalance,
-                ]);
+                $account->adjustToBalance($newBalance);
 
                 $this->info("    → Solde mis à jour: " . number_format($newBalance, 0, ',', ' ') . " FCFA");
                 $this->newLine();
@@ -155,10 +127,57 @@ class SyncAccountBalances extends Command
         } else {
             $this->newLine();
             $this->line('Options disponibles:');
-            $this->line('  --show        : Afficher seulement (aucune modification)');
-            $this->line('  --recalculate : Recalculer automatiquement depuis les transactions');
-            $this->line('  --reset       : Entrer manuellement les vrais soldes');
+            $this->line('  --show     : Afficher seulement (aucune modification)');
+            $this->line('  --verify   : Vérifier la cohérence entre solde et journal');
+            $this->line('  --reset    : Entrer manuellement les vrais soldes');
             $this->newLine();
+        }
+    }
+
+    /**
+     * Vérifie la cohérence entre le solde du compte et le dernier balance_after du journal.
+     */
+    private function verifyBalances($accounts, callable $fmt): void
+    {
+        $this->info('Vérification de la cohérence des soldes...');
+        $this->newLine();
+
+        $headers = ['Compte', 'Solde DB', 'Dernier journal', 'Écart', 'Statut'];
+        $rows = [];
+        $hasErrors = false;
+
+        foreach ($accounts as $account) {
+            $lastEntry = BalanceHistory::where('account_id', $account->id)
+                ->orderByDesc('created_at')
+                ->first();
+
+            $journalBalance = $lastEntry?->balance_after;
+            $ecart = $journalBalance !== null ? $account->balance - $journalBalance : null;
+
+            $status = '✓';
+            if ($journalBalance === null) {
+                $status = '⚠ Pas de journal';
+                $hasErrors = true;
+            } elseif ($ecart !== 0) {
+                $status = '✗ ÉCART';
+                $hasErrors = true;
+            }
+
+            $rows[] = [
+                $account->name,
+                $fmt($account->balance),
+                $journalBalance !== null ? $fmt($journalBalance) : '-',
+                $ecart !== null && $ecart !== 0 ? $fmt($ecart) : ($journalBalance !== null ? '0' : '-'),
+                $status,
+            ];
+        }
+
+        $this->table($headers, $rows);
+
+        if ($hasErrors) {
+            $this->warn('Des incohérences ont été détectées.');
+        } else {
+            $this->info('Tous les soldes sont cohérents avec le journal.');
         }
     }
 }

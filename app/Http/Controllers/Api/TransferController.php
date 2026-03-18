@@ -87,21 +87,8 @@ class TransferController extends Controller
         $transfers = [];
 
         DB::transaction(function () use ($request, $hops, &$transfers) {
-            // Disable Transfer events to avoid N recalculations during the loop
-            Transfer::withoutEvents(function () use ($request, $hops, &$transfers) {
-                foreach ($hops as $hop) {
-                    $transfers[] = $request->user()->transfers()->create($hop);
-                }
-            });
-
-            // Recalculate all affected accounts once
-            $accountIds = [];
             foreach ($hops as $hop) {
-                $accountIds[] = $hop['from_account_id'];
-                $accountIds[] = $hop['to_account_id'];
-            }
-            foreach (array_unique($accountIds) as $accountId) {
-                \App\Models\Account::find($accountId)?->recalculateBalance();
+                $transfers[] = $request->user()->transfers()->create($hop);
             }
         });
 

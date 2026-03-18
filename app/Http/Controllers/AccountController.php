@@ -100,8 +100,6 @@ class AccountController extends Controller
                 ->update(['is_default' => false]);
         }
 
-        $account->recalculateBalance();
-
         return redirect()->route('accounts.index')
             ->with('success', 'Compte mis à jour avec succès.');
     }

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Account;
 use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\BudgetSettings;
@@ -148,11 +147,6 @@ class BudgetCycleController extends Controller
         if ($activeCycle) {
             $activeCycle->close($startDate->copy()->subDay());
             $activeCycle->createClosure();
-
-            // Recalculer les soldes de tous les comptes
-            Account::where('user_id', $user->id)
-                ->whereNull('deleted_at')
-                ->each(fn ($account) => $account->recalculateBalance());
         }
 
         // Créer le nouveau cycle
@@ -208,11 +202,6 @@ class BudgetCycleController extends Controller
 
         $cycle->close($endDate);
         $closure = $cycle->createClosure();
-
-        // Recalculer les soldes de tous les comptes
-        Account::where('user_id', $request->user()->id)
-            ->whereNull('deleted_at')
-            ->each(fn ($account) => $account->recalculateBalance());
 
         return response()->json([
             'cycle' => $cycle,
