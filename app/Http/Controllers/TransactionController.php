@@ -28,6 +28,17 @@ class TransactionController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('beneficiary', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
+                  ->orWhereHas('category', function ($q2) use ($search) {
+                      $q2->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
         if ($request->filled('start_date')) {
             $query->whereDate('date', '>=', $request->start_date);
         }
@@ -51,7 +62,7 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'accounts' => $accounts,
             'categories' => $categories,
-            'filters' => $request->only(['type', 'account_id', 'category_id', 'start_date', 'end_date']),
+            'filters' => $request->only(['type', 'account_id', 'category_id', 'start_date', 'end_date', 'search']),
         ]);
     }
 

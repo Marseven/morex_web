@@ -8,6 +8,7 @@ import {
     TrashIcon,
     FunnelIcon,
     XMarkIcon,
+    MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -20,7 +21,16 @@ const props = defineProps({
 const localFilters = ref({
     type: props.filters.type || '',
     account_id: props.filters.account_id || '',
+    search: props.filters.search || '',
 })
+
+let searchTimeout = null
+const onSearchInput = () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        applyFilters()
+    }, 400)
+}
 
 const formatAmount = (amount) => {
     return new Intl.NumberFormat('fr-FR').format(amount)
@@ -68,12 +78,25 @@ const deleteTransaction = (tx) => {
                 </Link>
             </div>
 
-            <!-- Filters -->
-            <div class="flex flex-wrap gap-3">
+            <!-- Search & Filters -->
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Search -->
+                <div class="relative flex-1 min-w-[200px] max-w-sm">
+                    <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-text-muted pointer-events-none" />
+                    <input
+                        v-model="localFilters.search"
+                        @input="onSearchInput"
+                        type="text"
+                        placeholder="Rechercher..."
+                        class="w-full bg-theme-surface/50 border border-theme-border rounded-lg pl-9 pr-4 py-2 text-sm text-theme-text-primary placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
+                    />
+                </div>
+
+                <!-- Filter selects -->
                 <select
                     v-model="localFilters.type"
                     @change="applyFilters"
-                    class="bg-theme-card border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-white focus:ring-0 outline-none"
+                    class="bg-theme-surface/50 border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
                 >
                     <option value="">Tous types</option>
                     <option value="expense">Dépenses</option>
@@ -83,7 +106,7 @@ const deleteTransaction = (tx) => {
                 <select
                     v-model="localFilters.account_id"
                     @change="applyFilters"
-                    class="bg-theme-card border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary focus:border-white focus:ring-0 outline-none"
+                    class="bg-theme-surface/50 border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
                 >
                     <option value="">Tous comptes</option>
                     <option v-for="account in accounts" :key="account.id" :value="account.id">
@@ -93,8 +116,9 @@ const deleteTransaction = (tx) => {
                 <button
                     v-if="Object.values(localFilters).some(v => v)"
                     @click="clearFilters"
-                    class="text-xs text-theme-text-secondary hover:text-theme-text-primary"
+                    class="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors"
                 >
+                    <XMarkIcon class="w-3.5 h-3.5" />
                     Effacer
                 </button>
             </div>
