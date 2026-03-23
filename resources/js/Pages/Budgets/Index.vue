@@ -88,7 +88,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
             </div>
 
             <!-- Current Month Info & Close Button -->
-            <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+            <div class="glass-card p-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <ClockIcon class="w-5 h-5 text-theme-text-secondary" />
@@ -115,7 +115,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
 
             <!-- Analytics -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <BanknotesIcon class="w-4 h-4 text-theme-text-secondary" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Budget total</p>
@@ -123,7 +123,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                     <p class="text-xl font-semibold text-theme-text-primary">{{ formatAmount(totalBudget) }}</p>
                     <p class="text-xs text-theme-text-muted">FCFA / mois</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <CurrencyDollarIcon class="w-4 h-4 text-theme-text-secondary" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Dépensé ce mois</p>
@@ -131,7 +131,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                     <p class="text-xl font-semibold text-theme-text-primary">{{ formatAmount(totalSpent) }}</p>
                     <p class="text-xs text-theme-text-muted">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <CalculatorIcon class="w-4 h-4" :class="totalBudget - totalSpent >= 0 ? 'text-success' : 'text-danger'" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Restant</p>
@@ -141,7 +141,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                     </p>
                     <p class="text-xs text-theme-text-muted">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ExclamationTriangleIcon class="w-4 h-4" :class="overBudgetCount > 0 ? 'text-danger' : 'text-success'" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Dépassements</p>
@@ -156,7 +156,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
             <!-- Expense Categories -->
             <div>
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Dépenses</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg">
+                <div class="glass-card">
                     <div v-if="expenseCategories.length === 0" class="px-4 py-8 text-center">
                         <p class="text-sm text-theme-text-secondary">Aucune catégorie de dépense</p>
                     </div>
@@ -226,7 +226,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
             <!-- Income Categories -->
             <div>
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Revenus</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg">
+                <div class="glass-card">
                     <div v-if="incomeCategories.length === 0" class="px-4 py-8 text-center">
                         <p class="text-sm text-theme-text-secondary">Aucune catégorie de revenu</p>
                     </div>
@@ -272,7 +272,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
             <!-- Historique des clôtures -->
             <div v-if="closures.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Historique des clôtures</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg divide-y divide-theme-border">
+                <div class="glass-card divide-y divide-theme-border">
                     <div
                         v-for="closure in closures"
                         :key="closure.id"

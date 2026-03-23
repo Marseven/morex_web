@@ -72,7 +72,7 @@ const getProgress = (debt) => {
 
             <!-- Stats -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ArrowDownCircleIcon class="w-4 h-4 text-danger" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Je dois</p>
@@ -80,7 +80,7 @@ const getProgress = (debt) => {
                     <p class="text-xl font-semibold text-danger">{{ formatAmount(stats.total_debt) }}</p>
                     <p class="text-xs text-theme-text-muted">{{ stats.active_debts }} dette(s)</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ArrowUpCircleIcon class="w-4 h-4 text-success" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">On me doit</p>
@@ -88,7 +88,7 @@ const getProgress = (debt) => {
                     <p class="text-xl font-semibold text-success">{{ formatAmount(stats.total_credit) }}</p>
                     <p class="text-xs text-theme-text-muted">{{ stats.active_credits }} créance(s)</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ScaleIcon class="w-4 h-4" :class="stats.total_credit - stats.total_debt >= 0 ? 'text-success' : 'text-danger'" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Position nette</p>
@@ -98,7 +98,7 @@ const getProgress = (debt) => {
                     </p>
                     <p class="text-xs text-theme-text-muted">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ExclamationCircleIcon class="w-4 h-4" :class="stats.overdue_count > 0 ? 'text-danger' : 'text-success'" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">En retard</p>
@@ -111,7 +111,7 @@ const getProgress = (debt) => {
             <!-- Debts (Je dois) -->
             <div v-if="activeDebts.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Je dois</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg divide-y divide-theme-border">
+                <div class="glass-card divide-y divide-theme-border">
                     <div v-for="debt in activeDebts" :key="debt.id" class="p-4">
                         <div class="flex items-start justify-between mb-3">
                             <div>
@@ -152,7 +152,7 @@ const getProgress = (debt) => {
             <!-- Credits (On me doit) -->
             <div v-if="activeCredits.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">On me doit</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg divide-y divide-theme-border">
+                <div class="glass-card divide-y divide-theme-border">
                     <div v-for="credit in activeCredits" :key="credit.id" class="p-4">
                         <div class="flex items-start justify-between mb-3">
                             <div>
@@ -191,7 +191,7 @@ const getProgress = (debt) => {
             </div>
 
             <!-- Empty state -->
-            <div v-if="activeDebts.length === 0 && activeCredits.length === 0" class="bg-theme-card border border-theme-border rounded-lg px-4 py-12 text-center">
+            <div v-if="activeDebts.length === 0 && activeCredits.length === 0" class="glass-card px-4 py-12 text-center">
                 <p class="text-sm text-theme-text-secondary mb-4">Aucune dette ou créance active</p>
                 <Link href="/debts/create" class="text-sm text-theme-text-primary hover:underline">Ajouter une entrée</Link>
             </div>
@@ -199,7 +199,7 @@ const getProgress = (debt) => {
             <!-- Paid -->
             <div v-if="paidDebts.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Historique (Payé)</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg">
+                <div class="glass-card">
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-theme-border">

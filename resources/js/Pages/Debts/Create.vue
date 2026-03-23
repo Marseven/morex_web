@@ -56,7 +56,7 @@ const submit = () => {
                     </button>
                 </div>
 
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4 space-y-4">
+                <div class="glass-card p-4 space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">{{ form.type === 'debt' ? 'Pour quoi ?' : 'De quoi ?' }}</label>
                         <input v-model="form.name" type="text" required class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary placeholder-theme-text-muted focus:border-theme-text-primary focus:ring-0 outline-none" :placeholder="form.type === 'debt' ? 'Ex: Prêt personnel' : 'Ex: Prêt à un ami'" />

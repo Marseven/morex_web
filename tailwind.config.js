@@ -22,6 +22,7 @@ export default {
                     bg: 'var(--color-bg)',
                     surface: 'var(--color-surface)',
                     'surface-light': 'var(--color-surface-light)',
+                    'surface-hover': 'var(--color-surface-hover)',
                     card: 'var(--color-card)',
                     border: 'var(--color-border)',
                     divider: 'var(--color-divider)',
@@ -31,17 +32,22 @@ export default {
                     'btn-primary-bg': 'var(--color-btn-primary-bg)',
                     'btn-primary-text': 'var(--color-btn-primary-text)',
                 },
+                // Brand colors
+                brand: {
+                    DEFAULT: 'var(--color-brand)',
+                    light: 'var(--color-brand-light)',
+                },
                 // Legacy dark colors (for backward compatibility)
                 dark: {
-                    bg: '#0D0D0D',
-                    surface: '#1A1A1A',
-                    'surface-light': '#252525',
-                    card: '#1E1E1E',
-                    border: '#2A2A2A',
-                    divider: '#222222',
-                    'text-primary': '#FFFFFF',
-                    'text-secondary': '#8E8E93',
-                    'text-muted': '#52525B',
+                    bg: '#060B0A',
+                    surface: '#0F1816',
+                    'surface-light': '#142220',
+                    card: '#0F1816',
+                    border: '#1C332F',
+                    divider: '#152825',
+                    'text-primary': '#EDF5F3',
+                    'text-secondary': '#7FA69E',
+                    'text-muted': '#3E635B',
                 },
                 // Accent
                 accent: {
@@ -58,7 +64,11 @@ export default {
                 'sm': '4px',
                 'DEFAULT': '6px',
                 'md': '8px',
-                'lg': '10px',
+                'lg': '12px',
+                'xl': '16px',
+            },
+            backdropBlur: {
+                'xs': '2px',
             },
         },
     },

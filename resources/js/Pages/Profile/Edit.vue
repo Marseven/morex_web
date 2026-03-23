@@ -157,7 +157,7 @@ const isSettingUp2FA = computed(() => {
             </div>
 
             <!-- Avatar Section -->
-            <div class="bg-theme-card border border-theme-border rounded-lg p-6">
+            <div class="glass-card p-6">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-4">Photo de profil</h2>
 
                 <div class="flex items-center gap-6">
@@ -204,7 +204,7 @@ const isSettingUp2FA = computed(() => {
             </div>
 
             <!-- Profile Information -->
-            <form @submit.prevent="submitProfile" class="bg-theme-card border border-theme-border rounded-lg p-6">
+            <form @submit.prevent="submitProfile" class="glass-card p-6">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-4">Informations personnelles</h2>
 
                 <div class="space-y-4">
@@ -254,7 +254,7 @@ const isSettingUp2FA = computed(() => {
             </form>
 
             <!-- Password -->
-            <form @submit.prevent="submitPassword" class="bg-theme-card border border-theme-border rounded-lg p-6">
+            <form @submit.prevent="submitPassword" class="glass-card p-6">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-4">Mot de passe</h2>
 
                 <div class="space-y-4">
@@ -303,7 +303,7 @@ const isSettingUp2FA = computed(() => {
             </form>
 
             <!-- Two-Factor Authentication -->
-            <div class="bg-theme-card border border-theme-border rounded-lg p-6">
+            <div class="glass-card p-6">
                 <div class="flex items-center gap-2 mb-4">
                     <ShieldCheckIcon class="w-5 h-5 text-theme-text-secondary" />
                     <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Authentification à deux facteurs</h2>
@@ -437,34 +437,49 @@ const isSettingUp2FA = computed(() => {
             </div>
 
             <!-- Theme -->
-            <div class="bg-theme-card border border-theme-border rounded-lg p-6">
+            <div class="glass-card p-6">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-4">Apparence</h2>
 
-                <div class="flex gap-4">
+                <div class="flex gap-3">
                     <button
                         type="button"
                         @click="themeForm.theme = 'dark'; submitTheme()"
-                        class="flex-1 p-4 rounded-lg border-2 transition-all"
+                        class="flex-1 p-3 rounded-lg border-2 transition-all"
                         :class="themeForm.theme === 'dark' ? 'border-theme-btn-primary-bg' : 'border-theme-border hover:border-theme-text-secondary'"
                     >
-                        <div class="w-full h-20 rounded bg-black border border-zinc-800 mb-3 flex items-center justify-center">
-                            <div class="w-8 h-1 bg-white rounded"></div>
+                        <div class="w-full h-16 rounded bg-black border border-zinc-800 mb-2 flex items-center justify-center">
+                            <div class="w-6 h-1 bg-white rounded"></div>
                         </div>
                         <p class="text-sm font-medium text-theme-text-primary">Sombre</p>
-                        <p class="text-xs text-theme-text-muted">Interface sombre</p>
                     </button>
 
                     <button
                         type="button"
                         @click="themeForm.theme = 'light'; submitTheme()"
-                        class="flex-1 p-4 rounded-lg border-2 transition-all"
+                        class="flex-1 p-3 rounded-lg border-2 transition-all"
                         :class="themeForm.theme === 'light' ? 'border-theme-btn-primary-bg' : 'border-theme-border hover:border-theme-text-secondary'"
                     >
-                        <div class="w-full h-20 rounded bg-white border border-gray-200 mb-3 flex items-center justify-center">
-                            <div class="w-8 h-1 bg-black rounded"></div>
+                        <div class="w-full h-16 rounded bg-white border border-gray-200 mb-2 flex items-center justify-center">
+                            <div class="w-6 h-1 bg-black rounded"></div>
                         </div>
                         <p class="text-sm font-medium text-theme-text-primary">Clair</p>
-                        <p class="text-xs text-theme-text-muted">Interface claire</p>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="themeForm.theme = 'system'; submitTheme()"
+                        class="flex-1 p-3 rounded-lg border-2 transition-all"
+                        :class="themeForm.theme === 'system' ? 'border-theme-btn-primary-bg' : 'border-theme-border hover:border-theme-text-secondary'"
+                    >
+                        <div class="w-full h-16 rounded mb-2 flex overflow-hidden border border-gray-300">
+                            <div class="w-1/2 bg-black flex items-center justify-center">
+                                <div class="w-4 h-1 bg-white rounded"></div>
+                            </div>
+                            <div class="w-1/2 bg-white flex items-center justify-center">
+                                <div class="w-4 h-1 bg-black rounded"></div>
+                            </div>
+                        </div>
+                        <p class="text-sm font-medium text-theme-text-primary">Systeme</p>
                     </button>
                 </div>
             </div>

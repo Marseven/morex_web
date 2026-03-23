@@ -45,12 +45,24 @@ watch(currentTheme, (newTheme) => {
     applyTheme(newTheme)
 })
 
+const systemMediaQuery = window.matchMedia('(prefers-color-scheme: light)')
+
 const applyTheme = (theme) => {
     document.documentElement.classList.remove('light', 'dark')
-    if (theme === 'light') {
+    if (theme === 'system') {
+        if (systemMediaQuery.matches) {
+            document.documentElement.classList.add('light')
+        }
+    } else if (theme === 'light') {
         document.documentElement.classList.add('light')
     }
 }
+
+systemMediaQuery.addEventListener('change', () => {
+    if (currentTheme.value === 'system') {
+        applyTheme('system')
+    }
+})
 
 const logout = () => {
     router.post('/logout')
@@ -71,22 +83,25 @@ const getInitials = (name) => {
 
 <template>
     <div class="min-h-screen bg-theme-bg transition-colors duration-200">
+        <!-- Atmospheric background -->
+        <div class="atmosphere"></div>
+
         <!-- Mobile sidebar overlay -->
         <div
             v-if="sidebarOpen"
-            class="fixed inset-0 z-40 bg-black/80 lg:hidden"
+            class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
             @click="sidebarOpen = false"
         ></div>
 
         <!-- Mobile sidebar -->
         <div
-            class="fixed inset-y-0 left-0 z-50 w-64 bg-theme-bg border-r border-theme-border transform transition-transform lg:hidden"
+            class="fixed inset-y-0 left-0 z-50 w-64 glass-sidebar border-r border-theme-border transform transition-transform lg:hidden"
             :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
         >
             <div class="flex h-full flex-col px-4 pb-4">
-                <div class="flex h-14 items-center justify-between border-b border-theme-border">
+                <div class="flex h-14 items-center justify-between border-b border-theme-divider">
                     <img src="/images/logo.png" alt="MR Money" class="h-6 w-auto" />
-                    <button @click="sidebarOpen = false" class="text-theme-text-secondary hover:text-theme-text-primary">
+                    <button @click="sidebarOpen = false" class="text-theme-text-secondary hover:text-theme-text-primary transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -99,10 +114,10 @@ const getInitials = (name) => {
                             <Link
                                 :href="item.href"
                                 @click="sidebarOpen = false"
-                                class="flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors"
+                                class="flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-200"
                                 :class="isCurrentRoute(item.href)
-                                    ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text font-medium'
-                                    : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-surface'"
+                                    ? 'bg-[var(--color-lime-glow)] text-[var(--color-accent)] font-medium nav-active'
+                                    : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-surface-hover'"
                             >
                                 <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
                                 {{ item.name }}
@@ -111,15 +126,15 @@ const getInitials = (name) => {
                     </ul>
                 </nav>
 
-                <div class="border-t border-theme-border pt-4">
+                <div class="border-t border-theme-divider pt-4">
                     <Link
                         href="/profile"
                         @click="sidebarOpen = false"
-                        class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-theme-surface transition-colors"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-theme-surface-hover transition-colors"
                     >
-                        <div class="w-8 h-8 rounded-full bg-theme-surface border border-theme-border flex items-center justify-center overflow-hidden">
+                        <div class="w-8 h-8 rounded-full bg-[var(--color-teal-glow)] border border-[var(--color-brand)] flex items-center justify-center overflow-hidden">
                             <img v-if="user?.avatar" :src="`/storage/${user.avatar}`" class="w-full h-full object-cover" />
-                            <span v-else class="text-xs font-medium text-theme-text-secondary">
+                            <span v-else class="text-xs font-semibold text-[var(--color-brand-light)]">
                                 {{ getInitials(user?.name) }}
                             </span>
                         </div>
@@ -130,7 +145,7 @@ const getInitials = (name) => {
                     </Link>
                     <button
                         @click="logout"
-                        class="w-full mt-2 px-3 py-2 flex items-center gap-3 text-left text-sm text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+                        class="w-full mt-2 px-3 py-2 flex items-center gap-3 text-left text-sm text-theme-text-secondary hover:text-danger transition-colors rounded-lg"
                     >
                         <ArrowRightOnRectangleIcon class="w-5 h-5" />
                         Déconnexion
@@ -141,8 +156,8 @@ const getInitials = (name) => {
 
         <!-- Desktop sidebar -->
         <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
-            <div class="flex grow flex-col border-r border-theme-border bg-theme-bg px-4 pb-4">
-                <div class="flex h-14 items-center border-b border-theme-border">
+            <div class="flex grow flex-col border-r border-theme-border glass-sidebar px-4 pb-4">
+                <div class="flex h-14 items-center border-b border-theme-divider">
                     <img src="/images/logo.png" alt="MR Money" class="h-6 w-auto" />
                 </div>
 
@@ -151,10 +166,10 @@ const getInitials = (name) => {
                         <li v-for="item in navigation" :key="item.name">
                             <Link
                                 :href="item.href"
-                                class="flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors"
+                                class="flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-200"
                                 :class="isCurrentRoute(item.href)
-                                    ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text font-medium'
-                                    : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-surface'"
+                                    ? 'bg-[var(--color-lime-glow)] text-[var(--color-accent)] font-medium nav-active'
+                                    : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-surface-hover'"
                             >
                                 <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
                                 {{ item.name }}
@@ -163,15 +178,15 @@ const getInitials = (name) => {
                     </ul>
                 </nav>
 
-                <div class="border-t border-theme-border pt-4">
+                <div class="border-t border-theme-divider pt-4">
                     <Link
                         href="/profile"
-                        class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-theme-surface transition-colors"
-                        :class="isCurrentRoute('/profile') ? 'bg-theme-surface' : ''"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-theme-surface-hover transition-colors"
+                        :class="isCurrentRoute('/profile') ? 'bg-theme-surface-hover' : ''"
                     >
-                        <div class="w-8 h-8 rounded-full bg-theme-surface border border-theme-border flex items-center justify-center overflow-hidden">
+                        <div class="w-8 h-8 rounded-full bg-[var(--color-teal-glow)] border border-[var(--color-brand)] flex items-center justify-center overflow-hidden">
                             <img v-if="user?.avatar" :src="`/storage/${user.avatar}`" class="w-full h-full object-cover" />
-                            <span v-else class="text-xs font-medium text-theme-text-secondary">
+                            <span v-else class="text-xs font-semibold text-[var(--color-brand-light)]">
                                 {{ getInitials(user?.name) }}
                             </span>
                         </div>
@@ -182,7 +197,7 @@ const getInitials = (name) => {
                     </Link>
                     <button
                         @click="logout"
-                        class="w-full mt-2 px-3 py-2 flex items-center gap-3 text-left text-sm text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+                        class="w-full mt-2 px-3 py-2 flex items-center gap-3 text-left text-sm text-theme-text-secondary hover:text-danger transition-colors rounded-lg"
                     >
                         <ArrowRightOnRectangleIcon class="w-5 h-5" />
                         Déconnexion
@@ -192,12 +207,12 @@ const getInitials = (name) => {
         </div>
 
         <!-- Main content -->
-        <div class="lg:pl-56">
-            <!-- Top bar -->
-            <div class="sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-theme-border bg-theme-bg px-4 lg:px-6">
+        <div class="lg:pl-56 relative z-[1]">
+            <!-- Top bar (glassmorphism) -->
+            <div class="sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-theme-border glass-header px-4 lg:px-6">
                 <button
                     type="button"
-                    class="lg:hidden text-theme-text-secondary hover:text-theme-text-primary"
+                    class="lg:hidden text-theme-text-secondary hover:text-theme-text-primary transition-colors"
                     @click="sidebarOpen = true"
                 >
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -213,16 +228,16 @@ const getInitials = (name) => {
                         </svg>
                         <span>{{ currentDate }}</span>
                     </div>
-                    <div v-if="currentBudgetPeriod" class="flex items-center gap-2 px-2 py-1 bg-theme-surface rounded-md">
-                        <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-                        <span class="text-theme-text-primary font-medium">{{ currentBudgetPeriod }}</span>
+                    <div v-if="currentBudgetPeriod" class="flex items-center gap-2 px-3 py-1 bg-[var(--color-lime-glow)] border border-[rgba(219,242,39,0.15)] rounded-full">
+                        <span class="w-2 h-2 rounded-full bg-[var(--color-accent)] pulse-dot"></span>
+                        <span class="text-xs font-medium text-[var(--color-accent)]">{{ currentBudgetPeriod }}</span>
                     </div>
                 </div>
 
                 <div class="flex flex-1 items-center justify-end gap-3">
                     <Link
                         href="/transactions/create"
-                        class="inline-flex items-center gap-2 px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors"
+                        class="inline-flex items-center gap-2 px-4 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-lg hover:opacity-90 transition-all duration-200 hover:shadow-[0_0_12px_rgba(219,242,39,0.2)]"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -234,18 +249,18 @@ const getInitials = (name) => {
 
             <!-- Flash messages -->
             <div v-if="$page.props.flash?.success" class="mx-4 mt-4 lg:mx-6">
-                <div class="bg-theme-surface border border-success/30 text-success rounded-md px-4 py-3 text-sm">
+                <div class="glass-card border-success/30 text-success px-4 py-3 text-sm">
                     {{ $page.props.flash.success }}
                 </div>
             </div>
             <div v-if="$page.props.flash?.error" class="mx-4 mt-4 lg:mx-6">
-                <div class="bg-theme-surface border border-danger/30 text-danger rounded-md px-4 py-3 text-sm">
+                <div class="glass-card border-danger/30 text-danger px-4 py-3 text-sm">
                     {{ $page.props.flash.error }}
                 </div>
             </div>
 
             <!-- Page content -->
-            <main class="p-4 lg:p-6">
+            <main class="p-4 lg:p-6 animate-fade-up">
                 <slot />
             </main>
         </div>

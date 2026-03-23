@@ -51,7 +51,7 @@ const submit = () => {
             </div>
 
             <form @submit.prevent="submit" class="space-y-6">
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4 space-y-4">
+                <div class="glass-card p-4 space-y-4">
                     <!-- Montant -->
                     <div>
                         <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Montant (FCFA)</label>

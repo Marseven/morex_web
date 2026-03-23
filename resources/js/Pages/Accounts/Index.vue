@@ -83,7 +83,7 @@ const submitAdjust = () => {
                 </div>
             </div>
 
-            <div class="bg-theme-card border border-theme-border rounded-lg">
+            <div class="glass-card">
                 <div v-if="accounts.length === 0" class="px-4 py-12 text-center">
                     <p class="text-sm text-theme-text-secondary mb-4">Aucun compte</p>
                     <Link
@@ -220,7 +220,7 @@ const submitAdjust = () => {
         <Teleport to="body">
             <div v-if="adjustingAccount" class="fixed inset-0 z-50 flex items-center justify-center">
                 <div class="absolute inset-0 bg-black/50" @click="closeAdjust"></div>
-                <div class="relative bg-theme-card border border-theme-border rounded-lg p-6 w-full max-w-sm mx-4">
+                <div class="relative glass-card p-6 w-full max-w-sm mx-4">
                     <h3 class="text-sm font-semibold text-theme-text-primary mb-1">Ajuster le solde</h3>
                     <p class="text-xs text-theme-text-muted mb-4">{{ adjustingAccount.name }}</p>
 

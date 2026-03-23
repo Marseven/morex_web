@@ -60,15 +60,15 @@ const changePeriod = (period) => {
                     <h1 class="text-lg font-semibold text-theme-text-primary">Vue d'ensemble</h1>
                     <p class="text-sm text-theme-text-secondary">{{ periodLabel }}</p>
                 </div>
-                <div class="flex gap-1 p-1 bg-theme-card border border-theme-border rounded-md">
+                <div class="flex gap-1 p-1 glass-card !rounded-lg !border-theme-divider">
                     <button
                         v-for="period in periods"
                         :key="period.value"
                         @click="changePeriod(period.value)"
-                        class="px-3 py-1.5 text-xs rounded transition-colors"
+                        class="px-3 py-1.5 text-xs rounded-md transition-all duration-200"
                         :class="currentPeriod === period.value
-                            ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text font-medium'
-                            : 'text-theme-text-secondary hover:text-theme-text-primary'"
+                            ? 'bg-[var(--color-accent)] text-[var(--color-btn-primary-text)] font-medium shadow-[0_0_8px_rgba(219,242,39,0.2)]'
+                            : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-surface-hover'"
                     >
                         {{ period.label }}
                     </button>
@@ -77,7 +77,7 @@ const changePeriod = (period) => {
 
             <!-- Stats Grid -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <BanknotesIcon class="w-4 h-4 text-theme-text-secondary" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Solde total</p>
@@ -85,7 +85,7 @@ const changePeriod = (period) => {
                     <p class="text-xl font-semibold text-theme-text-primary">{{ formatAmount(totalBalance) }}</p>
                     <p class="text-xs text-theme-text-muted mt-0.5">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <component :is="periodVariation >= 0 ? ArrowTrendingUpIcon : ArrowTrendingDownIcon" class="w-4 h-4" :class="periodVariation >= 0 ? 'text-success' : 'text-danger'" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">{{ periodLabel }}</p>
@@ -95,7 +95,7 @@ const changePeriod = (period) => {
                     </p>
                     <p class="text-xs text-theme-text-muted mt-0.5">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ArrowTrendingUpIcon class="w-4 h-4 text-success" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Revenus</p>
@@ -103,7 +103,7 @@ const changePeriod = (period) => {
                     <p class="text-xl font-semibold text-success">{{ formatAmount(incomeForPeriod) }}</p>
                     <p class="text-xs text-theme-text-muted mt-0.5">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ArrowTrendingDownIcon class="w-4 h-4 text-danger" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Dépenses</p>
@@ -117,17 +117,17 @@ const changePeriod = (period) => {
                 <!-- Left column -->
                 <div class="lg:col-span-2 space-y-6">
                     <!-- Accounts -->
-                    <div class="bg-theme-card border border-theme-border rounded-lg">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+                    <div class="glass-card">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-divider">
                             <div class="flex items-center gap-2">
                                 <WalletIcon class="w-4 h-4 text-theme-text-secondary" />
                                 <h2 class="text-sm font-medium text-theme-text-primary">Comptes</h2>
                             </div>
-                            <Link href="/accounts" class="text-xs text-theme-text-secondary hover:text-theme-text-primary">
+                            <Link href="/accounts" class="text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors">
                                 Voir tout
                             </Link>
                         </div>
-                        <div class="divide-y divide-theme-border">
+                        <div class="divide-y divide-theme-divider">
                             <div v-if="accounts.length === 0" class="px-4 py-8 text-center text-sm text-theme-text-secondary">
                                 Aucun compte
                             </div>
@@ -146,17 +146,17 @@ const changePeriod = (period) => {
                     </div>
 
                     <!-- Recent Transactions -->
-                    <div class="bg-theme-card border border-theme-border rounded-lg">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+                    <div class="glass-card">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-divider">
                             <div class="flex items-center gap-2">
                                 <ArrowsRightLeftIcon class="w-4 h-4 text-theme-text-secondary" />
                                 <h2 class="text-sm font-medium text-theme-text-primary">Transactions récentes</h2>
                             </div>
-                            <Link href="/transactions" class="text-xs text-theme-text-secondary hover:text-theme-text-primary">
+                            <Link href="/transactions" class="text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors">
                                 Voir tout
                             </Link>
                         </div>
-                        <div class="divide-y divide-theme-border">
+                        <div class="divide-y divide-theme-divider">
                             <div v-if="recentTransactions.length === 0" class="px-4 py-8 text-center text-sm text-theme-text-secondary">
                                 Aucune transaction
                             </div>
@@ -164,7 +164,7 @@ const changePeriod = (period) => {
                                 v-for="tx in recentTransactions"
                                 :key="tx.id"
                                 :href="`/transactions/${tx.id}/edit`"
-                                class="flex items-center justify-between px-4 py-3 hover:bg-theme-surface transition-colors"
+                                class="flex items-center justify-between px-4 py-3 hover:bg-theme-surface-hover transition-all duration-200"
                             >
                                 <div class="flex items-center gap-3">
                                     <div class="w-2 h-2 rounded-full" :style="{ backgroundColor: tx.category?.color || '#71717A' }"></div>
@@ -187,13 +187,13 @@ const changePeriod = (period) => {
                 <!-- Right column -->
                 <div class="space-y-6">
                     <!-- Goals -->
-                    <div class="bg-theme-card border border-theme-border rounded-lg">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+                    <div class="glass-card">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-divider">
                             <div class="flex items-center gap-2">
                                 <FlagIcon class="w-4 h-4 text-theme-text-secondary" />
                                 <h2 class="text-sm font-medium text-theme-text-primary">Objectifs</h2>
                             </div>
-                            <Link href="/goals" class="text-xs text-theme-text-secondary hover:text-theme-text-primary">
+                            <Link href="/goals" class="text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors">
                                 Voir tout
                             </Link>
                         </div>
@@ -222,13 +222,13 @@ const changePeriod = (period) => {
                     </div>
 
                     <!-- Debts -->
-                    <div class="bg-theme-card border border-theme-border rounded-lg">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+                    <div class="glass-card">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-divider">
                             <div class="flex items-center gap-2">
                                 <CreditCardIcon class="w-4 h-4 text-theme-text-secondary" />
                                 <h2 class="text-sm font-medium text-theme-text-primary">Dettes & Créances</h2>
                             </div>
-                            <Link href="/debts" class="text-xs text-theme-text-secondary hover:text-theme-text-primary">
+                            <Link href="/debts" class="text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors">
                                 Voir tout
                             </Link>
                         </div>
@@ -251,13 +251,13 @@ const changePeriod = (period) => {
                     </div>
 
                     <!-- Budgets -->
-                    <div class="bg-theme-card border border-theme-border rounded-lg">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+                    <div class="glass-card">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-divider">
                             <div class="flex items-center gap-2">
                                 <ChartPieIcon class="w-4 h-4 text-theme-text-secondary" />
                                 <h2 class="text-sm font-medium text-theme-text-primary">Budgets</h2>
                             </div>
-                            <Link href="/budgets" class="text-xs text-theme-text-secondary hover:text-theme-text-primary">
+                            <Link href="/budgets" class="text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors">
                                 Voir tout
                             </Link>
                         </div>

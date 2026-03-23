@@ -90,7 +90,7 @@ const getTypeLabel = (type) => {
 
             <!-- Analytics -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <BanknotesIcon class="w-4 h-4 text-theme-text-secondary" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Objectif total</p>
@@ -98,7 +98,7 @@ const getTypeLabel = (type) => {
                     <p class="text-xl font-semibold text-theme-text-primary">{{ formatAmount(stats.total_target) }}</p>
                     <p class="text-xs text-theme-text-muted">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <SparklesIcon class="w-4 h-4 text-success" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Épargne actuelle</p>
@@ -106,7 +106,7 @@ const getTypeLabel = (type) => {
                     <p class="text-xl font-semibold text-success">{{ formatAmount(stats.total_current) }}</p>
                     <p class="text-xs text-theme-text-muted">FCFA</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ClockIcon class="w-4 h-4 text-theme-text-secondary" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">En cours</p>
@@ -114,7 +114,7 @@ const getTypeLabel = (type) => {
                     <p class="text-xl font-semibold text-theme-text-primary">{{ stats.active_count || 0 }}</p>
                     <p class="text-xs text-theme-text-muted">objectif(s)</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <CheckCircleIcon class="w-4 h-4 text-success" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Complétés</p>
@@ -127,7 +127,7 @@ const getTypeLabel = (type) => {
             <!-- Active Goals -->
             <div>
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">En cours</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg">
+                <div class="glass-card">
                     <div v-if="activeGoals.length === 0" class="px-4 py-12 text-center">
                         <p class="text-sm text-theme-text-secondary mb-4">Aucun objectif en cours</p>
                         <Link href="/goals/create" class="text-sm text-theme-text-primary hover:underline">
@@ -210,7 +210,7 @@ const getTypeLabel = (type) => {
             <!-- Completed Goals -->
             <div v-if="completedGoals.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Complétés</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg">
+                <div class="glass-card">
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-theme-border">

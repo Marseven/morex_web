@@ -126,7 +126,7 @@ class ProfileController extends Controller
     public function updateTheme(Request $request)
     {
         $validated = $request->validate([
-            'theme' => ['required', 'in:dark,light'],
+            'theme' => ['required', 'in:dark,light,system'],
         ]);
 
         $request->user()->update($validated);

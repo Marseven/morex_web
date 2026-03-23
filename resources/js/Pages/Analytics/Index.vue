@@ -162,28 +162,28 @@ const budgetChartOptions = computed(() => ({
 
             <!-- Key Metrics -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ArrowTrendingUpIcon class="w-4 h-4 text-success" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Revenus</p>
                     </div>
                     <p class="text-xl font-semibold text-success">{{ formatAmount(savingsRate.income) }}</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <ArrowTrendingDownIcon class="w-4 h-4 text-danger" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Dépenses</p>
                     </div>
                     <p class="text-xl font-semibold text-danger">{{ formatAmount(savingsRate.expense) }}</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <BanknotesIcon class="w-4 h-4" :class="savingsRate.savings >= 0 ? 'text-success' : 'text-danger'" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Épargne</p>
                     </div>
                     <p class="text-xl font-semibold" :class="savingsRate.savings >= 0 ? 'text-success' : 'text-danger'">{{ formatAmount(savingsRate.savings) }}</p>
                 </div>
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center gap-2 mb-2">
                         <CalculatorIcon class="w-4 h-4" :class="savingsRate.rate >= savingsRate.target ? 'text-success' : 'text-warning'" />
                         <p class="text-xs text-theme-text-secondary uppercase tracking-wider">Taux d'épargne</p>
@@ -196,7 +196,7 @@ const budgetChartOptions = computed(() => ({
             <!-- Charts Row 1 -->
             <div class="grid lg:grid-cols-2 gap-6">
                 <!-- Monthly Trend -->
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <h3 class="text-sm font-medium text-theme-text-primary mb-4">Évolution mensuelle {{ currentYear }}</h3>
                     <div class="h-64">
                         <Line :data="monthlyChartData" :options="monthlyChartOptions" />
@@ -204,7 +204,7 @@ const budgetChartOptions = computed(() => ({
                 </div>
 
                 <!-- Category Breakdown -->
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <h3 class="text-sm font-medium text-theme-text-primary mb-4">Répartition des dépenses</h3>
                     <div class="h-64">
                         <Doughnut v-if="categoryBreakdown.length > 0" :data="categoryChartData" :options="categoryChartOptions" />
@@ -214,7 +214,7 @@ const budgetChartOptions = computed(() => ({
             </div>
 
             <!-- Budget vs Actual -->
-            <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+            <div class="glass-card p-4">
                 <h3 class="text-sm font-medium text-theme-text-primary mb-4">Budget vs Réel (Ce mois)</h3>
                 <div class="h-64">
                     <Bar v-if="budgetComparison.length > 0" :data="budgetChartData" :options="budgetChartOptions" />
@@ -225,7 +225,7 @@ const budgetChartOptions = computed(() => ({
             <!-- Goals & Debts Summary -->
             <div class="grid lg:grid-cols-2 gap-6">
                 <!-- Goals Progress -->
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-sm font-medium text-theme-text-primary">Progression des objectifs</h3>
                         <Link href="/goals" class="text-xs text-theme-text-secondary hover:text-theme-text-primary">Voir tout</Link>
@@ -246,7 +246,7 @@ const budgetChartOptions = computed(() => ({
                 </div>
 
                 <!-- Debt Summary -->
-                <div class="bg-theme-card border border-theme-border rounded-lg p-4">
+                <div class="glass-card p-4">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-sm font-medium text-theme-text-primary">Situation des dettes</h3>
                         <Link href="/debts" class="text-xs text-theme-text-secondary hover:text-theme-text-primary">Voir tout</Link>
@@ -273,7 +273,7 @@ const budgetChartOptions = computed(() => ({
             </div>
 
             <!-- Category Details -->
-            <div class="bg-theme-card border border-theme-border rounded-lg">
+            <div class="glass-card">
                 <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
                     <h3 class="text-sm font-medium text-theme-text-primary">Détail par catégorie</h3>
                     <button @click="exportReport('csv')" class="px-3 py-1.5 text-xs bg-theme-surface border border-theme-border rounded-md text-theme-text-secondary hover:text-theme-text-primary transition-colors">

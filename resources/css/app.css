@@ -37,32 +37,217 @@
 
 /* Theme Variables */
 :root {
-    /* Dark theme (default) */
-    --color-bg: #0D0D0D;
-    --color-surface: #1A1A1A;
-    --color-surface-light: #252525;
-    --color-card: #1E1E1E;
-    --color-border: #2A2A2A;
-    --color-divider: #222222;
-    --color-text-primary: #FFFFFF;
-    --color-text-secondary: #8E8E93;
-    --color-text-muted: #52525B;
+    /* Dark theme (default) — teal-tinted palette */
+    --color-bg: #060B0A;
+    --color-surface: #0F1816;
+    --color-surface-light: #142220;
+    --color-card: #0F1816;
+    --color-border: #1C332F;
+    --color-divider: #152825;
+    --color-text-primary: #EDF5F3;
+    --color-text-secondary: #7FA69E;
+    --color-text-muted: #3E635B;
     --color-accent: #DBF227;
     --color-btn-primary-bg: #DBF227;
     --color-btn-primary-text: #042940;
+    --color-brand: #005C53;
+    --color-brand-light: #008577;
+    --color-lime-glow: rgba(219,242,39,0.12);
+    --color-teal-glow: rgba(0,92,83,0.25);
+    --color-surface-hover: #172926;
 }
 
 .light {
-    --color-bg: #F2F6FA;
+    --color-bg: #F5F5F5;
     --color-surface: #FFFFFF;
-    --color-surface-light: #ECEEF3;
+    --color-surface-light: #F0F0F0;
     --color-card: #FFFFFF;
-    --color-border: #D1D5DB;
-    --color-divider: #E5E7EB;
-    --color-text-primary: #042940;
-    --color-text-secondary: #6B7280;
-    --color-text-muted: #9CA3AF;
+    --color-border: #D4D4D4;
+    --color-divider: #E5E5E5;
+    --color-text-primary: #1A1A1A;
+    --color-text-secondary: #555555;
+    --color-text-muted: #888888;
     --color-accent: #DBF227;
     --color-btn-primary-bg: #042940;
     --color-btn-primary-text: #FFFFFF;
+    --color-brand: #005C53;
+    --color-brand-light: #008577;
+    --color-lime-glow: rgba(74,122,0,0.08);
+    --color-teal-glow: rgba(0,92,83,0.08);
+    --color-surface-hover: #EBEBEB;
+}
+
+/* Atmospheric background effect */
+.atmosphere {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+.atmosphere::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 70% 40% at 20% 0%, rgba(0,92,83,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 35% at 85% 100%, rgba(219,242,39,0.04) 0%, transparent 50%);
+}
+.atmosphere::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(219,242,39,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(219,242,39,0.012) 1px, transparent 1px);
+    background-size: 72px 72px;
+}
+.light .atmosphere::before {
+    background:
+        radial-gradient(ellipse 70% 40% at 20% 0%, rgba(0,92,83,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 35% at 85% 100%, rgba(219,242,39,0.02) 0%, transparent 50%);
+}
+.light .atmosphere::after {
+    background-image:
+        linear-gradient(rgba(0,92,83,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,92,83,0.02) 1px, transparent 1px);
+    background-size: 72px 72px;
+}
+
+/* Glassmorphism card base */
+.glass-card {
+    background: rgba(15,24,22,0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(28,51,47,0.5);
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+.glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,92,83,0.06) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    border-radius: inherit;
+}
+.glass-card:hover::before {
+    opacity: 1;
+}
+.glass-card:hover {
+    border-color: rgba(28,51,47,0.8);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,92,83,0.08);
+    transform: translateY(-1px);
+}
+
+/* Light mode glassmorphism */
+.light .glass-card {
+    background: rgba(255,255,255,0.7);
+    border-color: rgba(212,212,212,0.5);
+}
+.light .glass-card:hover {
+    background: rgba(255,255,255,0.85);
+    border-color: rgba(212,212,212,0.8);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,92,83,0.04);
+}
+
+/* Glassmorphism for header/sidebar */
+.glass-header {
+    background: rgba(6,11,10,0.75);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-color: rgba(28,51,47,0.4);
+}
+.light .glass-header {
+    background: rgba(245,245,245,0.8);
+    border-color: rgba(212,212,212,0.5);
+}
+
+/* Glassmorphism for sidebar */
+.glass-sidebar {
+    background: rgba(6,11,10,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+.light .glass-sidebar {
+    background: rgba(245,245,245,0.9);
+}
+
+/* Card hover glow effect (legacy compat) */
+.card-glow {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+.card-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,92,83,0.04) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    border-radius: inherit;
+}
+.card-glow:hover::before {
+    opacity: 1;
+}
+.card-glow:hover {
+    border-color: var(--color-border);
+    background: var(--color-surface-hover);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,92,83,0.1);
+}
+.light .card-glow:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,92,83,0.06);
+}
+
+/* Focus glow for inputs */
+.input-glow:focus {
+    border-color: var(--color-brand) !important;
+    box-shadow: 0 0 0 3px var(--color-teal-glow);
+}
+
+/* Sidebar active item left accent */
+.nav-active {
+    position: relative;
+}
+.nav-active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--color-accent);
+}
+
+/* Smooth page transition */
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+    animation: fade-up 0.5s ease-out;
+}
+
+/* Pulse dot animation */
+@keyframes pulse-ring {
+    0% { opacity: 0.5; transform: scale(1); }
+    100% { opacity: 0; transform: scale(2.8); }
+}
+.pulse-dot {
+    position: relative;
+}
+.pulse-dot::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0;
+    animation: pulse-ring 2.2s ease-out infinite;
 }

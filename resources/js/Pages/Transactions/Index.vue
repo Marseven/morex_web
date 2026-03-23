@@ -100,7 +100,7 @@ const deleteTransaction = (tx) => {
             </div>
 
             <!-- Transactions Table -->
-            <div class="bg-theme-card border border-theme-border rounded-lg">
+            <div class="glass-card">
                 <div v-if="transactions.data.length === 0" class="px-4 py-12 text-center">
                     <p class="text-sm text-theme-text-secondary mb-4">Aucune transaction</p>
                     <Link href="/transactions/create" class="text-sm text-theme-text-primary hover:underline">

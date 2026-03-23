@@ -84,7 +84,7 @@ const deleteTransfer = (transfer) => {
             </div>
 
             <!-- Transfers Table -->
-            <div class="bg-theme-card border border-theme-border rounded-lg">
+            <div class="glass-card">
                 <div v-if="transfers.data.length === 0" class="px-4 py-12 text-center">
                     <ArrowsRightLeftIcon class="w-10 h-10 text-theme-text-muted mx-auto mb-3" />
                     <p class="text-sm text-theme-text-secondary mb-4">Aucun transfert</p>

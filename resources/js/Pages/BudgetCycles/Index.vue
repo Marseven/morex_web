@@ -64,7 +64,7 @@ const closeCycle = () => {
             </div>
 
             <!-- Cycle actif -->
-            <div v-if="activeCycle" class="bg-theme-card border border-theme-border rounded-lg p-4">
+            <div v-if="activeCycle" class="glass-card p-4">
                 <div class="flex items-center justify-between mb-4">
                     <div>
                         <p class="text-xs text-theme-text-muted uppercase tracking-wider mb-1">Cycle actif</p>
@@ -105,7 +105,7 @@ const closeCycle = () => {
             </div>
 
             <!-- Message si pas de cycle actif -->
-            <div v-else class="bg-theme-card border border-theme-border rounded-lg p-8 text-center">
+            <div v-else class="glass-card p-8 text-center">
                 <ArrowPathIcon class="w-12 h-12 text-theme-text-muted mx-auto mb-3" />
                 <p class="text-sm text-theme-text-secondary mb-4">Aucun cycle budgétaire actif</p>
                 <button
@@ -120,7 +120,7 @@ const closeCycle = () => {
             <!-- Historique des clôtures -->
             <div v-if="closures.length > 0">
                 <h2 class="text-sm font-semibold text-theme-text-primary mb-3">Historique des clôtures</h2>
-                <div class="bg-theme-card border border-theme-border rounded-lg divide-y divide-theme-border">
+                <div class="glass-card divide-y divide-theme-border">
                     <div v-for="closure in closures" :key="closure.id" class="p-4 hover:bg-theme-surface transition-colors">
                         <div class="flex items-start justify-between">
                             <div class="flex-1">
