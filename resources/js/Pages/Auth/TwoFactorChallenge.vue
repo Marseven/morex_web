@@ -27,7 +27,7 @@ const toggleRecoveryCode = () => {
     <div class="min-h-screen bg-theme-bg flex items-center justify-center p-4">
         <div class="w-full max-w-sm">
             <div class="text-center mb-10">
-                <img src="/images/logo.png" alt="Morex" class="h-10 w-auto mx-auto mb-4" />
+                <img src="/images/logo.png" alt="Morex" class="h-12 w-auto mx-auto mb-4" />
                 <p class="text-theme-text-secondary text-sm">Vérification en deux étapes</p>
             </div>
 

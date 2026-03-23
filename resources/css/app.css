@@ -67,13 +67,13 @@
     --color-text-primary: #1A1A1A;
     --color-text-secondary: #555555;
     --color-text-muted: #888888;
-    --color-accent: #DBF227;
-    --color-btn-primary-bg: #042940;
+    --color-accent: #005C53;
+    --color-btn-primary-bg: #005C53;
     --color-btn-primary-text: #FFFFFF;
     --color-brand: #005C53;
     --color-brand-light: #008577;
-    --color-lime-glow: rgba(74,122,0,0.08);
-    --color-teal-glow: rgba(0,92,83,0.08);
+    --color-lime-glow: rgba(0,92,83,0.08);
+    --color-teal-glow: rgba(0,92,83,0.1);
     --color-surface-hover: #EBEBEB;
 }
 

@@ -12,6 +12,10 @@ import {
     CalendarIcon,
     ArrowRightOnRectangleIcon,
     BanknotesIcon,
+    BellIcon,
+    SunIcon,
+    MoonIcon,
+    ComputerDesktopIcon,
 } from '@heroicons/vue/24/outline'
 import Toast from '@/Components/Toast.vue'
 
@@ -64,6 +68,23 @@ systemMediaQuery.addEventListener('change', () => {
     }
 })
 
+const toggleTheme = () => {
+    const cycle = { dark: 'light', light: 'system', system: 'dark' }
+    const next = cycle[currentTheme.value] || 'dark'
+    router.put('/profile/theme', { theme: next }, { preserveState: true, preserveScroll: true })
+}
+
+const themeIcon = computed(() => {
+    if (currentTheme.value === 'light') return SunIcon
+    if (currentTheme.value === 'system') return ComputerDesktopIcon
+    return MoonIcon
+})
+
+const themeLabel = computed(() => {
+    const labels = { dark: 'Sombre', light: 'Clair', system: 'Système' }
+    return labels[currentTheme.value] || 'Sombre'
+})
+
 const logout = () => {
     router.post('/logout')
 }
@@ -100,7 +121,7 @@ const getInitials = (name) => {
         >
             <div class="flex h-full flex-col px-4 pb-4">
                 <div class="flex h-14 items-center justify-between border-b border-theme-divider">
-                    <img src="/images/logo.png" alt="MR Money" class="h-6 w-auto" />
+                    <img :src="currentTheme === 'light' ? '/images/logo-dark.png' : '/images/logo.png'" alt="MR Money" class="h-8 w-auto" />
                     <button @click="sidebarOpen = false" class="text-theme-text-secondary hover:text-theme-text-primary transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
@@ -158,7 +179,7 @@ const getInitials = (name) => {
         <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
             <div class="flex grow flex-col border-r border-theme-border glass-sidebar px-4 pb-4">
                 <div class="flex h-14 items-center border-b border-theme-divider">
-                    <img src="/images/logo.png" alt="MR Money" class="h-6 w-auto" />
+                    <img :src="currentTheme === 'light' ? '/images/logo-dark.png' : '/images/logo.png'" alt="MR Money" class="h-8 w-auto" />
                 </div>
 
                 <nav class="flex-1 py-4">
@@ -234,7 +255,30 @@ const getInitials = (name) => {
                     </div>
                 </div>
 
-                <div class="flex flex-1 items-center justify-end gap-3">
+                <div class="flex flex-1 items-center justify-end gap-2">
+                    <!-- Notification bell -->
+                    <button
+                        class="relative w-9 h-9 flex items-center justify-center rounded-lg text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-surface-hover transition-all duration-200"
+                        title="Notifications"
+                    >
+                        <BellIcon class="w-5 h-5" />
+                        <!-- Badge (uncomment when notifications exist) -->
+                        <!-- <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger pulse-dot"></span> -->
+                    </button>
+
+                    <!-- Theme toggle -->
+                    <button
+                        @click="toggleTheme"
+                        class="w-9 h-9 flex items-center justify-center rounded-lg text-theme-text-secondary hover:text-[var(--color-accent)] hover:bg-theme-surface-hover transition-all duration-200"
+                        :title="`Thème : ${themeLabel}`"
+                    >
+                        <component :is="themeIcon" class="w-5 h-5" />
+                    </button>
+
+                    <!-- Separator -->
+                    <div class="hidden sm:block w-px h-6 bg-theme-divider mx-1"></div>
+
+                    <!-- New transaction -->
                     <Link
                         href="/transactions/create"
                         class="inline-flex items-center gap-2 px-4 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-lg hover:opacity-90 transition-all duration-200 hover:shadow-[0_0_12px_rgba(219,242,39,0.2)]"

@@ -34,7 +34,7 @@ const submit = () => {
         <Toast />
         <div class="w-full max-w-sm relative z-[1] animate-fade-up">
             <div class="text-center mb-10">
-                <img src="/images/logo.png" alt="Morex" class="h-10 w-auto mx-auto mb-4" />
+                <img src="/images/logo.png" alt="Morex" class="h-12 w-auto mx-auto mb-4" />
                 <p class="text-theme-text-secondary text-sm">Pilotez votre avenir financier</p>
             </div>
 
