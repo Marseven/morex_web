@@ -85,7 +85,7 @@ const getInitials = (name) => {
         >
             <div class="flex h-full flex-col px-4 pb-4">
                 <div class="flex h-14 items-center justify-between border-b border-theme-border">
-                    <img src="/images/logo.png" alt="Morex" class="h-6 w-auto" />
+                    <img src="/images/logo.png" alt="MR Money" class="h-6 w-auto" />
                     <button @click="sidebarOpen = false" class="text-theme-text-secondary hover:text-theme-text-primary">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
@@ -143,7 +143,7 @@ const getInitials = (name) => {
         <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
             <div class="flex grow flex-col border-r border-theme-border bg-theme-bg px-4 pb-4">
                 <div class="flex h-14 items-center border-b border-theme-border">
-                    <img src="/images/logo.png" alt="Morex" class="h-6 w-auto" />
+                    <img src="/images/logo.png" alt="MR Money" class="h-6 w-auto" />
                 </div>
 
                 <nav class="flex-1 py-4">

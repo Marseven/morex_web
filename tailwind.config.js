@@ -14,7 +14,7 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Amazon Ember', 'Arial', 'Helvetica', 'sans-serif'],
+                sans: ['Golos Text', 'Arial', 'Helvetica', 'sans-serif'],
             },
             colors: {
                 // Theme colors using CSS variables
@@ -33,19 +33,19 @@ export default {
                 },
                 // Legacy dark colors (for backward compatibility)
                 dark: {
-                    bg: '#000000',
-                    surface: '#0A0A0A',
-                    'surface-light': '#141414',
-                    card: '#111111',
-                    border: '#1F1F1F',
-                    divider: '#1A1A1A',
+                    bg: '#0D0D0D',
+                    surface: '#1A1A1A',
+                    'surface-light': '#252525',
+                    card: '#1E1E1E',
+                    border: '#2A2A2A',
+                    divider: '#222222',
                     'text-primary': '#FFFFFF',
-                    'text-secondary': '#71717A',
+                    'text-secondary': '#8E8E93',
                     'text-muted': '#52525B',
                 },
                 // Accent
                 accent: {
-                    DEFAULT: '#FFFFFF',
+                    DEFAULT: 'var(--color-accent)',
                     muted: '#A1A1AA',
                     subtle: '#3F3F46',
                 },
