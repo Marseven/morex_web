@@ -40,6 +40,27 @@ const sidebarOpen = ref(false)
 
 // Theme management
 const currentTheme = computed(() => user.value?.theme || 'dark')
+const systemMediaQuery = window.matchMedia('(prefers-color-scheme: light)')
+
+// Track the actual visual state (light or dark), regardless of user preference
+const isLightMode = ref(false)
+
+const applyTheme = (theme) => {
+    document.documentElement.classList.remove('light', 'dark')
+    if (theme === 'light') {
+        document.documentElement.classList.add('light')
+        isLightMode.value = true
+    } else if (theme === 'system') {
+        if (systemMediaQuery.matches) {
+            document.documentElement.classList.add('light')
+            isLightMode.value = true
+        } else {
+            isLightMode.value = false
+        }
+    } else {
+        isLightMode.value = false
+    }
+}
 
 onMounted(() => {
     applyTheme(currentTheme.value)
@@ -48,19 +69,6 @@ onMounted(() => {
 watch(currentTheme, (newTheme) => {
     applyTheme(newTheme)
 })
-
-const systemMediaQuery = window.matchMedia('(prefers-color-scheme: light)')
-
-const applyTheme = (theme) => {
-    document.documentElement.classList.remove('light', 'dark')
-    if (theme === 'system') {
-        if (systemMediaQuery.matches) {
-            document.documentElement.classList.add('light')
-        }
-    } else if (theme === 'light') {
-        document.documentElement.classList.add('light')
-    }
-}
 
 systemMediaQuery.addEventListener('change', () => {
     if (currentTheme.value === 'system') {
@@ -84,6 +92,8 @@ const themeLabel = computed(() => {
     const labels = { dark: 'Sombre', light: 'Clair', system: 'Système' }
     return labels[currentTheme.value] || 'Sombre'
 })
+
+const logoSrc = computed(() => isLightMode.value ? '/images/logo-dark.png' : '/images/logo.png')
 
 const logout = () => {
     router.post('/logout')
@@ -121,7 +131,7 @@ const getInitials = (name) => {
         >
             <div class="flex h-full flex-col px-4 pb-4">
                 <div class="flex h-14 items-center justify-between border-b border-theme-divider">
-                    <img :src="currentTheme === 'light' ? '/images/logo-dark.png' : '/images/logo.png'" alt="MR Money" class="h-8 w-auto" />
+                    <img :src="logoSrc" alt="MR Money" class="h-8 w-auto" />
                     <button @click="sidebarOpen = false" class="text-theme-text-secondary hover:text-theme-text-primary transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
@@ -179,7 +189,7 @@ const getInitials = (name) => {
         <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
             <div class="flex grow flex-col border-r border-theme-border glass-sidebar px-4 pb-4">
                 <div class="flex h-14 items-center border-b border-theme-divider">
-                    <img :src="currentTheme === 'light' ? '/images/logo-dark.png' : '/images/logo.png'" alt="MR Money" class="h-8 w-auto" />
+                    <img :src="logoSrc" alt="MR Money" class="h-8 w-auto" />
                 </div>
 
                 <nav class="flex-1 py-4">
