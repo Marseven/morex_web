@@ -93,7 +93,10 @@ class DashboardController extends Controller
                     ? min(100, ($spent / $category->budget_limit) * 100)
                     : 0,
             ];
-        });
+        })
+        ->sortByDesc('spent')
+        ->take(5)
+        ->values();
 
         // Dettes actives
         $activeDebts = $user->debts()
