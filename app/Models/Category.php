@@ -52,8 +52,25 @@ class Category extends Model
         return $this->hasMany(Transaction::class);
     }
 
-    // spent_this_month est calculé via withSum() dans CategoryController
-    // pour respecter les dates du cycle budgétaire actif
+    /**
+     * Montant dépensé sur la catégorie ce mois-ci.
+     *
+     * Si une requête l'a déjà calculé (withSum aliasé dans CategoryController, sur les dates
+     * du cycle budgétaire actif), on réutilise cette valeur. Sinon on calcule le mois calendaire
+     * courant à la volée — ainsi le modèle est utilisable seul (ex. tests, accès direct).
+     */
+    public function getSpentThisMonthAttribute($value): int
+    {
+        if ($value !== null) {
+            return (int) $value;
+        }
+
+        return (int) $this->transactions()
+            ->where('type', 'expense')
+            ->whereYear('date', now()->year)
+            ->whereMonth('date', now()->month)
+            ->sum('amount');
+    }
 
     public function getBudgetProgressAttribute(): float
     {

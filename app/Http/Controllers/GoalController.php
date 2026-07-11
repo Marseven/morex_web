@@ -14,7 +14,7 @@ class GoalController extends Controller
         $goals = $request->user()
             ->goals()
             ->with('account')
-            ->orderByRaw("FIELD(status, 'active', 'completed', 'cancelled')")
+            ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'completed' THEN 1 WHEN 'cancelled' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')
             ->get();
 

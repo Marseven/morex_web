@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\RecurringTransactionResource;
 use App\Http\Resources\TransactionResource;
 use App\Models\RecurringTransaction;
+use App\Rules\OwnedOrSystemCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -91,7 +92,7 @@ class RecurringTransactionController extends Controller
             'type' => ['required', 'in:income,expense'],
             'amount' => ['required', 'integer', 'min:1'],
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'category_id' => ['required', 'uuid', 'exists:categories,id'],
+            'category_id' => ['required', 'uuid', new OwnedOrSystemCategory($userId)],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'frequency' => ['required', 'in:daily,weekly,biweekly,monthly,quarterly,yearly'],
@@ -177,7 +178,7 @@ class RecurringTransactionController extends Controller
             'type' => ['sometimes', 'in:income,expense'],
             'amount' => ['sometimes', 'integer', 'min:1'],
             'account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'category_id' => ['sometimes', 'uuid', 'exists:categories,id'],
+            'category_id' => ['sometimes', 'uuid', new OwnedOrSystemCategory($userId)],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'frequency' => ['sometimes', 'in:daily,weekly,biweekly,monthly,quarterly,yearly'],

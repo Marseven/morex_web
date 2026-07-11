@@ -9,12 +9,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // MySQL requires direct SQL to modify enum
-        DB::statement("ALTER TABLE accounts MODIFY COLUMN type ENUM('current', 'checking', 'savings', 'cash', 'credit', 'investment') DEFAULT 'current'");
+        // MySQL nécessite du SQL direct pour modifier un enum ; SQLite (tests) matérialise
+        // l'enum en contrainte CHECK et doit être modifié via un rebuild de colonne.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE accounts MODIFY COLUMN type ENUM('current', 'checking', 'savings', 'cash', 'credit', 'investment') DEFAULT 'current'");
+        } else {
+            Schema::table('accounts', function (Blueprint $table) {
+                $table->enum('type', ['current', 'checking', 'savings', 'cash', 'credit', 'investment'])->default('current')->change();
+            });
+        }
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE accounts MODIFY COLUMN type ENUM('current', 'savings', 'investment') DEFAULT 'current'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE accounts MODIFY COLUMN type ENUM('current', 'savings', 'investment') DEFAULT 'current'");
+        } else {
+            Schema::table('accounts', function (Blueprint $table) {
+                $table->enum('type', ['current', 'savings', 'investment'])->default('current')->change();
+            });
+        }
     }
 };

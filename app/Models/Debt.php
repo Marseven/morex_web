@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Debt extends Model
 {
@@ -99,36 +100,40 @@ class Debt extends Model
             ? "Remboursement: {$this->name}"
             : "Recu: {$this->name}";
 
-        $transaction = new Transaction([
-            'amount' => $amount,
-            'type' => $transactionType,
-            'account_id' => $accountId,
-            'beneficiary' => $beneficiary,
-            'description' => $description,
-            'date' => $paymentDate,
-        ]);
-        $transaction->user_id = $this->user_id;
-        $transaction->save();
+        // Atomicité : la transaction, le paiement et la mise à jour de la dette
+        // doivent réussir ou échouer ensemble (évite les incohérences financières).
+        return DB::transaction(function () use ($amount, $accountId, $transactionType, $beneficiary, $description, $paymentDate) {
+            $transaction = new Transaction([
+                'amount' => $amount,
+                'type' => $transactionType,
+                'account_id' => $accountId,
+                'beneficiary' => $beneficiary,
+                'description' => $description,
+                'date' => $paymentDate,
+            ]);
+            $transaction->user_id = $this->user_id;
+            $transaction->save();
 
-        // Create the debt payment record
-        $payment = new DebtPayment([
-            'debt_id' => $this->id,
-            'account_id' => $accountId,
-            'transaction_id' => $transaction->id,
-            'amount' => $amount,
-            'date' => $paymentDate,
-            'description' => $description,
-        ]);
-        $payment->user_id = $this->user_id;
-        $payment->save();
+            // Create the debt payment record
+            $payment = new DebtPayment([
+                'debt_id' => $this->id,
+                'account_id' => $accountId,
+                'transaction_id' => $transaction->id,
+                'amount' => $amount,
+                'date' => $paymentDate,
+                'description' => $description,
+            ]);
+            $payment->user_id = $this->user_id;
+            $payment->save();
 
-        // Update debt amount
-        $this->current_amount = max(0, $this->current_amount - $amount);
-        if ($this->current_amount <= 0) {
-            $this->status = 'paid';
-        }
-        $this->save();
+            // Update debt amount
+            $this->current_amount = max(0, $this->current_amount - $amount);
+            if ($this->current_amount <= 0) {
+                $this->status = 'paid';
+            }
+            $this->save();
 
-        return $payment;
+            return $payment;
+        });
     }
 }

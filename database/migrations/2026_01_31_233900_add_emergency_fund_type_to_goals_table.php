@@ -10,7 +10,13 @@ return new class extends Migration
     public function up(): void
     {
         // Modifier l'enum pour ajouter emergency_fund
-        DB::statement("ALTER TABLE goals MODIFY COLUMN type ENUM('savings', 'debt', 'investment', 'custom', 'emergency_fund') DEFAULT 'savings'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE goals MODIFY COLUMN type ENUM('savings', 'debt', 'investment', 'custom', 'emergency_fund') DEFAULT 'savings'");
+        } else {
+            Schema::table('goals', function (Blueprint $table) {
+                $table->enum('type', ['savings', 'debt', 'investment', 'custom', 'emergency_fund'])->default('savings')->change();
+            });
+        }
 
         // Mettre à jour les objectifs "Fonds d'Urgence" avec le bon type
         DB::table('goals')
@@ -27,6 +33,12 @@ return new class extends Migration
             ->update(['type' => 'savings']);
 
         // Retirer emergency_fund de l'enum
-        DB::statement("ALTER TABLE goals MODIFY COLUMN type ENUM('savings', 'debt', 'investment', 'custom') DEFAULT 'savings'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE goals MODIFY COLUMN type ENUM('savings', 'debt', 'investment', 'custom') DEFAULT 'savings'");
+        } else {
+            Schema::table('goals', function (Blueprint $table) {
+                $table->enum('type', ['savings', 'debt', 'investment', 'custom'])->default('savings')->change();
+            });
+        }
     }
 };

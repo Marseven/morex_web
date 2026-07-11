@@ -50,7 +50,7 @@ class DebtController extends Controller
             $query->where('status', $request->status);
         }
 
-        $debts = $query->orderByRaw("FIELD(status, 'active', 'paid', 'cancelled')")
+        $debts = $query->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'paid' THEN 1 WHEN 'cancelled' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')
             ->paginate($request->per_page ?? 20);
 
