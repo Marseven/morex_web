@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Models;
 
+use App\Models\Account;
 use App\Models\Debt;
 use App\Models\User;
 use Carbon\Carbon;
@@ -144,8 +145,9 @@ class DebtTest extends TestCase
             'current_amount' => 100000,
             'status' => 'active',
         ]);
+        $account = Account::factory()->for($debt->user)->create();
 
-        $debt->addPayment(30000);
+        $debt->addPayment(30000, $account->id);
 
         $this->assertEquals(70000, $debt->current_amount);
         $this->assertEquals('active', $debt->status);
@@ -158,8 +160,9 @@ class DebtTest extends TestCase
             'current_amount' => 30000,
             'status' => 'active',
         ]);
+        $account = Account::factory()->for($debt->user)->create();
 
-        $debt->addPayment(30000);
+        $debt->addPayment(30000, $account->id);
 
         $this->assertEquals(0, $debt->current_amount);
         $this->assertEquals('paid', $debt->status);
@@ -172,8 +175,9 @@ class DebtTest extends TestCase
             'current_amount' => 20000,
             'status' => 'active',
         ]);
+        $account = Account::factory()->for($debt->user)->create();
 
-        $debt->addPayment(50000);
+        $debt->addPayment(50000, $account->id);
 
         $this->assertEquals(0, $debt->current_amount);
         $this->assertEquals('paid', $debt->status);

@@ -191,7 +191,7 @@ class AccountTest extends TestCase
         $response = $this->actingAs($this->user)->delete("/accounts/{$account->id}");
 
         $response->assertRedirect('/accounts');
-        $this->assertDatabaseMissing('accounts', ['id' => $account->id]);
+        $this->assertSoftDeleted('accounts', ['id' => $account->id]);
     }
 
     public function test_user_cannot_delete_other_users_account(): void

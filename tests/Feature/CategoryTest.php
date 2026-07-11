@@ -202,7 +202,7 @@ class CategoryTest extends TestCase
         $response = $this->actingAs($this->user)->delete("/budgets/{$category->id}");
 
         $response->assertRedirect('/budgets');
-        $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+        $this->assertSoftDeleted('categories', ['id' => $category->id]);
     }
 
     public function test_user_cannot_delete_system_category(): void

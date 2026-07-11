@@ -281,7 +281,7 @@ class GoalTest extends TestCase
         $response = $this->actingAs($this->user)->delete("/goals/{$goal->id}");
 
         $response->assertRedirect('/goals');
-        $this->assertDatabaseMissing('goals', ['id' => $goal->id]);
+        $this->assertSoftDeleted('goals', ['id' => $goal->id]);
     }
 
     public function test_user_cannot_delete_other_users_goal(): void
