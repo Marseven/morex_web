@@ -13,7 +13,7 @@ class DebtController extends Controller
     {
         $debts = $request->user()
             ->debts()
-            ->orderByRaw("FIELD(status, 'active', 'paid', 'cancelled')")
+            ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'paid' THEN 1 WHEN 'cancelled' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')
             ->get();
 

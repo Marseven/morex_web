@@ -34,6 +34,32 @@ class Account extends Model
         ];
     }
 
+    /**
+     * Cascade applicative des soft-deletes.
+     *
+     * Les FK transactions.account_id / transfers.* sont déclarées `cascadeOnDelete` en base,
+     * mais comme Account utilise SoftDeletes, la suppression est un simple UPDATE deleted_at :
+     * la cascade SQL ne se déclenche jamais. On soft-delete donc explicitement les enfants
+     * (et on les restaure au restore) pour éviter des transactions/transferts orphelins.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (Account $account) {
+            if ($account->isForceDeleting()) {
+                return;
+            }
+            $account->transactions()->get()->each->delete();
+            $account->outgoingTransfers()->get()->each->delete();
+            $account->incomingTransfers()->get()->each->delete();
+        });
+
+        static::restoring(function (Account $account) {
+            $account->transactions()->onlyTrashed()->get()->each->restore();
+            $account->outgoingTransfers()->onlyTrashed()->get()->each->restore();
+            $account->incomingTransfers()->onlyTrashed()->get()->each->restore();
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

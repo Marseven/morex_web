@@ -115,6 +115,12 @@ class SyncController extends Controller
      */
     private array $pendingAdjustments = [];
 
+    /**
+     * Snapshots des valeurs AVANT update (transactions/transferts), indexés par server_id.
+     * Permet de reverser l'ancien mouvement avant d'appliquer le nouveau (évite le double-comptage).
+     */
+    private array $originalSnapshots = [];
+
     public function push(Request $request): JsonResponse
     {
         $request->validate([
@@ -137,6 +143,7 @@ class SyncController extends Controller
         ];
 
         $this->pendingAdjustments = [];
+        $this->originalSnapshots = [];
 
         DB::beginTransaction();
 
@@ -284,31 +291,87 @@ class SyncController extends Controller
             return;
         }
 
-        // Pour create/update, appliquer le mouvement basé sur les données
+        // Pour un update, reverser d'abord l'ancien mouvement (s'il avait été comptabilisé),
+        // AVANT d'appliquer le nouveau. Sans cela, l'update double-compte le solde.
+        if ($action === 'update' && $serverId && isset($this->originalSnapshots[$serverId])) {
+            $this->reverseOriginalSnapshot($type, $serverId);
+        }
+
+        // Pour create/update, appliquer le mouvement basé sur l'état courant
         if ($type === 'transaction' && $serverId) {
             $transaction = Transaction::withTrashed()->find($serverId);
-            if ($transaction) {
-                $delta = match ($transaction->type) {
-                    'income' => $transaction->amount,
-                    'expense' => -$transaction->amount,
-                    default => 0,
-                };
-                $historyType = match ($transaction->type) {
-                    'income' => 'income',
-                    'expense' => 'expense',
-                    default => 'adjustment',
-                };
-                if ($delta !== 0) {
-                    $this->addPendingAdjustment($transaction->account_id, $delta, $historyType, 'transaction', $serverId);
-                }
+            // Ne comptabiliser que si la transaction est active (non supprimée)
+            if ($transaction && !$transaction->trashed()) {
+                $this->applyTransactionMovement($transaction->account_id, $transaction->type, (int) $transaction->amount, $serverId, false);
             }
         } elseif ($type === 'transfer' && $serverId) {
             $transfer = Transfer::withTrashed()->find($serverId);
-            if ($transfer) {
+            if ($transfer && !$transfer->trashed()) {
                 $this->addPendingAdjustment($transfer->from_account_id, -$transfer->amount, 'transfer_out', 'transfer', $serverId);
                 $this->addPendingAdjustment($transfer->to_account_id, $transfer->amount, 'transfer_in', 'transfer', $serverId);
             }
         }
+    }
+
+    /**
+     * Capture les valeurs de solde AVANT modification (transaction/transfert non supprimé).
+     */
+    private function captureOriginalSnapshot(string $serverId, $model): void
+    {
+        if ($model instanceof Transaction) {
+            $this->originalSnapshots[$serverId] = [
+                'was_trashed' => $model->trashed(),
+                'account_id' => $model->account_id,
+                'type' => $model->type,
+                'amount' => (int) $model->amount,
+            ];
+        } elseif ($model instanceof Transfer) {
+            $this->originalSnapshots[$serverId] = [
+                'was_trashed' => $model->trashed(),
+                'from_account_id' => $model->from_account_id,
+                'to_account_id' => $model->to_account_id,
+                'amount' => (int) $model->amount,
+            ];
+        }
+    }
+
+    /**
+     * Reverse le mouvement de solde correspondant à l'état capturé avant update.
+     * Ne fait rien si l'ancien état était déjà supprimé (mouvement non comptabilisé).
+     */
+    private function reverseOriginalSnapshot(string $type, string $serverId): void
+    {
+        $orig = $this->originalSnapshots[$serverId] ?? null;
+        if (!$orig || !empty($orig['was_trashed'])) {
+            return;
+        }
+
+        if ($type === 'transaction') {
+            $this->applyTransactionMovement($orig['account_id'], $orig['type'], (int) $orig['amount'], $serverId, true);
+        } elseif ($type === 'transfer') {
+            // Reverser : re-créditer le compte source, re-débiter le compte destination
+            $this->addPendingAdjustment($orig['from_account_id'], (int) $orig['amount'], 'transfer_in', 'transfer', $serverId, 'Reversal update sync');
+            $this->addPendingAdjustment($orig['to_account_id'], -(int) $orig['amount'], 'transfer_out', 'transfer', $serverId, 'Reversal update sync');
+        }
+    }
+
+    /**
+     * Applique (ou reverse) le mouvement de solde d'une transaction sur son compte.
+     */
+    private function applyTransactionMovement(string $accountId, ?string $txType, int $amount, string $serverId, bool $reverse): void
+    {
+        $sign = $reverse ? -1 : 1;
+        $delta = match ($txType) {
+            'income' => $sign * $amount,
+            'expense' => -$sign * $amount,
+            default => 0,
+        };
+        if ($delta === 0) {
+            return;
+        }
+        // Le type d'historique reflète le sens réel du mouvement appliqué
+        $historyType = $delta > 0 ? 'income' : 'expense';
+        $this->addPendingAdjustment($accountId, $delta, $historyType, 'transaction', $serverId, $reverse ? 'Reversal update sync' : null);
     }
 
     /**
@@ -360,6 +423,61 @@ class SyncController extends Controller
     }
 
     /**
+     * Vérifie que toutes les clés étrangères présentes dans $data appartiennent bien à l'utilisateur.
+     * Empêche un client de rattacher une transaction/transfert au compte ou à la dette d'autrui (IDOR).
+     * Les catégories peuvent être privées (à l'utilisateur) OU système (user_id = NULL).
+     *
+     * @throws \RuntimeException si une FK ne peut être résolue dans le périmètre de l'utilisateur
+     */
+    private function assertForeignKeysBelongToUser($user, array $data): void
+    {
+        // Champs FK pointant vers un compte de l'utilisateur
+        $accountFields = ['account_id', 'from_account_id', 'to_account_id', 'transfer_to_account_id', 'salary_account_id'];
+        foreach ($accountFields as $field) {
+            if (!empty($data[$field])) {
+                $ok = Account::withTrashed()
+                    ->whereKey($data[$field])
+                    ->where('user_id', $user->id)
+                    ->exists();
+                if (!$ok) {
+                    throw new \RuntimeException("Compte non autorisé pour le champ {$field}");
+                }
+            }
+        }
+
+        // Champs FK pointant vers une catégorie (privée à l'utilisateur ou système)
+        foreach (['category_id', 'salary_category_id', 'parent_id'] as $field) {
+            if (!empty($data[$field])) {
+                $ok = Category::withTrashed()
+                    ->whereKey($data[$field])
+                    ->where(function ($q) use ($user) {
+                        $q->where('user_id', $user->id)->orWhereNull('user_id');
+                    })
+                    ->exists();
+                if (!$ok) {
+                    throw new \RuntimeException("Catégorie non autorisée pour le champ {$field}");
+                }
+            }
+        }
+
+        // Dette de l'utilisateur
+        if (!empty($data['debt_id'])) {
+            $ok = Debt::withTrashed()->whereKey($data['debt_id'])->where('user_id', $user->id)->exists();
+            if (!$ok) {
+                throw new \RuntimeException('Dette non autorisée');
+            }
+        }
+
+        // Transaction de l'utilisateur (ex. debt_payment.transaction_id)
+        if (!empty($data['transaction_id'])) {
+            $ok = Transaction::withTrashed()->whereKey($data['transaction_id'])->where('user_id', $user->id)->exists();
+            if (!$ok) {
+                throw new \RuntimeException('Transaction non autorisée');
+            }
+        }
+    }
+
+    /**
      * Retourne la classe du modèle selon le type
      */
     private function getModelClass(string $type): ?string
@@ -384,6 +502,9 @@ class SyncController extends Controller
     {
         // Retirer les champs non-fillable
         unset($data['id'], $data['user_id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
+
+        // Sécurité : vérifier que les FK référencées appartiennent bien à l'utilisateur (anti-IDOR)
+        $this->assertForeignKeysBelongToUser($user, $data);
 
         // Pour les comptes, s'assurer que balance = initial_balance si non fourni
         if ($modelClass === Account::class) {
@@ -579,6 +700,14 @@ class SyncController extends Controller
 
         // Appliquer les changements
         unset($data['id'], $data['user_id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
+
+        // Sécurité : vérifier que les FK référencées appartiennent bien à l'utilisateur (anti-IDOR)
+        $this->assertForeignKeysBelongToUser($user, $data);
+
+        // Capturer l'état AVANT modification pour pouvoir reverser l'ancien mouvement de solde
+        // (transactions/transferts). Évite le double-comptage lors d'un update.
+        $this->captureOriginalSnapshot($serverId, $model);
+
         $model->fill($data);
         $model->save();
 

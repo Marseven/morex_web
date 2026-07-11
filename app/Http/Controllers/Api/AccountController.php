@@ -231,8 +231,8 @@ class AccountController extends Controller
     }
 
     #[OA\Post(
-        path: "/accounts/reorder",
-        summary: "Réordonner les comptes",
+        path: "/accounts/balance-reset",
+        summary: "Réajuster le solde réel des comptes",
         tags: ["Accounts"],
         security: [["bearerAuth" => []]],
         requestBody: new OA\RequestBody(
@@ -246,7 +246,7 @@ class AccountController extends Controller
                         items: new OA\Items(
                             properties: [
                                 new OA\Property(property: "id", type: "string", format: "uuid"),
-                                new OA\Property(property: "order_index", type: "integer"),
+                                new OA\Property(property: "real_balance", type: "integer"),
                             ]
                         )
                     ),
@@ -254,7 +254,7 @@ class AccountController extends Controller
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: "Ordre mis à jour"),
+            new OA\Response(response: 200, description: "Soldes réajustés"),
             new OA\Response(response: 401, description: "Non authentifié"),
         ]
     )]
@@ -321,6 +321,34 @@ class AccountController extends Controller
         ]);
     }
 
+    #[OA\Post(
+        path: "/accounts/reorder",
+        summary: "Réordonner les comptes",
+        tags: ["Accounts"],
+        security: [["bearerAuth" => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["accounts"],
+                properties: [
+                    new OA\Property(
+                        property: "accounts",
+                        type: "array",
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: "id", type: "string", format: "uuid"),
+                                new OA\Property(property: "order_index", type: "integer"),
+                            ]
+                        )
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Ordre mis à jour"),
+            new OA\Response(response: 401, description: "Non authentifié"),
+        ]
+    )]
     public function reorder(Request $request): JsonResponse
     {
         $validated = $request->validate([

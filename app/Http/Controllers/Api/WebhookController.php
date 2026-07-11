@@ -32,7 +32,19 @@ class WebhookController extends Controller
         $user = $request->user();
 
         // Determine account: use provided account_id or try to match by source
-        $accountId = $validated['account_id'] ?? null;
+        // Sécurité : le compte fourni DOIT appartenir à l'utilisateur (anti-IDOR)
+        $accountId = null;
+        if (!empty($validated['account_id'])) {
+            $accountId = $user->accounts()
+                ->whereKey($validated['account_id'])
+                ->value('id');
+            if (!$accountId) {
+                return response()->json([
+                    'message' => 'Compte invalide.',
+                    'parsed' => true,
+                ], 403);
+            }
+        }
         if (!$accountId) {
             // Try to find a matching account by name
             $source = strtolower($result['source'] ?? '');

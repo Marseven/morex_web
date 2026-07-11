@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\Debt;
 use App\Models\User;
 use Carbon\Carbon;
@@ -211,9 +212,11 @@ class DebtTest extends TestCase
             'current_amount' => 100000,
             'status' => 'active',
         ]);
+        $account = Account::factory()->for($this->user)->create();
 
         $response = $this->actingAs($this->user)->post("/debts/{$debt->id}/payment", [
             'amount' => 30000,
+            'account_id' => $account->id,
         ]);
 
         $response->assertRedirect();
@@ -228,9 +231,11 @@ class DebtTest extends TestCase
             'current_amount' => 30000,
             'status' => 'active',
         ]);
+        $account = Account::factory()->for($this->user)->create();
 
         $response = $this->actingAs($this->user)->post("/debts/{$debt->id}/payment", [
             'amount' => 30000,
+            'account_id' => $account->id,
         ]);
 
         $response->assertRedirect();
@@ -258,7 +263,7 @@ class DebtTest extends TestCase
         $response = $this->actingAs($this->user)->delete("/debts/{$debt->id}");
 
         $response->assertRedirect('/debts');
-        $this->assertDatabaseMissing('debts', ['id' => $debt->id]);
+        $this->assertSoftDeleted('debts', ['id' => $debt->id]);
     }
 
     public function test_user_cannot_delete_other_users_debt(): void

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  tests:
+    name: Tests (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php: ['8.2']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, dom, fileinfo, sqlite3, pdo_sqlite, bcmath
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests
+        # La suite tourne sur SQLite :memory: (voir phpunit.xml)
+        run: php artisan test

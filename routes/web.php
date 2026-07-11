@@ -18,19 +18,19 @@ use Illuminate\Support\Facades\Route;
 // Routes d'authentification (publiques)
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 
     // Password Reset
     Route::get('/forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
-    Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email')->middleware('throttle:5,1');
     Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
-    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.update');
+    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.update')->middleware('throttle:5,1');
 
     // 2FA Challenge (user authenticated but not yet 2FA verified)
     Route::get('/two-factor-challenge', [TwoFactorAuthController::class, 'showChallenge'])->name('two-factor.challenge');
-    Route::post('/two-factor-challenge', [TwoFactorAuthController::class, 'verifyChallenge']);
+    Route::post('/two-factor-challenge', [TwoFactorAuthController::class, 'verifyChallenge'])->middleware('throttle:5,1');
 });
 
 // Routes protégées
