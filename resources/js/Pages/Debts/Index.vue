@@ -200,7 +200,8 @@ const getProgress = (debt) => {
             <div v-if="paidDebts.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Historique (Payé)</h2>
                 <div class="glass-card">
-                    <table class="w-full">
+                    <div class="overflow-x-auto">
+                    <table class="w-full min-w-[640px]">
                         <thead>
                             <tr class="border-b border-theme-border">
                                 <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Nom</th>
@@ -220,6 +221,7 @@ const getProgress = (debt) => {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>

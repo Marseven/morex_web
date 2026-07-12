@@ -161,7 +161,8 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                         <p class="text-sm text-theme-text-secondary">Aucune catégorie de dépense</p>
                     </div>
 
-                    <table v-else class="w-full">
+                    <div v-else class="overflow-x-auto">
+                    <table class="w-full min-w-[640px]">
                         <thead>
                             <tr class="border-b border-theme-border">
                                 <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Catégorie</th>
@@ -220,6 +221,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 
@@ -231,7 +233,8 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                         <p class="text-sm text-theme-text-secondary">Aucune catégorie de revenu</p>
                     </div>
 
-                    <table v-else class="w-full">
+                    <div v-else class="overflow-x-auto">
+                    <table class="w-full min-w-[640px]">
                         <thead>
                             <tr class="border-b border-theme-border">
                                 <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Catégorie</th>
@@ -266,6 +269,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 

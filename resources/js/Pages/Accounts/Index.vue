@@ -95,7 +95,8 @@ const submitAdjust = () => {
                 </div>
 
                 <!-- Simple view -->
-                <table v-else-if="!showDetails" class="w-full">
+                <div v-else-if="!showDetails" class="overflow-x-auto">
+                <table class="w-full min-w-[640px]">
                     <thead>
                         <tr class="border-b border-theme-border">
                             <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Compte</th>
@@ -147,6 +148,7 @@ const submitAdjust = () => {
                         </tr>
                     </tbody>
                 </table>
+                </div>
 
                 <!-- Reconciliation view -->
                 <div v-else class="divide-y divide-theme-border">

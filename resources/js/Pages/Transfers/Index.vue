@@ -93,7 +93,8 @@ const deleteTransfer = (transfer) => {
                     </Link>
                 </div>
 
-                <table v-else class="w-full">
+                <div v-else class="overflow-x-auto">
+                <table class="w-full min-w-[640px]">
                     <thead>
                         <tr class="border-b border-theme-border">
                             <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">De</th>
@@ -134,6 +135,7 @@ const deleteTransfer = (transfer) => {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <!-- Pagination -->
