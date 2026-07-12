@@ -15,6 +15,13 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon-180.png">
 
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MR Money">
+
     <!-- Open Graph / Social -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="MR Money - Pilotez votre avenir financier">
@@ -33,5 +40,16 @@
 </head>
 <body class="font-sans antialiased bg-theme-bg text-theme-text-primary">
     @inertia
+
+    <!-- PWA : enregistrement du service worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js').catch(function (error) {
+                    console.warn('Service worker registration failed:', error);
+                });
+            });
+        }
+    </script>
 </body>
 </html>

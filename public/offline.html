@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#005C53">
+    <title>Hors ligne — MR Money</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.25rem;
+            padding: 2rem;
+            text-align: center;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            background: #003a34;
+            color: #e6fffb;
+        }
+        img { width: 96px; height: 96px; border-radius: 20px; }
+        h1 { font-size: 1.25rem; margin: 0; }
+        p { margin: 0; max-width: 28rem; color: #9fded6; line-height: 1.5; }
+        button {
+            margin-top: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #003a34;
+            background: #35e0c9;
+            border: none;
+            border-radius: 0.75rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <img src="/images/pwa-192.png" alt="MR Money">
+    <h1>Vous êtes hors ligne</h1>
+    <p>Impossible de charger cette page sans connexion. Vérifiez votre réseau et réessayez.</p>
+    <button onclick="location.reload()">Réessayer</button>
+</body>
+</html>
