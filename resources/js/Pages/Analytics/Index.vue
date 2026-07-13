@@ -281,8 +281,22 @@ const budgetChartOptions = computed(() => ({
                     </button>
                 </div>
                 <div v-if="categoryBreakdown.length === 0" class="px-4 py-8 text-center text-sm text-theme-text-secondary">Aucune dépense pour cette période</div>
-                <div v-else class="overflow-x-auto">
-                <table class="w-full min-w-[640px]">
+                <template v-else>
+                <!-- Liste en cartes (mobile) : pas de scroll horizontal, troncature propre -->
+                <ul class="sm:hidden divide-y divide-theme-border">
+                    <li v-for="cat in categoryBreakdown" :key="cat.id" class="flex items-center gap-3 px-4 py-3">
+                        <div class="w-3 h-3 rounded-full flex-shrink-0" :style="{ backgroundColor: cat.color }"></div>
+                        <span class="min-w-0 flex-1 truncate text-sm text-theme-text-primary">{{ cat.name }}</span>
+                        <div class="flex flex-col items-end flex-shrink-0">
+                            <span class="text-sm font-medium text-theme-text-primary whitespace-nowrap">{{ formatAmount(cat.amount) }}</span>
+                            <span class="text-xs text-theme-text-muted">{{ cat.percentage }}%</span>
+                        </div>
+                    </li>
+                </ul>
+
+                <!-- Tableau (tablette / desktop) -->
+                <div class="hidden sm:block overflow-x-auto">
+                <table class="w-full">
                     <thead>
                         <tr class="border-b border-theme-border">
                             <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Catégorie</th>
@@ -306,6 +320,7 @@ const budgetChartOptions = computed(() => ({
                     </tbody>
                 </table>
                 </div>
+                </template>
             </div>
         </div>
     </AppLayout>

@@ -8,6 +8,7 @@ import {
     SparklesIcon,
     ClockIcon,
     CheckCircleIcon,
+    TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -211,8 +212,26 @@ const getTypeLabel = (type) => {
             <div v-if="completedGoals.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Complétés</h2>
                 <div class="glass-card">
-                    <div class="overflow-x-auto">
-                    <table class="w-full min-w-[640px]">
+                    <!-- Liste en cartes (mobile) : pas de scroll horizontal, troncature propre -->
+                    <ul class="sm:hidden divide-y divide-theme-border">
+                        <li v-for="goal in completedGoals" :key="goal.id" class="flex items-center gap-3 px-4 py-3">
+                            <div class="w-2 h-2 rounded-full bg-success flex-shrink-0"></div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-theme-text-primary truncate">{{ goal.name }}</p>
+                                <p class="text-xs text-theme-text-muted truncate">{{ getTypeLabel(goal.type) }}</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <span class="text-sm font-medium text-success whitespace-nowrap">{{ formatAmount(goal.target_amount) }} FCFA</span>
+                                <button @click="deleteGoal(goal)" class="p-1.5 -my-1 rounded-md text-theme-text-secondary hover:text-danger" title="Supprimer" aria-label="Supprimer">
+                                    <TrashIcon class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <!-- Tableau (tablette / desktop) -->
+                    <div class="hidden sm:block overflow-x-auto">
+                    <table class="w-full">
                         <thead>
                             <tr class="border-b border-theme-border">
                                 <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Objectif</th>

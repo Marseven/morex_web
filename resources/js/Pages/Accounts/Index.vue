@@ -1,7 +1,7 @@
 <script setup>
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { WalletIcon } from '@heroicons/vue/24/outline'
+import { WalletIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { ref } from 'vue'
 
 const props = defineProps({
@@ -95,8 +95,37 @@ const submitAdjust = () => {
                 </div>
 
                 <!-- Simple view -->
-                <div v-else-if="!showDetails" class="overflow-x-auto">
-                <table class="w-full min-w-[640px]">
+                <template v-else-if="!showDetails">
+                <!-- Liste en cartes (mobile) : pas de scroll horizontal, troncature propre -->
+                <ul class="sm:hidden divide-y divide-theme-border">
+                    <li v-for="account in accounts" :key="account.id" class="flex items-center gap-3 px-4 py-3">
+                        <div class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: account.color || '#fff' }"></div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-theme-text-primary truncate">{{ account.name }}</p>
+                            <p class="text-xs text-theme-text-muted truncate">
+                                {{ accountTypeLabels[account.type] || account.type }}<span v-if="account.is_default"> · Par défaut</span>
+                            </p>
+                        </div>
+                        <div class="flex flex-col items-end flex-shrink-0">
+                            <span class="text-sm font-medium text-theme-text-primary whitespace-nowrap">{{ formatAmount(account.balance) }} FCFA</span>
+                            <div class="flex items-center gap-0.5 mt-1">
+                                <button @click="openAdjust(account)" class="p-1.5 -my-1 rounded-md text-xs text-theme-text-secondary hover:text-theme-text-primary">
+                                    Ajuster
+                                </button>
+                                <Link :href="`/accounts/${account.id}/edit`" class="p-1.5 -my-1 rounded-md text-theme-text-secondary hover:text-theme-text-primary" title="Modifier" aria-label="Modifier">
+                                    <PencilSquareIcon class="w-4 h-4" />
+                                </Link>
+                                <button @click="deleteAccount(account)" class="p-1.5 -my-1 rounded-md text-theme-text-secondary hover:text-danger" title="Supprimer" aria-label="Supprimer">
+                                    <TrashIcon class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+
+                <!-- Tableau (tablette / desktop) -->
+                <div class="hidden sm:block overflow-x-auto">
+                <table class="w-full">
                     <thead>
                         <tr class="border-b border-theme-border">
                             <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Compte</th>
@@ -149,6 +178,7 @@ const submitAdjust = () => {
                     </tbody>
                 </table>
                 </div>
+                </template>
 
                 <!-- Reconciliation view -->
                 <div v-else class="divide-y divide-theme-border">

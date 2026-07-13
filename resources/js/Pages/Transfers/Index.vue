@@ -4,6 +4,8 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
     ArrowsRightLeftIcon,
+    PencilSquareIcon,
+    TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -93,8 +95,34 @@ const deleteTransfer = (transfer) => {
                     </Link>
                 </div>
 
-                <div v-else class="overflow-x-auto">
-                <table class="w-full min-w-[640px]">
+                <template v-else>
+                <!-- Liste en cartes (mobile) : pas de scroll horizontal, troncature propre -->
+                <ul class="sm:hidden divide-y divide-theme-border">
+                    <li v-for="transfer in transfers.data" :key="transfer.id" class="flex items-center gap-3 px-4 py-3">
+                        <div class="w-2 h-2 rounded-full flex-shrink-0 bg-blue-400"></div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-theme-text-primary truncate">
+                                {{ transfer.from_account?.name || '?' }} → {{ transfer.to_account?.name || '?' }}
+                            </p>
+                            <p class="text-xs text-theme-text-muted truncate">{{ formatDate(transfer.date) }}</p>
+                        </div>
+                        <div class="flex flex-col items-end flex-shrink-0">
+                            <span class="text-sm font-medium text-blue-400 whitespace-nowrap">{{ formatAmount(transfer.amount) }} FCFA</span>
+                            <div class="flex items-center gap-0.5 mt-1">
+                                <Link :href="`/transfers/${transfer.id}/edit`" class="p-1.5 -my-1 rounded-md text-theme-text-secondary hover:text-theme-text-primary" title="Modifier" aria-label="Modifier">
+                                    <PencilSquareIcon class="w-4 h-4" />
+                                </Link>
+                                <button @click="deleteTransfer(transfer)" class="p-1.5 -my-1 rounded-md text-theme-text-secondary hover:text-danger" title="Supprimer" aria-label="Supprimer">
+                                    <TrashIcon class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+
+                <!-- Tableau (tablette / desktop) -->
+                <div class="hidden sm:block overflow-x-auto">
+                <table class="w-full">
                     <thead>
                         <tr class="border-b border-theme-border">
                             <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">De</th>
@@ -136,6 +164,7 @@ const deleteTransfer = (transfer) => {
                     </tbody>
                 </table>
                 </div>
+                </template>
             </div>
 
             <!-- Pagination -->

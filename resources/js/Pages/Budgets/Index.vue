@@ -11,6 +11,8 @@ import {
     LockClosedIcon,
     ClockIcon,
     CheckCircleIcon,
+    PencilSquareIcon,
+    TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -161,8 +163,47 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                         <p class="text-sm text-theme-text-secondary">Aucune catégorie de dépense</p>
                     </div>
 
-                    <div v-else class="overflow-x-auto">
-                    <table class="w-full min-w-[640px]">
+                    <template v-else>
+                    <!-- Liste en cartes (mobile) -->
+                    <ul class="sm:hidden divide-y divide-theme-border">
+                        <li v-for="cat in expenseCategories" :key="cat.id" class="flex items-center gap-3 px-4 py-3">
+                            <div class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: cat.color || '#71717A' }"></div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-theme-text-primary truncate">{{ cat.name }}</p>
+                                <p v-if="cat.budget_limit" class="text-xs text-theme-text-muted truncate">
+                                    {{ formatAmount(cat.spent_this_month) }} / {{ formatAmount(cat.budget_limit) }} FCFA
+                                </p>
+                                <p v-else class="text-xs text-theme-text-muted truncate">
+                                    Pas de budget<span v-if="cat.is_system"> · Système</span>
+                                </p>
+                                <div v-if="cat.budget_limit" class="w-full h-1.5 bg-theme-surface rounded-full overflow-hidden mt-1">
+                                    <div
+                                        class="h-full rounded-full transition-all"
+                                        :class="getBudgetProgress(cat) > 100 ? 'bg-danger' : getBudgetProgress(cat) > 80 ? 'bg-warning' : 'bg-theme-btn-primary-bg'"
+                                        :style="{ width: `${Math.min(100, getBudgetProgress(cat))}%` }"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-0.5 flex-shrink-0">
+                                <Link :href="`/budgets/${cat.id}/edit`" class="p-1.5 rounded-md text-theme-text-secondary hover:text-theme-text-primary" title="Modifier" aria-label="Modifier">
+                                    <PencilSquareIcon class="w-4 h-4" />
+                                </Link>
+                                <button
+                                    v-if="!cat.is_system"
+                                    @click="deleteCategory(cat)"
+                                    class="p-1.5 rounded-md text-theme-text-secondary hover:text-danger"
+                                    title="Supprimer"
+                                    aria-label="Supprimer"
+                                >
+                                    <TrashIcon class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <!-- Tableau (tablette / desktop) -->
+                    <div class="hidden sm:block overflow-x-auto">
+                    <table class="w-full">
                         <thead>
                             <tr class="border-b border-theme-border">
                                 <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Catégorie</th>
@@ -222,6 +263,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                         </tbody>
                     </table>
                     </div>
+                    </template>
                 </div>
             </div>
 
@@ -233,8 +275,35 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                         <p class="text-sm text-theme-text-secondary">Aucune catégorie de revenu</p>
                     </div>
 
-                    <div v-else class="overflow-x-auto">
-                    <table class="w-full min-w-[640px]">
+                    <template v-else>
+                    <!-- Liste en cartes (mobile) -->
+                    <ul class="sm:hidden divide-y divide-theme-border">
+                        <li v-for="cat in incomeCategories" :key="cat.id" class="flex items-center gap-3 px-4 py-3">
+                            <div class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: cat.color || '#71717A' }"></div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-theme-text-primary truncate">{{ cat.name }}</p>
+                                <p v-if="cat.is_system" class="text-xs text-theme-text-muted truncate">Système</p>
+                            </div>
+                            <div class="flex items-center gap-0.5 flex-shrink-0">
+                                <Link :href="`/budgets/${cat.id}/edit`" class="p-1.5 rounded-md text-theme-text-secondary hover:text-theme-text-primary" title="Modifier" aria-label="Modifier">
+                                    <PencilSquareIcon class="w-4 h-4" />
+                                </Link>
+                                <button
+                                    v-if="!cat.is_system"
+                                    @click="deleteCategory(cat)"
+                                    class="p-1.5 rounded-md text-theme-text-secondary hover:text-danger"
+                                    title="Supprimer"
+                                    aria-label="Supprimer"
+                                >
+                                    <TrashIcon class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <!-- Tableau (tablette / desktop) -->
+                    <div class="hidden sm:block overflow-x-auto">
+                    <table class="w-full">
                         <thead>
                             <tr class="border-b border-theme-border">
                                 <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Catégorie</th>
@@ -270,6 +339,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                         </tbody>
                     </table>
                     </div>
+                    </template>
                 </div>
             </div>
 

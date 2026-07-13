@@ -8,6 +8,7 @@ import {
     ArrowUpCircleIcon,
     ScaleIcon,
     ExclamationCircleIcon,
+    TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -200,8 +201,25 @@ const getProgress = (debt) => {
             <div v-if="paidDebts.length > 0">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-3">Historique (Payé)</h2>
                 <div class="glass-card">
-                    <div class="overflow-x-auto">
-                    <table class="w-full min-w-[640px]">
+                    <!-- Liste en cartes (mobile) : pas de scroll horizontal, troncature propre -->
+                    <ul class="sm:hidden divide-y divide-theme-border">
+                        <li v-for="debt in paidDebts" :key="debt.id" class="flex items-center gap-3 px-4 py-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-theme-text-primary truncate">{{ debt.name }}</p>
+                                <p class="text-xs truncate" :class="debt.type === 'debt' ? 'text-danger' : 'text-success'">{{ debt.type === 'debt' ? 'Dette' : 'Créance' }}</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <span class="text-sm font-medium text-theme-text-primary whitespace-nowrap">{{ formatAmount(debt.initial_amount) }}</span>
+                                <button @click="deleteDebt(debt)" class="p-1.5 -my-1 rounded-md text-theme-text-secondary hover:text-danger" title="Supprimer" aria-label="Supprimer">
+                                    <TrashIcon class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <!-- Tableau (tablette / desktop) -->
+                    <div class="hidden sm:block overflow-x-auto">
+                    <table class="w-full">
                         <thead>
                             <tr class="border-b border-theme-border">
                                 <th class="px-4 py-3 text-left text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Nom</th>
