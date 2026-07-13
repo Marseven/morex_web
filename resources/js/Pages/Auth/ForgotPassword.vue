@@ -45,7 +45,7 @@ const submit = () => {
                             type="email"
                             required
                             autofocus
-                            class="w-full bg-theme-surface/50 border border-theme-border rounded-lg px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
+                            class="w-full bg-theme-surface border border-theme-border rounded-lg px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
                             placeholder="votre@email.com"
                         />
                         <p v-if="form.errors.email" class="mt-2 text-xs text-danger">

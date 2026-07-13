@@ -49,7 +49,7 @@ const submit = () => {
                         type="email"
                         required
                         autofocus
-                        class="w-full bg-theme-surface/50 border border-theme-border rounded-lg px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
+                        class="w-full bg-theme-surface border border-theme-border rounded-lg px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
                         placeholder="votre@email.com"
                     />
                     <p v-if="form.errors.email" class="mt-2 text-xs text-danger">
@@ -66,7 +66,7 @@ const submit = () => {
                         v-model="form.password"
                         type="password"
                         required
-                        class="w-full bg-theme-surface/50 border border-theme-border rounded-lg px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
+                        class="w-full bg-theme-surface border border-theme-border rounded-lg px-4 py-3 text-theme-text-primary text-sm placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
                         placeholder="••••••••"
                     />
                     <p v-if="form.errors.password" class="mt-2 text-xs text-danger">
@@ -80,7 +80,7 @@ const submit = () => {
                             id="remember"
                             v-model="form.remember"
                             type="checkbox"
-                            class="w-4 h-4 bg-theme-surface/50 border-theme-border rounded text-[var(--color-brand)] focus:ring-[var(--color-brand)] focus:ring-offset-0"
+                            class="w-4 h-4 bg-theme-surface border-theme-border rounded text-[var(--color-brand)] focus:ring-[var(--color-brand)] focus:ring-offset-0"
                         />
                         <label for="remember" class="ml-2 text-sm text-theme-text-secondary">
                             Se souvenir de moi

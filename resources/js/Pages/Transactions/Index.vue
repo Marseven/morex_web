@@ -20,6 +20,7 @@ const props = defineProps({
 
 const localFilters = ref({
     type: props.filters.type || '',
+    category_id: props.filters.category_id || '',
     account_id: props.filters.account_id || '',
     search: props.filters.search || '',
 })
@@ -88,16 +89,16 @@ const deleteTransaction = (tx) => {
                         @input="onSearchInput"
                         type="text"
                         placeholder="Rechercher..."
-                        class="w-full bg-theme-surface/50 border border-theme-border rounded-lg pl-9 pr-4 py-2 text-sm text-theme-text-primary placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
+                        class="w-full bg-theme-surface border border-theme-border rounded-lg pl-9 pr-4 py-2 text-sm text-theme-text-primary placeholder-theme-text-muted input-glow focus:ring-0 outline-none transition-all duration-200"
                     />
                 </div>
 
-                <!-- Filter selects (côte à côte sur mobile) -->
-                <div class="flex items-center gap-3">
+                <!-- Filter selects (répartis, 2 par ligne sur mobile) -->
+                <div class="flex flex-wrap items-center gap-3">
                     <select
                         v-model="localFilters.type"
                         @change="applyFilters"
-                        class="flex-1 sm:flex-none min-w-0 bg-theme-surface/50 border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
+                        class="flex-1 sm:flex-none min-w-[140px] bg-theme-surface border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
                     >
                         <option value="">Tous types</option>
                         <option value="expense">Dépenses</option>
@@ -105,9 +106,19 @@ const deleteTransaction = (tx) => {
                         <option value="transfer">Transferts</option>
                     </select>
                     <select
+                        v-model="localFilters.category_id"
+                        @change="applyFilters"
+                        class="flex-1 sm:flex-none min-w-[140px] bg-theme-surface border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
+                    >
+                        <option value="">Toutes catégories</option>
+                        <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                            {{ cat.name }}
+                        </option>
+                    </select>
+                    <select
                         v-model="localFilters.account_id"
                         @change="applyFilters"
-                        class="flex-1 sm:flex-none min-w-0 bg-theme-surface/50 border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
+                        class="flex-1 sm:flex-none min-w-[140px] bg-theme-surface border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
                     >
                         <option value="">Tous comptes</option>
                         <option v-for="account in accounts" :key="account.id" :value="account.id">
