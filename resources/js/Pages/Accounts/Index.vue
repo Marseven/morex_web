@@ -273,12 +273,21 @@ const submitAdjust = () => {
                             <p v-if="adjustForm.errors.balance" class="text-xs text-red-400 mt-1">{{ adjustForm.errors.balance }}</p>
                         </div>
 
-                        <div v-if="adjustForm.balance !== adjustingAccount.balance">
+                        <div v-if="adjustForm.balance !== adjustingAccount.balance" class="rounded-md border border-theme-border bg-theme-surface p-3 space-y-1">
                             <p class="text-xs text-theme-text-muted">
                                 Différence :
                                 <span :class="adjustForm.balance > adjustingAccount.balance ? 'text-green-400' : 'text-red-400'">
                                     {{ adjustForm.balance > adjustingAccount.balance ? '+' : '' }}{{ formatAmount(adjustForm.balance - adjustingAccount.balance) }} FCFA
                                 </span>
+                            </p>
+                            <!-- Interprétation : un écart = probablement une transaction oubliée -->
+                            <p class="text-xs" :class="adjustForm.balance > adjustingAccount.balance ? 'text-green-400' : 'text-red-400'">
+                                {{ adjustForm.balance > adjustingAccount.balance
+                                    ? '↑ Il y a plus que prévu — une entrée oubliée ?'
+                                    : '↓ Il manque de l\'argent — une dépense oubliée ?' }}
+                            </p>
+                            <p class="text-[11px] text-theme-text-muted">
+                                Astuce : mieux vaut saisir la transaction manquante que d'ajuster, pour garder un historique juste.
                             </p>
                         </div>
                     </div>

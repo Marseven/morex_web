@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\BudgetCycle;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
@@ -61,6 +62,12 @@ class HandleInertiaRequests extends Middleware
             ],
             'currentDate' => now()->format('d/m/Y'),
             'currentBudgetPeriod' => fn () => $this->getCurrentBudgetPeriod($request),
+            // Nombre de transactions en attente de validation (import SMS) → badge cloche.
+            'pendingCount' => fn () => $request->user()
+                ? Transaction::where('user_id', $request->user()->id)
+                    ->where('status', 'pending_validation')
+                    ->count()
+                : 0,
         ];
     }
 

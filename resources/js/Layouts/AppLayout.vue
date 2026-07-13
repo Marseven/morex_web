@@ -23,6 +23,7 @@ const page = usePage()
 const user = computed(() => page.props.auth?.user)
 const currentDate = computed(() => page.props.currentDate)
 const currentBudgetPeriod = computed(() => page.props.currentBudgetPeriod)
+const pendingCount = computed(() => page.props.pendingCount || 0)
 
 const navigation = [
     { name: 'Dashboard', href: '/', icon: HomeIcon },
@@ -266,15 +267,20 @@ const getInitials = (name) => {
                 </div>
 
                 <div class="flex flex-1 items-center justify-end gap-2">
-                    <!-- Notification bell -->
-                    <button
+                    <!-- Notification bell → transactions à valider -->
+                    <Link
+                        href="/transactions/pending"
                         class="relative w-9 h-9 flex items-center justify-center rounded-lg text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-surface-hover transition-all duration-200"
-                        title="Notifications"
+                        title="Transactions à valider"
                     >
                         <BellIcon class="w-5 h-5" />
-                        <!-- Badge (uncomment when notifications exist) -->
-                        <!-- <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger pulse-dot"></span> -->
-                    </button>
+                        <span
+                            v-if="pendingCount > 0"
+                            class="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center text-[10px] font-semibold rounded-full bg-danger text-white"
+                        >
+                            {{ pendingCount > 99 ? '99+' : pendingCount }}
+                        </span>
+                    </Link>
 
                     <!-- Theme toggle -->
                     <button

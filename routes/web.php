@@ -45,6 +45,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('accounts.adjust-balance');
 
     // Transactions
+    // (routes spécifiques AVANT la resource pour ne pas être capturées par {transaction})
+    Route::get('/transactions/pending', [TransactionController::class, 'pending'])->name('transactions.pending');
+    Route::post('/transactions/{transaction}/validate', [TransactionController::class, 'validateTransaction'])->name('transactions.validate');
     Route::resource('transactions', TransactionController::class);
 
     // Budgets (catégories)

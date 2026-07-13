@@ -161,4 +161,46 @@ class TransactionController extends Controller
         return redirect()->route('transactions.index')
             ->with('success', 'Transaction supprimée avec succès.');
     }
+
+    /**
+     * Liste des transactions en attente de validation (importées par SMS).
+     */
+    public function pending(Request $request): Response
+    {
+        $transactions = $request->user()->transactions()
+            ->with(['category', 'account'])
+            ->where('status', 'pending_validation')
+            ->orderByDesc('date')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $categories = Category::where(function ($q) use ($request) {
+            $q->where('user_id', $request->user()->id)->orWhere('is_system', true);
+        })->orderBy('order_index')->get();
+
+        return Inertia::render('Transactions/Pending', [
+            'transactions' => $transactions,
+            'categories' => $categories,
+        ]);
+    }
+
+    /**
+     * Valide une transaction en attente (optionnellement en (re)catégorisant).
+     */
+    public function validateTransaction(Request $request, Transaction $transaction)
+    {
+        $this->authorize('update', $transaction);
+
+        $validated = $request->validate([
+            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($request->user()->id)],
+        ]);
+
+        if (array_key_exists('category_id', $validated)) {
+            $transaction->category_id = $validated['category_id'];
+        }
+        $transaction->status = 'confirmed';
+        $transaction->save();
+
+        return back()->with('success', 'Transaction validée.');
+    }
 }
