@@ -40,10 +40,17 @@ export async function subscribeToPush(vapidPublicKey) {
 
     const res = await fetch('/push-subscriptions', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'Accept': 'application/json' },
         body: JSON.stringify(subscription.toJSON()),
     })
-    if (!res.ok) throw new Error('Enregistrement de l\'abonnement échoué.')
+    if (!res.ok) {
+        const hint = res.status === 404 ? ' (route introuvable — videz le cache de routes)'
+            : res.status === 419 ? ' (session expirée — rechargez la page)'
+            : res.status === 401 ? ' (non connecté)'
+            : ''
+        throw new Error(`Enregistrement de l'abonnement échoué (${res.status})${hint}.`)
+    }
     return true
 }
 
@@ -56,6 +63,7 @@ export async function unsubscribeFromPush() {
 
     await fetch('/push-subscriptions', {
         method: 'DELETE',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'Accept': 'application/json' },
         body: JSON.stringify({ endpoint: subscription.endpoint }),
     })
