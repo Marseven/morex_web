@@ -84,6 +84,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile/avatar', [ProfileController::class, 'deleteAvatar'])->name('profile.avatar.delete');
     Route::put('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
 
+    // Web Push (notifications PWA)
+    Route::post('/push-subscriptions', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('push.store');
+    Route::delete('/push-subscriptions', [\App\Http\Controllers\PushSubscriptionController::class, 'destroy'])->name('push.destroy');
+
     // 2FA Management
     Route::post('/two-factor/enable', [TwoFactorAuthController::class, 'enable'])->name('two-factor.enable');
     Route::post('/two-factor/confirm', [TwoFactorAuthController::class, 'confirm'])->name('two-factor.confirm');

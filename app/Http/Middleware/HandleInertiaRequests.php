@@ -61,6 +61,7 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
             ],
             'currentDate' => now()->format('d/m/Y'),
+            'vapidPublicKey' => config('webpush.public_key'),
             'currentBudgetPeriod' => fn () => $this->getCurrentBudgetPeriod($request),
             // Nombre de transactions en attente de validation (import SMS) → badge cloche.
             'pendingCount' => fn () => $request->user()

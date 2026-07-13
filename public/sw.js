@@ -10,7 +10,7 @@
  *
  * Incrémenter CACHE_VERSION à chaque changement de la liste de précache.
  */
-const CACHE_VERSION = 'mrmoney-v1';
+const CACHE_VERSION = 'mrmoney-v2';
 const PRECACHE = `${CACHE_VERSION}-precache`;
 const RUNTIME = `${CACHE_VERSION}-runtime`;
 
@@ -44,6 +44,39 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// Notifications Web Push
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: 'MR Money', body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'MR Money';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: '/images/pwa-192.png',
+      badge: '/images/pwa-192.png',
+      data: { url: data.url || '/' },
+      tag: data.tag || 'mrmoney',
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) { client.navigate(url); return client.focus(); }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
 });
 
 function isStaticAsset(url) {

@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Head, useForm, router, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { UserIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
+import { UserIcon, ShieldCheckIcon, BellIcon } from '@heroicons/vue/24/outline'
+import { pushSupported, isSubscribed, subscribeToPush, unsubscribeFromPush } from '@/pushNotifications'
 
 const props = defineProps({
     user: { type: Object, required: true },
@@ -10,6 +11,37 @@ const props = defineProps({
 })
 
 const page = usePage()
+
+// Notifications push (PWA)
+const pushIsSupported = ref(false)
+const pushEnabled = ref(false)
+const pushBusy = ref(false)
+const pushError = ref('')
+
+onMounted(async () => {
+    pushIsSupported.value = pushSupported()
+    if (pushIsSupported.value) {
+        try { pushEnabled.value = await isSubscribed() } catch (e) { /* ignore */ }
+    }
+})
+
+const togglePush = async () => {
+    pushError.value = ''
+    pushBusy.value = true
+    try {
+        if (pushEnabled.value) {
+            await unsubscribeFromPush()
+            pushEnabled.value = false
+        } else {
+            await subscribeToPush(page.props.vapidPublicKey)
+            pushEnabled.value = true
+        }
+    } catch (e) {
+        pushError.value = e.message || 'Une erreur est survenue.'
+    } finally {
+        pushBusy.value = false
+    }
+}
 
 // Profile form
 const profileForm = useForm({
@@ -433,6 +465,37 @@ const isSettingUp2FA = computed(() => {
                             <p v-if="twoFactorDisableForm.errors.password" class="text-xs text-danger mt-1">{{ twoFactorDisableForm.errors.password }}</p>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="glass-card p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <BellIcon class="w-4 h-4 text-theme-text-secondary" />
+                    <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Notifications</h2>
+                </div>
+
+                <div v-if="!pushIsSupported" class="text-sm text-theme-text-muted">
+                    Les notifications ne sont pas supportées par ce navigateur.
+                    <span class="block text-xs mt-1">Sur iPhone, installez d'abord l'app sur l'écran d'accueil (iOS 16.4+).</span>
+                </div>
+
+                <div v-else class="flex items-center justify-between gap-4">
+                    <div class="min-w-0">
+                        <p class="text-sm text-theme-text-primary">Rappels quotidiens de saisie</p>
+                        <p class="text-xs text-theme-text-muted">Recevez un rappel pour ne pas oublier de noter vos dépenses.</p>
+                        <p v-if="pushError" class="text-xs text-danger mt-1">{{ pushError }}</p>
+                    </div>
+                    <button
+                        @click="togglePush"
+                        :disabled="pushBusy"
+                        class="flex-shrink-0 px-4 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+                        :class="pushEnabled
+                            ? 'border border-theme-border text-theme-text-secondary hover:text-theme-text-primary'
+                            : 'bg-theme-btn-primary-bg text-theme-btn-primary-text hover:opacity-90'"
+                    >
+                        {{ pushBusy ? '...' : (pushEnabled ? 'Désactiver' : 'Activer') }}
+                    </button>
                 </div>
             </div>
 
