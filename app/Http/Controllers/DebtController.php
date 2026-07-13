@@ -68,7 +68,10 @@ class DebtController extends Controller
         $this->authorize('update', $debt);
 
         return Inertia::render('Debts/Edit', [
-            'debt' => $debt,
+            // due_date en Y-m-d (fuseau app) pour <input type="date"> — évite le décalage UTC.
+            'debt' => array_merge($debt->toArray(), [
+                'due_date' => $debt->due_date?->format('Y-m-d'),
+            ]),
         ]);
     }
 

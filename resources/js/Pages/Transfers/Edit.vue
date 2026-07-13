@@ -8,12 +8,15 @@ const props = defineProps({
     accounts: { type: Array, default: () => [] },
 })
 
+// <input type="date"> exige yyyy-MM-dd, sinon le champ s'affiche vide.
+const toDateInput = (value) => (value ? String(value).slice(0, 10) : '')
+
 const form = useForm({
     from_account_id: props.transfer.from_account_id,
     to_account_id: props.transfer.to_account_id,
     amount: props.transfer.amount,
     description: props.transfer.description || '',
-    date: props.transfer.date,
+    date: toDateInput(props.transfer.date),
 })
 
 const toAccounts = computed(() => {

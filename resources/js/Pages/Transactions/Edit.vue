@@ -9,6 +9,10 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
 })
 
+// Un <input type="date"> exige le format yyyy-MM-dd ; on normalise quel que soit
+// le format reçu (date simple ou datetime ISO) sinon le champ s'affiche vide.
+const toDateInput = (value) => (value ? String(value).slice(0, 10) : '')
+
 const form = useForm({
     amount: props.transaction.amount,
     type: props.transaction.type,
@@ -16,7 +20,7 @@ const form = useForm({
     account_id: props.transaction.account_id,
     beneficiary: props.transaction.beneficiary || '',
     description: props.transaction.description || '',
-    date: props.transaction.date,
+    date: toDateInput(props.transaction.date),
     transfer_to_account_id: props.transaction.transfer_to_account_id || '',
 })
 

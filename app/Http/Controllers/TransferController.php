@@ -79,8 +79,13 @@ class TransferController extends Controller
 
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
 
+        $transfer->load(['fromAccount', 'toAccount']);
+
         return Inertia::render('Transfers/Edit', [
-            'transfer' => $transfer->load(['fromAccount', 'toAccount']),
+            // Date en Y-m-d (fuseau app) pour <input type="date"> — évite le décalage UTC.
+            'transfer' => array_merge($transfer->toArray(), [
+                'date' => $transfer->date?->format('Y-m-d'),
+            ]),
             'accounts' => $accounts,
         ]);
     }

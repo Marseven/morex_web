@@ -37,6 +37,10 @@
 
 /* Theme Variables */
 :root {
+    /* Indique aux contrôles natifs (select, input[type=date], scrollbars) d'utiliser
+       le rendu sombre → évite le texte blanc sur fond blanc dans les listes déroulantes. */
+    color-scheme: dark;
+
     /* Dark theme (default) — teal-tinted palette */
     --color-bg: #060B0A;
     --color-surface: #0F1816;
@@ -58,6 +62,7 @@
 }
 
 .light {
+    color-scheme: light;
     --color-bg: #F5F5F5;
     --color-surface: #FFFFFF;
     --color-surface-light: #F0F0F0;
@@ -75,6 +80,23 @@
     --color-lime-glow: rgba(0,92,83,0.08);
     --color-teal-glow: rgba(0,92,83,0.1);
     --color-surface-hover: #EBEBEB;
+}
+
+/* Lisibilité des listes déroulantes natives sur tous les navigateurs
+   (certains n'héritent pas de la couleur du <select> pour ses <option>). */
+option,
+optgroup {
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+}
+
+/* Le calendrier natif de input[type=date] suit le thème via color-scheme.
+   On garantit aussi que l'icône reste visible en thème sombre. */
+:root input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+}
+.light input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: none;
 }
 
 /* Atmospheric background effect */

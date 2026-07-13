@@ -117,8 +117,14 @@ class TransactionController extends Controller
               ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
 
+        $transaction->load(['category', 'account', 'transferToAccount']);
+
         return Inertia::render('Transactions/Edit', [
-            'transaction' => $transaction->load(['category', 'account', 'transferToAccount']),
+            // On sérialise la date en Y-m-d (fuseau de l'app) pour <input type="date"> :
+            // le cast 'date' brut renverrait un datetime ISO en UTC → décalage d'un jour.
+            'transaction' => array_merge($transaction->toArray(), [
+                'date' => $transaction->date?->format('Y-m-d'),
+            ]),
             'accounts' => $accounts,
             'categories' => $categories,
         ]);

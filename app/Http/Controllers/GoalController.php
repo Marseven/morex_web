@@ -69,8 +69,13 @@ class GoalController extends Controller
 
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
 
+        $goal->load('account');
+
         return Inertia::render('Goals/Edit', [
-            'goal' => $goal->load('account'),
+            // target_date en Y-m-d (fuseau app) pour <input type="date"> — évite le décalage UTC.
+            'goal' => array_merge($goal->toArray(), [
+                'target_date' => $goal->target_date?->format('Y-m-d'),
+            ]),
             'accounts' => $accounts,
         ]);
     }
