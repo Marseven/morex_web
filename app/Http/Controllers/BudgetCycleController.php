@@ -48,10 +48,16 @@ class BudgetCycleController extends Controller
             ->orderBy('order_index')
             ->get(['id', 'name', 'budget_limit', 'color', 'icon']);
 
+        // Revenu suggéré = moyenne des revenus des cycles clôturés (pour pré-remplir).
+        $suggestedIncome = (int) round(BudgetClosure::where('user_id', $user->id)->avg('total_income') ?? 0);
+
         return Inertia::render('BudgetCycles/Index', [
             'activeCycle' => $activeCycle,
             'closures' => $closures,
             'categories' => $categories,
+            'suggestedIncome' => $suggestedIncome,
+            // Cible d'épargne (objectif financier) affichée comme repère.
+            'savingsTargetRate' => 25,
         ]);
     }
 
@@ -59,6 +65,7 @@ class BudgetCycleController extends Controller
     {
         $validated = $request->validate([
             'start_date' => ['sometimes', 'date'],
+            'expected_income' => ['nullable', 'integer', 'min:0'],
             'budgets' => ['sometimes', 'array'],
             'budgets.*.id' => ['required', 'uuid'],
             'budgets.*.budget_limit' => ['nullable', 'integer', 'min:0'],
@@ -108,6 +115,7 @@ class BudgetCycleController extends Controller
             'period_name' => $periodName,
             'total_budget' => $totalBudget,
             'total_spent' => 0,
+            'expected_income' => $validated['expected_income'] ?? 0,
             'status' => 'active',
         ]);
         $newCycle->user_id = $user->id;

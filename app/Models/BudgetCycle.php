@@ -17,6 +17,7 @@ class BudgetCycle extends Model
         'period_name',
         'total_budget',
         'total_spent',
+        'expected_income',
         'status',
         'trigger_transaction_id',
     ];
@@ -26,6 +27,7 @@ class BudgetCycle extends Model
         'end_date' => 'date',
         'total_budget' => 'integer',
         'total_spent' => 'integer',
+        'expected_income' => 'integer',
     ];
 
     public function user(): BelongsTo

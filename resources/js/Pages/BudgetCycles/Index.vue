@@ -8,6 +8,8 @@ const props = defineProps({
     activeCycle: { type: Object, default: null },
     closures: { type: Array, default: () => [] },
     categories: { type: Array, default: () => [] },
+    suggestedIncome: { type: Number, default: 0 },
+    savingsTargetRate: { type: Number, default: 25 },
 })
 
 const formatAmount = (amount) => {
@@ -24,6 +26,7 @@ const closingCycle = ref(false)
 // Modale d'ajustement des budgets par catégorie au lancement d'un cycle
 const showStartModal = ref(false)
 const budgetForm = ref([])
+const expectedIncome = ref(0)
 
 const openStartModal = () => {
     budgetForm.value = props.categories.map(c => ({
@@ -32,6 +35,7 @@ const openStartModal = () => {
         color: c.color,
         budget_limit: c.budget_limit ?? 0,
     }))
+    expectedIncome.value = props.suggestedIncome || 0
     showStartModal.value = true
 }
 
@@ -39,9 +43,19 @@ const totalBudgetPreview = computed(() =>
     budgetForm.value.reduce((sum, c) => sum + (Number(c.budget_limit) || 0), 0)
 )
 
+// Cohérence entrées/sorties : épargne prévue = revenu prévu − budgets de dépenses.
+const plannedSavings = computed(() => (Number(expectedIncome.value) || 0) - totalBudgetPreview.value)
+const plannedSavingsRate = computed(() => {
+    const income = Number(expectedIncome.value) || 0
+    if (income <= 0) return 0
+    return Math.round((plannedSavings.value / income) * 100)
+})
+const isOverBudget = computed(() => plannedSavings.value < 0)
+
 const confirmStartCycle = () => {
     startingNewCycle.value = true
     router.post('/budget-cycles/start', {
+        expected_income: Number(expectedIncome.value) || 0,
         budgets: budgetForm.value.map(c => ({
             id: c.id,
             budget_limit: Number(c.budget_limit) || 0,
@@ -111,10 +125,14 @@ const closeCycle = () => {
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                     <div>
                         <p class="text-theme-text-muted mb-1">Début</p>
                         <p class="text-theme-text-primary">{{ formatDate(activeCycle.start_date) }}</p>
+                    </div>
+                    <div v-if="activeCycle.expected_income">
+                        <p class="text-theme-text-muted mb-1">Revenu prévu</p>
+                        <p class="text-theme-text-primary">{{ formatAmount(activeCycle.expected_income) }} FCFA</p>
                     </div>
                     <div>
                         <p class="text-theme-text-muted mb-1">Budget total</p>
@@ -202,6 +220,22 @@ const closeCycle = () => {
 
                 <!-- Liste des catégories avec budget éditable -->
                 <div class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                    <!-- Revenu prévu du cycle -->
+                    <div>
+                        <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-1">Revenu prévu du cycle</label>
+                        <div class="relative">
+                            <input
+                                v-model.number="expectedIncome"
+                                type="number"
+                                min="0"
+                                class="w-full bg-theme-surface border border-theme-border rounded-md pl-3 pr-12 py-2 text-sm text-right text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
+                            />
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-theme-text-muted pointer-events-none">FCFA</span>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-theme-divider"></div>
+
                     <p class="text-xs text-theme-text-secondary">Ajustez le budget alloué à chaque catégorie pour ce cycle.</p>
 
                     <div v-if="budgetForm.length === 0" class="text-sm text-theme-text-muted py-6 text-center">
@@ -227,11 +261,30 @@ const closeCycle = () => {
                     </div>
                 </div>
 
-                <!-- Pied : total + actions -->
+                <!-- Pied : cohérence entrées/sorties + actions -->
                 <div class="border-t border-theme-border px-4 py-3 space-y-3">
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="text-theme-text-secondary">Budget total</span>
-                        <span class="font-semibold text-theme-text-primary">{{ formatAmount(totalBudgetPreview) }} FCFA</span>
+                    <div class="space-y-1.5 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-theme-text-secondary">Budget dépenses</span>
+                            <span class="text-theme-text-primary">{{ formatAmount(totalBudgetPreview) }} FCFA</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-theme-text-secondary">Épargne prévue</span>
+                            <span class="font-semibold" :class="isOverBudget ? 'text-danger' : 'text-success'">
+                                {{ isOverBudget ? '' : '+' }}{{ formatAmount(plannedSavings) }} FCFA
+                                <span class="text-xs font-normal text-theme-text-muted">({{ plannedSavingsRate }}%)</span>
+                            </span>
+                        </div>
+                        <!-- Repère : cible d'épargne / dépassement -->
+                        <p v-if="isOverBudget" class="text-xs text-danger">
+                            ⚠️ Vos budgets dépassent le revenu prévu. Réduisez des catégories pour équilibrer.
+                        </p>
+                        <p v-else-if="plannedSavingsRate < savingsTargetRate" class="text-xs text-warning">
+                            Épargne sous la cible de {{ savingsTargetRate }}%. Réduisez des dépenses pour l'atteindre.
+                        </p>
+                        <p v-else class="text-xs text-success">
+                            👍 Épargne au-dessus de la cible de {{ savingsTargetRate }}%.
+                        </p>
                     </div>
                     <div class="flex gap-3">
                         <button
