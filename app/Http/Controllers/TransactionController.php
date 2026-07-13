@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Transaction;
 use App\Rules\OwnedOrSystemCategory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -160,6 +161,60 @@ class TransactionController extends Controller
 
         return redirect()->route('transactions.index')
             ->with('success', 'Transaction supprimée avec succès.');
+    }
+
+    /**
+     * Page d'import de relevé (CSV).
+     */
+    public function showImport(Request $request): Response
+    {
+        $accounts = $request->user()->accounts()->orderBy('order_index')->get();
+        $categories = Category::where(function ($q) use ($request) {
+            $q->where('user_id', $request->user()->id)->orWhere('is_system', true);
+        })->orderBy('order_index')->get();
+
+        return Inertia::render('Transactions/Import', [
+            'accounts' => $accounts,
+            'categories' => $categories,
+        ]);
+    }
+
+    /**
+     * Crée en masse les transactions d'un relevé importé.
+     */
+    public function import(Request $request)
+    {
+        $userId = $request->user()->id;
+
+        $validated = $request->validate([
+            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
+            'rows' => ['required', 'array', 'min:1', 'max:500'],
+            'rows.*.date' => ['required', 'date'],
+            'rows.*.amount' => ['required', 'integer', 'min:1'],
+            'rows.*.type' => ['required', 'in:expense,income'],
+            'rows.*.beneficiary' => ['nullable', 'string', 'max:255'],
+            'rows.*.description' => ['nullable', 'string', 'max:1000'],
+            'rows.*.category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+        ]);
+
+        DB::transaction(function () use ($validated, $userId) {
+            foreach ($validated['rows'] as $row) {
+                $tx = new Transaction([
+                    'amount' => $row['amount'],
+                    'type' => $row['type'],
+                    'account_id' => $validated['account_id'],
+                    'category_id' => $row['category_id'] ?? null,
+                    'beneficiary' => $row['beneficiary'] ?? null,
+                    'description' => $row['description'] ?? null,
+                    'date' => $row['date'],
+                ]);
+                $tx->user_id = $userId;
+                $tx->save();
+            }
+        });
+
+        return redirect()->route('transactions.index')
+            ->with('success', count($validated['rows']) . ' transaction(s) importée(s).');
     }
 
     /**

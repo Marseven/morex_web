@@ -71,12 +71,20 @@ const deleteTransaction = (tx) => {
                     <ArrowsRightLeftIcon class="w-5 h-5 text-theme-text-secondary" />
                     <h1 class="text-lg font-semibold text-theme-text-primary">Transactions</h1>
                 </div>
-                <Link
-                    href="/transactions/create"
-                    class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors"
-                >
-                    + Nouvelle
-                </Link>
+                <div class="flex items-center gap-2">
+                    <Link
+                        href="/transactions/import"
+                        class="px-3 py-1.5 border border-theme-border text-theme-text-secondary hover:text-theme-text-primary text-sm font-medium rounded-md transition-colors"
+                    >
+                        Importer
+                    </Link>
+                    <Link
+                        href="/transactions/create"
+                        class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors"
+                    >
+                        + Nouvelle
+                    </Link>
+                </div>
             </div>
 
             <!-- Search & Filters -->

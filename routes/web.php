@@ -48,6 +48,8 @@ Route::middleware('auth')->group(function () {
     // (routes spécifiques AVANT la resource pour ne pas être capturées par {transaction})
     Route::get('/transactions/pending', [TransactionController::class, 'pending'])->name('transactions.pending');
     Route::post('/transactions/{transaction}/validate', [TransactionController::class, 'validateTransaction'])->name('transactions.validate');
+    Route::get('/transactions/import', [TransactionController::class, 'showImport'])->name('transactions.import');
+    Route::post('/transactions/import', [TransactionController::class, 'import'])->name('transactions.import.store');
     Route::resource('transactions', TransactionController::class);
 
     // Budgets (catégories)
