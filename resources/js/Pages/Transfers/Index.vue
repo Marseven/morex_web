@@ -168,22 +168,46 @@ const deleteTransfer = (transfer) => {
             </div>
 
             <!-- Pagination -->
-            <div v-if="transfers.last_page > 1" class="flex items-center justify-center gap-1">
-                <template v-for="(link, index) in transfers.links" :key="index">
+            <div v-if="transfers.last_page > 1">
+                <!-- Mobile : pager compact -->
+                <div class="flex sm:hidden items-center justify-between gap-2">
                     <Link
-                        v-if="link.url"
-                        :href="link.url"
-                        class="px-3 py-1 text-sm rounded-md transition-colors"
-                        :class="link.active ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text' : 'text-theme-text-secondary hover:text-theme-text-primary'"
+                        v-if="transfers.prev_page_url"
+                        :href="transfers.prev_page_url"
                         preserve-scroll
-                        v-html="link.label"
-                    />
-                    <span
-                        v-else
-                        class="px-3 py-1 text-sm text-theme-text-muted"
-                        v-html="link.label"
-                    />
-                </template>
+                        class="px-3 py-1.5 text-sm rounded-md border border-theme-border text-theme-text-secondary hover:text-theme-text-primary"
+                    >Précédent</Link>
+                    <span v-else class="px-3 py-1.5 text-sm text-theme-text-muted opacity-50">Précédent</span>
+
+                    <span class="text-sm text-theme-text-secondary">Page {{ transfers.current_page }} / {{ transfers.last_page }}</span>
+
+                    <Link
+                        v-if="transfers.next_page_url"
+                        :href="transfers.next_page_url"
+                        preserve-scroll
+                        class="px-3 py-1.5 text-sm rounded-md border border-theme-border text-theme-text-secondary hover:text-theme-text-primary"
+                    >Suivant</Link>
+                    <span v-else class="px-3 py-1.5 text-sm text-theme-text-muted opacity-50">Suivant</span>
+                </div>
+
+                <!-- Desktop : numéros de page -->
+                <div class="hidden sm:flex items-center justify-center gap-1 flex-wrap">
+                    <template v-for="(link, index) in transfers.links" :key="index">
+                        <Link
+                            v-if="link.url"
+                            :href="link.url"
+                            class="px-3 py-1 text-sm rounded-md transition-colors"
+                            :class="link.active ? 'bg-theme-btn-primary-bg text-theme-btn-primary-text' : 'text-theme-text-secondary hover:text-theme-text-primary'"
+                            preserve-scroll
+                            v-html="link.label"
+                        />
+                        <span
+                            v-else
+                            class="px-3 py-1 text-sm text-theme-text-muted"
+                            v-html="link.label"
+                        />
+                    </template>
+                </div>
             </div>
         </div>
     </AppLayout>
