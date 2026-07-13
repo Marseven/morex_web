@@ -1,7 +1,7 @@
 <script setup>
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { WalletIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { WalletIcon, PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
 import { ref } from 'vue'
 
 const props = defineProps({
@@ -281,10 +281,12 @@ const submitAdjust = () => {
                                 </span>
                             </p>
                             <!-- Interprétation : un écart = probablement une transaction oubliée -->
-                            <p class="text-xs" :class="adjustForm.balance > adjustingAccount.balance ? 'text-green-400' : 'text-red-400'">
-                                {{ adjustForm.balance > adjustingAccount.balance
-                                    ? '↑ Il y a plus que prévu — une entrée oubliée ?'
-                                    : '↓ Il manque de l\'argent — une dépense oubliée ?' }}
+                            <p class="flex items-start gap-1.5 text-xs" :class="adjustForm.balance > adjustingAccount.balance ? 'text-green-400' : 'text-red-400'">
+                                <ArrowUpIcon v-if="adjustForm.balance > adjustingAccount.balance" class="w-4 h-4 flex-shrink-0 mt-px" />
+                                <ArrowDownIcon v-else class="w-4 h-4 flex-shrink-0 mt-px" />
+                                <span>{{ adjustForm.balance > adjustingAccount.balance
+                                    ? 'Il y a plus que prévu — une entrée oubliée ?'
+                                    : 'Il manque de l\'argent — une dépense oubliée ?' }}</span>
                             </p>
                             <p class="text-[11px] text-theme-text-muted">
                                 Astuce : mieux vaut saisir la transaction manquante que d'ajuster, pour garder un historique juste.

@@ -1,7 +1,7 @@
 <script setup>
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { CalendarIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { CalendarIcon, ArrowPathIcon, XMarkIcon, ExclamationTriangleIcon, CheckCircleIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import { ref, computed } from 'vue'
 
 const props = defineProps({
@@ -276,14 +276,17 @@ const closeCycle = () => {
                             </span>
                         </div>
                         <!-- Repère : cible d'épargne / dépassement -->
-                        <p v-if="isOverBudget" class="text-xs text-danger">
-                            ⚠️ Vos budgets dépassent le revenu prévu. Réduisez des catégories pour équilibrer.
+                        <p v-if="isOverBudget" class="flex items-start gap-1.5 text-xs text-danger">
+                            <ExclamationTriangleIcon class="w-4 h-4 flex-shrink-0 mt-px" />
+                            <span>Vos budgets dépassent le revenu prévu. Réduisez des catégories pour équilibrer.</span>
                         </p>
-                        <p v-else-if="plannedSavingsRate < savingsTargetRate" class="text-xs text-warning">
-                            Épargne sous la cible de {{ savingsTargetRate }}%. Réduisez des dépenses pour l'atteindre.
+                        <p v-else-if="plannedSavingsRate < savingsTargetRate" class="flex items-start gap-1.5 text-xs text-warning">
+                            <InformationCircleIcon class="w-4 h-4 flex-shrink-0 mt-px" />
+                            <span>Épargne sous la cible de {{ savingsTargetRate }}%. Réduisez des dépenses pour l'atteindre.</span>
                         </p>
-                        <p v-else class="text-xs text-success">
-                            👍 Épargne au-dessus de la cible de {{ savingsTargetRate }}%.
+                        <p v-else class="flex items-start gap-1.5 text-xs text-success">
+                            <CheckCircleIcon class="w-4 h-4 flex-shrink-0 mt-px" />
+                            <span>Épargne au-dessus de la cible de {{ savingsTargetRate }}%.</span>
                         </p>
                     </div>
                     <div class="flex gap-3">
