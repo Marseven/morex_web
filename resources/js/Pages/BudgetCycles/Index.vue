@@ -1,12 +1,13 @@
 <script setup>
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { CalendarIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
-import { ref } from 'vue'
+import { CalendarIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
     activeCycle: { type: Object, default: null },
     closures: { type: Array, default: () => [] },
+    categories: { type: Array, default: () => [] },
 })
 
 const formatAmount = (amount) => {
@@ -20,14 +21,36 @@ const formatDate = (date) => {
 const startingNewCycle = ref(false)
 const closingCycle = ref(false)
 
-const startNewCycle = () => {
-    if (!confirm('Démarrer un nouveau cycle budgétaire ? Le cycle actuel sera clôturé automatiquement.')) {
-        return
-    }
+// Modale d'ajustement des budgets par catégorie au lancement d'un cycle
+const showStartModal = ref(false)
+const budgetForm = ref([])
 
+const openStartModal = () => {
+    budgetForm.value = props.categories.map(c => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        budget_limit: c.budget_limit ?? 0,
+    }))
+    showStartModal.value = true
+}
+
+const totalBudgetPreview = computed(() =>
+    budgetForm.value.reduce((sum, c) => sum + (Number(c.budget_limit) || 0), 0)
+)
+
+const confirmStartCycle = () => {
     startingNewCycle.value = true
-    router.post('/budget-cycles/start', {}, {
-        onFinish: () => startingNewCycle.value = false
+    router.post('/budget-cycles/start', {
+        budgets: budgetForm.value.map(c => ({
+            id: c.id,
+            budget_limit: Number(c.budget_limit) || 0,
+        })),
+    }, {
+        onFinish: () => {
+            startingNewCycle.value = false
+            showStartModal.value = false
+        },
     })
 }
 
@@ -55,7 +78,7 @@ const closeCycle = () => {
                 </div>
                 <button
                     v-if="!activeCycle"
-                    @click="startNewCycle"
+                    @click="openStartModal"
                     :disabled="startingNewCycle"
                     class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
                 >
@@ -79,7 +102,7 @@ const closeCycle = () => {
                             {{ closingCycle ? 'Clôture...' : 'Clôturer' }}
                         </button>
                         <button
-                            @click="startNewCycle"
+                            @click="openStartModal"
                             :disabled="startingNewCycle"
                             class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
                         >
@@ -109,7 +132,7 @@ const closeCycle = () => {
                 <ArrowPathIcon class="w-12 h-12 text-theme-text-muted mx-auto mb-3" />
                 <p class="text-sm text-theme-text-secondary mb-4">Aucun cycle budgétaire actif</p>
                 <button
-                    @click="startNewCycle"
+                    @click="openStartModal"
                     :disabled="startingNewCycle"
                     class="px-4 py-2 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
                 >
@@ -151,6 +174,79 @@ const closeCycle = () => {
                                 </span>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale : ajustement des budgets par catégorie au lancement du cycle -->
+        <div
+            v-if="showStartModal"
+            class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        >
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showStartModal = false"></div>
+
+            <div class="relative glass-card w-full sm:max-w-lg max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl">
+                <!-- En-tête -->
+                <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+                    <div>
+                        <h2 class="text-base font-semibold text-theme-text-primary">Nouveau cycle budgétaire</h2>
+                        <p v-if="activeCycle" class="text-xs text-theme-text-muted mt-0.5">
+                            Le cycle actuel sera clôturé automatiquement.
+                        </p>
+                    </div>
+                    <button @click="showStartModal = false" class="text-theme-text-secondary hover:text-theme-text-primary">
+                        <XMarkIcon class="w-5 h-5" />
+                    </button>
+                </div>
+
+                <!-- Liste des catégories avec budget éditable -->
+                <div class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                    <p class="text-xs text-theme-text-secondary">Ajustez le budget alloué à chaque catégorie pour ce cycle.</p>
+
+                    <div v-if="budgetForm.length === 0" class="text-sm text-theme-text-muted py-6 text-center">
+                        Aucune catégorie de dépense.
+                    </div>
+
+                    <div
+                        v-for="cat in budgetForm"
+                        :key="cat.id"
+                        class="flex items-center gap-3"
+                    >
+                        <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" :style="{ backgroundColor: cat.color || '#71717A' }"></div>
+                        <label class="flex-1 min-w-0 text-sm text-theme-text-primary truncate">{{ cat.name }}</label>
+                        <div class="relative flex-shrink-0 w-36">
+                            <input
+                                v-model.number="cat.budget_limit"
+                                type="number"
+                                min="0"
+                                class="w-full bg-theme-surface border border-theme-border rounded-md pl-3 pr-12 py-2 text-sm text-right text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
+                            />
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-theme-text-muted pointer-events-none">FCFA</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pied : total + actions -->
+                <div class="border-t border-theme-border px-4 py-3 space-y-3">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-theme-text-secondary">Budget total</span>
+                        <span class="font-semibold text-theme-text-primary">{{ formatAmount(totalBudgetPreview) }} FCFA</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <button
+                            @click="showStartModal = false"
+                            class="flex-1 py-2 text-sm text-theme-text-secondary hover:text-theme-text-primary border border-theme-border rounded-md transition-colors"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            @click="confirmStartCycle"
+                            :disabled="startingNewCycle"
+                            class="flex-1 py-2 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
+                        >
+                            {{ startingNewCycle ? 'Démarrage...' : 'Démarrer le cycle' }}
+                        </button>
                     </div>
                 </div>
             </div>

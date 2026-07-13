@@ -39,9 +39,19 @@ class BudgetCycleController extends Controller
                 ];
             });
 
+        // Catégories de dépense (perso + système) avec leur budget actuel,
+        // pour permettre l'ajustement au lancement d'un cycle.
+        $categories = Category::where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)->orWhereNull('user_id');
+            })
+            ->where('type', 'expense')
+            ->orderBy('order_index')
+            ->get(['id', 'name', 'budget_limit', 'color', 'icon']);
+
         return Inertia::render('BudgetCycles/Index', [
             'activeCycle' => $activeCycle,
             'closures' => $closures,
+            'categories' => $categories,
         ]);
     }
 
@@ -49,9 +59,24 @@ class BudgetCycleController extends Controller
     {
         $validated = $request->validate([
             'start_date' => ['sometimes', 'date'],
+            'budgets' => ['sometimes', 'array'],
+            'budgets.*.id' => ['required', 'uuid'],
+            'budgets.*.budget_limit' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $user = $request->user();
+
+        // Appliquer les budgets ajustés par catégorie (dépenses uniquement, perso ou système)
+        if (!empty($validated['budgets'])) {
+            foreach ($validated['budgets'] as $b) {
+                Category::whereKey($b['id'])
+                    ->where('type', 'expense')
+                    ->where(function ($q) use ($user) {
+                        $q->where('user_id', $user->id)->orWhereNull('user_id');
+                    })
+                    ->update(['budget_limit' => $b['budget_limit'] ?? null]);
+            }
+        }
 
         // Clôturer le cycle actif s'il existe
         $activeCycle = BudgetCycle::where('user_id', $user->id)
