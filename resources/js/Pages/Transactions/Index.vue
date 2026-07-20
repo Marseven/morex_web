@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
@@ -9,6 +9,7 @@ import {
     FunnelIcon,
     XMarkIcon,
     MagnifyingGlassIcon,
+    ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -22,7 +23,17 @@ const localFilters = ref({
     type: props.filters.type || '',
     category_id: props.filters.category_id || '',
     account_id: props.filters.account_id || '',
+    start_date: props.filters.start_date || '',
+    end_date: props.filters.end_date || '',
     search: props.filters.search || '',
+})
+
+// Lien d'export : reprend les filtres courants (période, catégorie, compte…)
+const exportUrl = computed(() => {
+    const params = new URLSearchParams()
+    Object.entries(localFilters.value).forEach(([k, v]) => { if (v) params.append(k, v) })
+    const qs = params.toString()
+    return '/transactions/export' + (qs ? `?${qs}` : '')
 })
 
 let searchTimeout = null
@@ -134,14 +145,43 @@ const deleteTransaction = (tx) => {
                         </option>
                     </select>
                 </div>
-                <button
-                    v-if="Object.values(localFilters).some(v => v)"
-                    @click="clearFilters"
-                    class="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors self-start"
-                >
-                    <XMarkIcon class="w-3.5 h-3.5" />
-                    Effacer
-                </button>
+                <!-- Période (sert aussi à cadrer l'export) -->
+                <div class="flex items-center gap-2">
+                    <input
+                        v-model="localFilters.start_date"
+                        @change="applyFilters"
+                        type="date"
+                        aria-label="Du"
+                        class="flex-1 min-w-0 bg-theme-surface border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
+                    />
+                    <span class="text-xs text-theme-text-muted">au</span>
+                    <input
+                        v-model="localFilters.end_date"
+                        @change="applyFilters"
+                        type="date"
+                        aria-label="Au"
+                        class="flex-1 min-w-0 bg-theme-surface border border-theme-border rounded-lg px-3 py-2 text-sm text-theme-text-primary input-glow focus:ring-0 outline-none transition-all duration-200"
+                    />
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a
+                        :href="exportUrl"
+                        class="inline-flex items-center gap-1 text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors"
+                        title="Exporter en CSV (filtres appliqués)"
+                    >
+                        <ArrowDownTrayIcon class="w-3.5 h-3.5" />
+                        Exporter CSV
+                    </a>
+                    <button
+                        v-if="Object.values(localFilters).some(v => v)"
+                        @click="clearFilters"
+                        class="flex items-center gap-1 text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors"
+                    >
+                        <XMarkIcon class="w-3.5 h-3.5" />
+                        Effacer
+                    </button>
+                </div>
             </div>
 
             <!-- Transactions Table -->

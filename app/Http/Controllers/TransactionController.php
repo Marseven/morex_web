@@ -9,15 +9,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TransactionController extends Controller
 {
-    public function index(Request $request): Response
+    /**
+     * Applique les filtres de la liste (partagés entre l'affichage et l'export).
+     */
+    private function applyFilters($query, Request $request)
     {
-        $query = $request->user()
-            ->transactions()
-            ->with(['category', 'account', 'transferToAccount']);
-
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
@@ -48,6 +48,17 @@ class TransactionController extends Controller
         if ($request->filled('end_date')) {
             $query->whereDate('date', '<=', $request->end_date);
         }
+
+        return $query;
+    }
+
+    public function index(Request $request): Response
+    {
+        $query = $request->user()
+            ->transactions()
+            ->with(['category', 'account', 'transferToAccount']);
+
+        $this->applyFilters($query, $request);
 
         $transactions = $query->orderByDesc('date')
             ->orderByDesc('created_at')
@@ -161,6 +172,41 @@ class TransactionController extends Controller
 
         return redirect()->route('transactions.index')
             ->with('success', 'Transaction supprimée avec succès.');
+    }
+
+    /**
+     * Export CSV des transactions (filtres de la liste appliqués).
+     * Même ordre de colonnes que l'import → aller-retour possible,
+     * et format directement exploitable par une IA pour analyse.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $query = $request->user()->transactions()->with(['category', 'account']);
+        $this->applyFilters($query, $request);
+
+        $filename = 'transactions-' . now()->format('Y-m-d') . '.csv';
+
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 (Excel)
+            fputcsv($out, ['date', 'montant', 'type', 'beneficiaire', 'description', 'categorie', 'compte'], ';');
+
+            $query->orderBy('date')->chunk(500, function ($transactions) use ($out) {
+                foreach ($transactions as $t) {
+                    fputcsv($out, [
+                        $t->date?->format('Y-m-d'),
+                        $t->amount,
+                        $t->type,
+                        $t->beneficiary,
+                        $t->description,
+                        $t->category?->name,
+                        $t->account?->name,
+                    ], ';');
+                }
+            });
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**

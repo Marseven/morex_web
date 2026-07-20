@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/transactions/{transaction}/validate', [TransactionController::class, 'validateTransaction'])->name('transactions.validate');
     Route::get('/transactions/import', [TransactionController::class, 'showImport'])->name('transactions.import');
     Route::post('/transactions/import', [TransactionController::class, 'import'])->name('transactions.import.store');
+    Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
     Route::resource('transactions', TransactionController::class);
 
     // Budgets (catégories)

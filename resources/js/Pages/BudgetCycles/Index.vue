@@ -1,7 +1,7 @@
 <script setup>
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { CalendarIcon, ArrowPathIcon, XMarkIcon, ExclamationTriangleIcon, CheckCircleIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
+import { CalendarIcon, ArrowPathIcon, XMarkIcon, ExclamationTriangleIcon, CheckCircleIcon, InformationCircleIcon, ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
 import { ref, computed } from 'vue'
 
 const props = defineProps({
@@ -42,6 +42,37 @@ const openStartModal = () => {
 const totalBudgetPreview = computed(() =>
     budgetForm.value.reduce((sum, c) => sum + (Number(c.budget_limit) || 0), 0)
 )
+
+// --- Import de budgets (CSV) : "catégorie;montant" par ligne ---------------
+const showBudgetImport = ref(false)
+const budgetImportText = ref('')
+const budgetImportResult = ref('')
+
+const applyBudgetImport = () => {
+    const lines = budgetImportText.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    let applied = 0
+    const unmatched = []
+
+    for (const line of lines) {
+        const sep = line.includes(';') ? ';' : ','
+        const parts = line.split(sep).map(p => p.trim().replace(/^"|"$/g, ''))
+        const name = (parts[0] || '').toLowerCase()
+        const amount = parseInt(String(parts[1] ?? '').replace(/[^\d]/g, ''), 10)
+        if (!name || Number.isNaN(amount)) continue
+
+        const cat = budgetForm.value.find(c => c.name.trim().toLowerCase() === name)
+        if (cat) {
+            cat.budget_limit = amount
+            applied++
+        } else {
+            unmatched.push(parts[0])
+        }
+    }
+
+    budgetImportResult.value = applied === 0 && unmatched.length === 0
+        ? 'Aucune ligne valide détectée.'
+        : `${applied} budget(s) appliqué(s)` + (unmatched.length ? ` — non reconnu(s) : ${unmatched.join(', ')}` : '')
+}
 
 // Cohérence entrées/sorties : épargne prévue = revenu prévu − budgets de dépenses.
 const plannedSavings = computed(() => (Number(expectedIncome.value) || 0) - totalBudgetPreview.value)
@@ -231,6 +262,42 @@ const closeCycle = () => {
                                 class="w-full bg-theme-surface border border-theme-border rounded-md pl-3 pr-12 py-2 text-sm text-right text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
                             />
                             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-theme-text-muted pointer-events-none">FCFA</span>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-theme-divider"></div>
+
+                    <!-- Import de budgets (ex. proposés par une IA à partir de l'export) -->
+                    <div>
+                        <button
+                            type="button"
+                            @click="showBudgetImport = !showBudgetImport"
+                            class="inline-flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+                        >
+                            <ArrowUpTrayIcon class="w-3.5 h-3.5" />
+                            {{ showBudgetImport ? 'Masquer l\'import' : 'Importer des budgets (CSV)' }}
+                        </button>
+
+                        <div v-if="showBudgetImport" class="mt-2 space-y-2">
+                            <p class="text-xs text-theme-text-muted">
+                                Une ligne par catégorie : <code class="text-theme-text-secondary">catégorie ; montant</code>
+                            </p>
+                            <textarea
+                                v-model="budgetImportText"
+                                rows="4"
+                                placeholder="Alimentation ; 60000&#10;Transport ; 30000"
+                                class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-xs text-theme-text-primary font-mono focus:border-theme-text-primary focus:ring-0 outline-none"
+                            ></textarea>
+                            <div class="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    @click="applyBudgetImport"
+                                    class="px-3 py-1.5 text-xs border border-theme-border rounded-md text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+                                >
+                                    Appliquer
+                                </button>
+                                <p v-if="budgetImportResult" class="text-xs text-theme-text-muted">{{ budgetImportResult }}</p>
+                            </div>
                         </div>
                     </div>
 
