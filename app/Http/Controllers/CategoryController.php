@@ -35,7 +35,10 @@ class CategoryController extends Controller
             $q->where('user_id', $user->id)
               ->orWhere('is_system', true);
         })
-        ->withSum(['transactions as spent_this_month' => function ($q) use ($user, $startDateStr, $endDateStr) {
+        // Alias 'spent_cycle' (et NON 'spent_this_month') : éviter de déclencher l'accesseur
+        // getSpentThisMonthAttribute, dont le fallback calendaire fausserait les catégories
+        // sans dépense dans le cycle (withSum null → il recalcule le mois courant).
+        ->withSum(['transactions as spent_cycle' => function ($q) use ($user, $startDateStr, $endDateStr) {
             $q->where('user_id', $user->id)
               ->where('type', 'expense')
               ->where('date', '>=', $startDateStr);
@@ -47,8 +50,9 @@ class CategoryController extends Controller
         ->orderBy('order_index')
         ->get()
         ->map(function ($category) {
-            // S'assurer que spent_this_month est un entier (évite la concaténation de strings en JS)
-            $category->spent_this_month = (int) ($category->spent_this_month ?? 0);
+            // spent_cycle est brut (null si aucune dépense) → on force un entier (0),
+            // ce qui empêche l'accesseur de retomber sur le mois calendaire.
+            $category->spent_this_month = (int) ($category->getAttributes()['spent_cycle'] ?? 0);
             return $category;
         });
 
