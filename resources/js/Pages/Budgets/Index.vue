@@ -431,7 +431,7 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                             <div>
                                 <p class="text-sm font-medium text-theme-text-primary">{{ getMonthName(closure.month, closure.year) }}</p>
                                 <p class="text-xs text-theme-text-muted">
-                                    Revenus: {{ formatAmount(closure.total_budget) }} FCFA
+                                    Revenus: {{ formatAmount(closure.total_income) }} FCFA
                                     · Dépenses: {{ formatAmount(closure.total_spent) }} FCFA
                                 </p>
                             </div>
