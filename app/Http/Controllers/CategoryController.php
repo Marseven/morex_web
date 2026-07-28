@@ -159,91 +159,49 @@ class CategoryController extends Controller
             return back()->with('error', 'Aucune période budgétaire active.');
         }
 
-        $startDate = $activeCycle->start_date->format('Y-m-d');
         $periodName = $activeCycle->period_name;
 
-        // Extraire mois/année pour la clôture
-        $year = $activeCycle->start_date->year;
-        $month = $activeCycle->start_date->month;
-        // Si le cycle commence en fin de mois précédent, utiliser le mois suivant
-        if ($activeCycle->start_date->day >= 25) {
-            $month = $activeCycle->start_date->addMonth()->month;
-            $year = $activeCycle->start_date->addMonth()->year;
-        }
+        // Un SEUL chemin de clôture : on borne bien la période (start_date → aujourd'hui),
+        // et createClosure() calcule proprement revenus, dépenses, budget et épargne
+        // (total_saved = revenus − dépenses). Évite le bug d'addition sans borne de fin
+        // et l'écriture du revenu dans total_budget.
+        $activeCycle->close(now());
+        $closure = $activeCycle->createClosure();
 
-        // Vérifier si déjà clôturé
-        $existingClosure = BudgetClosure::where('user_id', $user->id)
-            ->where('year', $year)
-            ->where('month', $month)
-            ->first();
-
-        if ($existingClosure) {
-            return back()->with('error', 'Cette période a déjà été clôturée.');
-        }
-
-        // Calculer les revenus de la période
-        $totalIncome = Transaction::where('user_id', $user->id)
-            ->where('type', 'income')
-            ->where('date', '>=', $startDate)
-            ->sum('amount');
-
-        // Calculer les dépenses de la période
-        $totalExpenses = Transaction::where('user_id', $user->id)
-            ->where('type', 'expense')
-            ->where('date', '>=', $startDate)
-            ->sum('amount');
-
-        // Solde net = revenus - dépenses (peut être négatif)
-        $netBalance = $totalIncome - $totalExpenses;
-
-        // Détails par catégorie de dépenses
-        $expenseCategories = Category::where(function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-              ->orWhere('is_system', true);
-        })
-        ->where('type', 'expense')
-        ->get();
-
-        $details = [];
-        foreach ($expenseCategories as $cat) {
-            $spent = Transaction::where('user_id', $user->id)
-                ->where('category_id', $cat->id)
-                ->where('type', 'expense')
-                ->where('date', '>=', $startDate)
-                ->sum('amount');
-
-            if ($spent > 0) {
-                $details[] = [
-                    'category_id' => $cat->id,
-                    'category_name' => $cat->name,
-                    'budget' => $cat->budget_limit ?? 0,
-                    'spent' => $spent,
-                ];
-            }
-        }
-
-        // Clôturer le cycle actif
-        $activeCycle->update([
-            'end_date' => now(),
-            'status' => 'closed',
-            'total_spent' => $totalExpenses,
-        ]);
-
-        // Créer l'enregistrement de clôture
-        $closure = new BudgetClosure([
-            'year' => $year,
-            'month' => $month,
-            'total_budget' => $totalIncome,
-            'total_spent' => $totalExpenses,
-            'total_saved' => $netBalance,
-            'details' => $details,
-        ]);
-        $closure->user_id = $user->id;
-        $closure->save();
-
-        $status = $netBalance >= 0 ? 'Excédent' : 'Déficit';
-        $message = "{$periodName} clôturé. {$status}: " . number_format(abs($netBalance), 0, ',', ' ') . " FCFA";
+        $status = $closure->total_saved >= 0 ? 'Excédent' : 'Déficit';
+        $message = "{$periodName} clôturé. {$status}: "
+            . number_format(abs($closure->total_saved), 0, ',', ' ') . " FCFA";
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * Met à jour en masse les budgets (budget_limit) des catégories de dépense.
+     * Utile pour appliquer une proposition (ex. issue d'une analyse IA) sans relancer un cycle.
+     */
+    public function importBudgets(Request $request)
+    {
+        $userId = $request->user()->id;
+
+        $validated = $request->validate([
+            'budgets' => ['required', 'array', 'min:1', 'max:200'],
+            'budgets.*.id' => ['required', 'uuid'],
+            'budgets.*.budget_limit' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $applied = 0;
+        foreach ($validated['budgets'] as $b) {
+            $applied += Category::whereKey($b['id'])
+                ->where('type', 'expense')
+                ->where(function ($q) use ($userId) {
+                    $q->where('user_id', $userId)->orWhereNull('user_id');
+                })
+                ->update(['budget_limit' => $b['budget_limit'] ?? null]);
+        }
+
+        // Aligner le total du cycle actif sur les nouveaux budgets.
+        BudgetCycle::where('user_id', $userId)->where('status', 'active')->first()?->updateTotals();
+
+        return back()->with('success', "{$applied} budget(s) mis à jour.");
     }
 }

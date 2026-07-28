@@ -13,6 +13,7 @@ import {
     CheckCircleIcon,
     PencilSquareIcon,
     TrashIcon,
+    ArrowUpTrayIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -49,6 +50,43 @@ const formatAmount = (amount) => {
 
 const expenseCategories = computed(() => props.categories.filter(c => c.type === 'expense'))
 const incomeCategories = computed(() => props.categories.filter(c => c.type === 'income'))
+
+// --- Import de budgets (CSV "catégorie;montant") ---------------------------
+const showBudgetImport = ref(false)
+const budgetImportText = ref('')
+const budgetImportResult = ref('')
+const importing = ref(false)
+
+const submitBudgetImport = () => {
+    budgetImportResult.value = ''
+    const lines = budgetImportText.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    const budgets = []
+    const unmatched = []
+    for (const line of lines) {
+        const sep = line.includes(';') ? ';' : ','
+        const parts = line.split(sep).map(p => p.trim().replace(/^"|"$/g, ''))
+        const name = (parts[0] || '').toLowerCase()
+        const amount = parseInt(String(parts[1] ?? '').replace(/[^\d]/g, ''), 10)
+        if (!name || Number.isNaN(amount)) continue
+        const cat = expenseCategories.value.find(c => c.name.trim().toLowerCase() === name)
+        if (cat) budgets.push({ id: cat.id, budget_limit: amount })
+        else unmatched.push(parts[0])
+    }
+    if (budgets.length === 0) {
+        budgetImportResult.value = 'Aucune catégorie reconnue.' + (unmatched.length ? ' Non reconnu(s) : ' + unmatched.join(', ') : '')
+        return
+    }
+    importing.value = true
+    router.post('/budgets/import-limits', { budgets }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showBudgetImport.value = false
+            budgetImportText.value = ''
+            budgetImportResult.value = ''
+        },
+        onFinish: () => { importing.value = false },
+    })
+}
 
 const deleteCategory = (cat) => {
     if (cat.is_system) {
@@ -112,6 +150,42 @@ const overBudgetCount = computed(() => categoriesWithBudget.value.filter(c => (c
                         <LockClosedIcon class="w-4 h-4" />
                         Clôturer le mois
                     </button>
+                </div>
+            </div>
+
+            <!-- Import de budgets -->
+            <div class="glass-card p-4">
+                <button
+                    type="button"
+                    @click="showBudgetImport = !showBudgetImport"
+                    class="inline-flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+                >
+                    <ArrowUpTrayIcon class="w-4 h-4" />
+                    {{ showBudgetImport ? 'Masquer l\'import de budgets' : 'Importer des budgets (CSV)' }}
+                </button>
+
+                <div v-if="showBudgetImport" class="mt-3 space-y-2">
+                    <p class="text-xs text-theme-text-muted">
+                        Une ligne par catégorie : <code class="text-theme-text-secondary">catégorie ; montant</code>.
+                        Applique les budgets aux catégories de dépense correspondantes.
+                    </p>
+                    <textarea
+                        v-model="budgetImportText"
+                        rows="5"
+                        placeholder="Logement ; 395000&#10;Alimentation ; 95000"
+                        class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-xs text-theme-text-primary font-mono focus:border-theme-text-primary focus:ring-0 outline-none"
+                    ></textarea>
+                    <div class="flex items-center gap-3">
+                        <button
+                            type="button"
+                            @click="submitBudgetImport"
+                            :disabled="importing"
+                            class="px-4 py-2 text-sm bg-theme-btn-primary-bg text-theme-btn-primary-text rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
+                        >
+                            {{ importing ? 'Application…' : 'Appliquer les budgets' }}
+                        </button>
+                        <p v-if="budgetImportResult" class="text-xs text-danger">{{ budgetImportResult }}</p>
+                    </div>
                 </div>
             </div>
 

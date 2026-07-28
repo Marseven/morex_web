@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
         'budgets' => 'category',
     ]);
     Route::post('/budgets/close-month', [CategoryController::class, 'closeBudget'])->name('budgets.close');
+    Route::post('/budgets/import-limits', [CategoryController::class, 'importBudgets'])->name('budgets.import-limits');
 
     // Cycles budgétaires
     Route::get('/budget-cycles', [BudgetCycleController::class, 'index'])->name('budget-cycles.index');
