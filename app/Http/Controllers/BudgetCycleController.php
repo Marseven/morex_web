@@ -125,6 +125,32 @@ class BudgetCycleController extends Controller
             ->with('success', "Nouveau cycle '{$periodName}' démarré avec succès.");
     }
 
+    /**
+     * Ajuste la date de début du cycle actif (corrige un cycle démarré à la mauvaise date,
+     * qui ferait fuir les transactions du mois précédent dans « dépensé ce mois »).
+     */
+    public function updateActive(Request $request)
+    {
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+        ]);
+
+        $cycle = BudgetCycle::where('user_id', $request->user()->id)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$cycle) {
+            return back()->with('error', 'Aucun cycle actif.');
+        }
+
+        $cycle->start_date = Carbon::parse($validated['start_date']);
+        $cycle->period_name = BudgetCycle::generatePeriodName($cycle->start_date);
+        $cycle->save();
+        $cycle->updateTotals(); // recalcule total_spent/total_budget sur la nouvelle plage
+
+        return back()->with('success', 'Date de début du cycle mise à jour.');
+    }
+
     public function close(Request $request)
     {
         $validated = $request->validate([

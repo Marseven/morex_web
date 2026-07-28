@@ -23,6 +23,28 @@ const formatDate = (date) => {
 const startingNewCycle = ref(false)
 const closingCycle = ref(false)
 
+// Ajustement de la date de début du cycle actif
+const editingStart = ref(false)
+const newStartDate = ref('')
+const savingStart = ref(false)
+
+const openEditStart = () => {
+    newStartDate.value = props.activeCycle?.start_date
+        ? String(props.activeCycle.start_date).slice(0, 10)
+        : ''
+    editingStart.value = true
+}
+
+const saveStartDate = () => {
+    if (!newStartDate.value) return
+    savingStart.value = true
+    router.put('/budget-cycles/active', { start_date: newStartDate.value }, {
+        preserveScroll: true,
+        onSuccess: () => { editingStart.value = false },
+        onFinish: () => { savingStart.value = false },
+    })
+}
+
 // Modale d'ajustement des budgets par catégorie au lancement d'un cycle
 const showStartModal = ref(false)
 const budgetForm = ref([])
@@ -159,7 +181,23 @@ const closeCycle = () => {
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                     <div>
                         <p class="text-theme-text-muted mb-1">Début</p>
-                        <p class="text-theme-text-primary">{{ formatDate(activeCycle.start_date) }}</p>
+                        <template v-if="editingStart">
+                            <div class="flex items-center gap-2">
+                                <input
+                                    v-model="newStartDate"
+                                    type="date"
+                                    class="bg-theme-surface border border-theme-border rounded px-2 py-1 text-xs text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
+                                />
+                                <button @click="saveStartDate" :disabled="savingStart" class="text-xs text-[var(--color-accent)] disabled:opacity-50">OK</button>
+                                <button @click="editingStart = false" class="text-theme-text-muted hover:text-theme-text-primary" aria-label="Annuler">
+                                    <XMarkIcon class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </template>
+                        <p v-else class="text-theme-text-primary">
+                            {{ formatDate(activeCycle.start_date) }}
+                            <button @click="openEditStart" class="ml-1 text-xs text-theme-text-secondary hover:text-theme-text-primary underline">ajuster</button>
+                        </p>
                     </div>
                     <div v-if="activeCycle.expected_income">
                         <p class="text-theme-text-muted mb-1">Revenu prévu</p>
