@@ -39,9 +39,9 @@ class CategoryController extends Controller
             $q->where('user_id', $user->id)
               ->where('type', 'expense')
               ->where('date', '>=', $startDateStr);
-            if ($endDateStr) {
-                $q->where('date', '<=', $endDateStr);
-            }
+            // Borne haute : end_date du cycle, sinon aujourd'hui (un cycle ouvert ne doit
+            // pas compter de transactions datées dans le futur, ex. récurrences générées).
+            $q->where('date', '<=', $endDateStr ?? now()->format('Y-m-d'));
         }], 'amount')
         ->orderBy('type')
         ->orderBy('order_index')
