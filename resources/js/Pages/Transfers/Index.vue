@@ -56,12 +56,20 @@ const deleteTransfer = (transfer) => {
                     <ArrowsRightLeftIcon class="w-5 h-5 text-theme-text-secondary" />
                     <h1 class="text-lg font-semibold text-theme-text-primary">Transferts</h1>
                 </div>
+                <div class="flex items-center gap-2">
+                <Link
+                    href="/transfers/import"
+                    class="px-3 py-1.5 border border-theme-border text-theme-text-secondary hover:text-theme-text-primary text-sm font-medium rounded-md transition-colors"
+                >
+                    Importer
+                </Link>
                 <Link
                     href="/transfers/create"
                     class="px-3 py-1.5 bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium rounded-md hover:opacity-90 transition-colors"
                 >
                     + Nouveau
                 </Link>
+                </div>
             </div>
 
             <!-- Filters -->

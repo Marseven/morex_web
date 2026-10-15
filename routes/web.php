@@ -71,6 +71,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'contribute'])->name('goals.contribute');
 
     // Transferts
+    Route::get('/transfers/import', [TransferController::class, 'showImport'])->name('transfers.import');
+    Route::post('/transfers/import', [TransferController::class, 'import'])->name('transfers.import.store');
     Route::resource('transfers', TransferController::class);
 
     // Dettes & Créances

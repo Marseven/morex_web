@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Transfer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -71,6 +72,57 @@ class TransferController extends Controller
 
         return redirect()->route('transfers.index')
             ->with('success', 'Transfert créé avec succès.');
+    }
+
+    /**
+     * Page d'import de transferts (CSV).
+     */
+    public function showImport(Request $request): Response
+    {
+        $accounts = $request->user()->accounts()->orderBy('order_index')->get();
+
+        return Inertia::render('Transfers/Import', [
+            'accounts' => $accounts,
+        ]);
+    }
+
+    /**
+     * Crée en masse des transferts depuis un relevé importé.
+     */
+    public function import(Request $request)
+    {
+        $userId = $request->user()->id;
+
+        $validated = $request->validate([
+            'rows' => ['required', 'array', 'min:1', 'max:500'],
+            'rows.*.date' => ['required', 'date'],
+            'rows.*.amount' => ['required', 'integer', 'min:1'],
+            'rows.*.from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
+            'rows.*.to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
+            'rows.*.description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        DB::transaction(function () use ($validated, $userId) {
+            foreach ($validated['rows'] as $row) {
+                // Un transfert doit relier deux comptes distincts.
+                if ($row['from_account_id'] === $row['to_account_id']) {
+                    continue;
+                }
+
+                $transfer = new Transfer([
+                    'from_account_id' => $row['from_account_id'],
+                    'to_account_id' => $row['to_account_id'],
+                    'amount' => $row['amount'],
+                    'description' => $row['description'] ?? null,
+                    'date' => $row['date'],
+                ]);
+                $transfer->user_id = $userId;
+                $transfer->save();
+            }
+        });
+
+        return redirect()->route('transfers.index')
+            ->with('success', count($validated['rows']) . ' transfert(s) importé(s).');
     }
 
     public function edit(Request $request, Transfer $transfer): Response
