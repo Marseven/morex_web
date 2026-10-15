@@ -41,7 +41,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Comptes
-    Route::resource('accounts', AccountController::class);
+    Route::resource('accounts', AccountController::class)->except(['show']);
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('accounts.adjust-balance');
 
     // Transactions
@@ -51,12 +51,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/transactions/import', [TransactionController::class, 'showImport'])->name('transactions.import');
     Route::post('/transactions/import', [TransactionController::class, 'import'])->name('transactions.import.store');
     Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
-    Route::resource('transactions', TransactionController::class);
+    Route::resource('transactions', TransactionController::class)->except(['show']);
 
     // Budgets (catégories)
     Route::resource('budgets', CategoryController::class)->parameters([
         'budgets' => 'category',
-    ]);
+    ])->except(['show']);
     Route::post('/budgets/close-month', [CategoryController::class, 'closeBudget'])->name('budgets.close');
     Route::post('/budgets/import-limits', [CategoryController::class, 'importBudgets'])->name('budgets.import-limits');
 
@@ -67,16 +67,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/budget-cycles/close', [BudgetCycleController::class, 'close'])->name('budget-cycles.close');
 
     // Objectifs
-    Route::resource('goals', GoalController::class);
+    Route::resource('goals', GoalController::class)->except(['show']);
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'contribute'])->name('goals.contribute');
 
     // Transferts
     Route::get('/transfers/import', [TransferController::class, 'showImport'])->name('transfers.import');
     Route::post('/transfers/import', [TransferController::class, 'import'])->name('transfers.import.store');
-    Route::resource('transfers', TransferController::class);
+    // show non implémenté (pas de page détail) → exclu pour éviter qu'un chemin comme
+    // /transfers/import tombe sur show si le cache de routes est périmé.
+    Route::resource('transfers', TransferController::class)->except(['show']);
 
     // Dettes & Créances
-    Route::resource('debts', DebtController::class);
+    Route::resource('debts', DebtController::class)->except(['show']);
     Route::post('/debts/{debt}/payment', [DebtController::class, 'payment'])->name('debts.payment');
 
     // Analytics
