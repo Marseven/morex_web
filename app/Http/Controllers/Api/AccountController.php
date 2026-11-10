@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AccountResource;
 use App\Models\Account;
-use App\Models\BalanceReset;
 use App\Models\Transfer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class AccountController extends Controller
@@ -228,97 +226,6 @@ class AccountController extends Controller
         $account->adjustToBalance($validated['balance']);
 
         return new AccountResource($account->fresh());
-    }
-
-    #[OA\Post(
-        path: "/accounts/balance-reset",
-        summary: "Réajuster le solde réel des comptes",
-        tags: ["Accounts"],
-        security: [["bearerAuth" => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ["accounts"],
-                properties: [
-                    new OA\Property(
-                        property: "accounts",
-                        type: "array",
-                        items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: "id", type: "string", format: "uuid"),
-                                new OA\Property(property: "real_balance", type: "integer"),
-                            ]
-                        )
-                    ),
-                ]
-            )
-        ),
-        responses: [
-            new OA\Response(response: 200, description: "Soldes réajustés"),
-            new OA\Response(response: 401, description: "Non authentifié"),
-        ]
-    )]
-    public function balanceReset(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'accounts' => ['required', 'array', 'min:1'],
-            'accounts.*.id' => ['required', 'uuid'],
-            'accounts.*.real_balance' => ['required', 'integer'],
-        ]);
-
-        $user = $request->user();
-        $results = [];
-
-        DB::transaction(function () use ($user, $validated, &$results) {
-            foreach ($validated['accounts'] as $item) {
-                $account = $user->accounts()->where('id', $item['id'])->first();
-                if (!$account) {
-                    continue;
-                }
-
-                $oldBalance = $account->balance;
-                $oldInitialBalance = $account->initial_balance;
-                $realBalance = $item['real_balance'];
-
-                // Calculate the transaction balance (for reference only)
-                $income = $account->transactions()->where('type', 'income')->sum('amount');
-                $expense = $account->transactions()->where('type', 'expense')->sum('amount');
-                $transfersOut = $account->outgoingTransfers()->sum('amount');
-                $transfersIn = $account->incomingTransfers()->sum('amount');
-
-                $txBalance = $income - $expense - $transfersOut + $transfersIn;
-                $newInitialBalance = $realBalance - $txBalance;
-
-                // Update initial_balance and set balance directly
-                $account->initial_balance = $newInitialBalance;
-                $account->balance = $realBalance;
-                $account->save();
-
-                // Audit trail
-                $reset = new BalanceReset([
-                    'account_id' => $account->id,
-                    'old_balance' => $oldBalance,
-                    'new_balance' => $realBalance,
-                    'old_initial_balance' => $oldInitialBalance,
-                    'reset_date' => now(),
-                ]);
-                $reset->user_id = $user->id;
-                $reset->save();
-
-                $results[] = [
-                    'id' => $account->id,
-                    'name' => $account->name,
-                    'old_balance' => $oldBalance,
-                    'new_balance' => $realBalance,
-                    'initial_balance_adjusted' => $newInitialBalance,
-                ];
-            }
-        });
-
-        return response()->json([
-            'message' => count($results) . ' compte(s) reajuste(s).',
-            'accounts' => $results,
-        ]);
     }
 
     #[OA\Post(
