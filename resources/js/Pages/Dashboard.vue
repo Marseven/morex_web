@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SavingsGoalCard from '@/Components/Goals/SavingsGoalCard.vue'
 import BudgetCapCard from '@/Components/Budgets/BudgetCapCard.vue'
+import TransitCard from '@/Components/Budgets/TransitCard.vue'
 import {
     BanknotesIcon,
     ArrowTrendingUpIcon,
@@ -18,6 +19,8 @@ const props = defineProps({
     periodVariation: { type: Number, default: 0 },
     incomeForPeriod: { type: Number, default: 0 },
     expenseForPeriod: { type: Number, default: 0 },
+    proExpense: { type: Number, default: null },
+    transit: { type: Object, default: null },
     accounts: { type: Array, default: () => [] },
     recentTransactions: { type: Array, default: () => [] },
     activeGoals: { type: Array, default: () => [] },
@@ -114,6 +117,10 @@ const changePeriod = (period) => {
                     </div>
                     <p class="text-xl font-semibold text-danger">{{ formatAmount(expenseForPeriod) }}</p>
                     <p class="text-xs text-theme-text-muted mt-0.5">FCFA</p>
+                    <p v-if="proExpense !== null" class="flex flex-wrap items-center gap-1 text-xs text-theme-text-secondary mt-2">
+                        <span class="px-1.5 py-0.5 rounded-full border border-theme-border bg-theme-surface">Pro</span>
+                        MRTECH {{ formatAmount(proExpense) }} · inclus dans le total
+                    </p>
                 </div>
             </div>
 
@@ -256,6 +263,9 @@ const changePeriod = (period) => {
                             </div>
                         </div>
                     </div>
+
+                    <!-- Tontines et avances (module revenus-transit) -->
+                    <TransitCard v-if="transit" :transit="transit" :period="budgetPeriod" />
 
                     <!-- Plafonds et alertes du cycle (module plafonds-alertes) -->
                     <BudgetCapCard :caps="budgetCategories" :alerts="budgetAlerts" :period="budgetPeriod" />

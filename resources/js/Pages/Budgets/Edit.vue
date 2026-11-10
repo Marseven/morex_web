@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import NatureField from '@/Components/Budgets/NatureField.vue'
 
 const props = defineProps({
     category: { type: Object, required: true },
@@ -12,6 +13,7 @@ const form = useForm({
     color: props.category.color || '#FFFFFF',
     icon: props.category.icon || 'tag',
     budget_limit: props.category.budget_limit || '',
+    nature: props.category.nature || 'regular',
 })
 
 const colors = ['#FFFFFF', '#71717A', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899']
@@ -67,7 +69,9 @@ const submit = () => {
                         />
                     </div>
 
-                    <div v-if="form.type === 'expense'">
+                    <NatureField v-model="form.nature" :error="form.errors.nature" />
+
+                    <div v-if="form.type === 'expense' && form.nature !== 'transit'">
                         <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Budget mensuel (FCFA)</label>
                         <input
                             v-model.number="form.budget_limit"
@@ -75,7 +79,7 @@ const submit = () => {
                             min="0"
                             class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary focus:border-white focus:ring-0 outline-none"
                         />
-                        <p class="text-xs text-theme-text-muted mt-1">Laissez vide si pas de limite</p>
+                        <p class="text-xs text-theme-text-muted mt-1">{{ form.nature === 'pro' ? 'Plafond propre au pro' : 'Laissez vide si pas de limite' }}</p>
                     </div>
 
                     <div>
