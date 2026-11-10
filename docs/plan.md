@@ -6,7 +6,7 @@ Taux de référence : 80 000 FCFA par jour (projet personnel, à titre indicatif
 | # | Module | Contenu (1 ligne) | Dépend de | UI ? | Sensible ? | Est. | Statut |
 |---|---|---|---|---|---|---|---|
 | 0 | correctifs-critiques | P1–P4 (2FA, synchro, verrou du solde, SMS en attente) — PR morex_web#1 + morex_mobile#1 | — | non | oui | — | livré (PR ouvertes) |
-| 1 | socle-prod | `APP_DEBUG` coupé, en-têtes de sécurité, Swagger fermé en prod, `/health`, cron `schedule:run`, sauvegarde MySQL quotidienne | 0 | non | oui | 1 j | à faire |
+| 1 | socle-prod | `APP_DEBUG` coupé, en-têtes de sécurité, Swagger fermé en prod, `/health`, cron `schedule:run`, sauvegarde MySQL quotidienne | 0 | non | oui | 1 j | en cours |
 | 2 | saisie-rapide | Formulaire mobile « montant d'abord », compte par défaut, catégorie suggérée par libellé, modèles favoris, widget iOS | 0 | oui | non | 2 j | à faire |
 | 3 | sms-iphone | Jeton Sanctum limité au webhook, Raccourci iOS documenté, `SmsParser` testé sur des SMS réels, validation en lot | 1 | oui | oui | 2 j | à faire |
 | 4 | rapprochement | Saisie du solde réel → écart, opérations non pointées, transaction d'écart tracée, historique ; remplace `adjustToBalance` | 0 | oui | non | 2 j | à faire |
