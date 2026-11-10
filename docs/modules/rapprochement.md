@@ -1,4 +1,4 @@
-# Module rapprochement                                statut : analysé · 2026-11-10
+# Module rapprochement                                statut : livré · 2026-11-10
 
 **Conclusion** : je saisis le solde réel d'un compte, l'app montre l'écart et les opérations pas encore pointées, et l'écart devient une **opération tracée** (catégorie système « Écart de rapprochement »). Le solde ne change plus jamais en silence. Pour rester sous 15 fichiers, le module se scinde : ici le **serveur, l'API et l'écran web** ; l'écran mobile devient le module 4 bis (`rapprochement-mobile`), qui appellera la même API.
 
@@ -42,3 +42,25 @@
 3. Peut-on supprimer `balance-reset` ? → *Hypothèse : oui (code mort qui contourne les invariants).*
 
 **Hors module** : écran mobile (4 bis), pointage des transferts, rappel push hebdomadaire, import de relevés PDF ou CSV.
+
+## Livré
+- **Serveur** :
+  - migrations réversibles `transactions.reconciled_at`, `reconciliations` et catégories système d'écart à UUID fixes (`Category::RECONCILIATION_*`), avec rollback testé ;
+  - `ReconciliationService` (`reconcile`, `adjustTo`, verrou, fenêtre de pointage) ;
+  - écarts exclus des cycles et de la page Budgets.
+- **API** : `GET /api/accounts/{id}/reconciliation` (avec `older_count`), `POST /api/accounts/{id}/reconciliations`, `StoreReconciliationRequest`, `ReconciliationResource`, `UnclearedTransactionResource`. `balance-reset` est supprimé. `adjust-balance` (web et API) passe par le service et est borné à ±10¹².
+- **Web** : `Accounts/Reconcile.vue` (direction A), `ReconciledBadge`, lien « Rapprocher » dans la page Comptes.
+- **Tests** : 4 fichiers, 37 tests (schéma, service, API 401/403/422, web). Suite : 309 au vert. Parcours vérifié dans le navigateur sur une instance locale jetable : relevé 152 300, taxi décoché → écart +1 800, solde final 151 800, badge à jour, taxi resté à pointer, affichage mobile correct.
+- **Écarts avec l'analyse** :
+  - RM-5 amendée (opérations non cochées non compensées) ;
+  - pas de borne de date sur les opérations à pointer ;
+  - fenêtre des 500 opérations les plus récentes : les plus anciennes sont pointées d'office (RM-3), au lieu d'une pagination à 100.
+- **Revue de sécurité** :
+  - aucun contournement d'autorisation ni IDOR ;
+  - point haut corrigé : une opération future créait un faux écart ;
+  - points moyens corrigés : écart affiché différent au-delà de 500 opérations, montant d'ajustement non borné ;
+  - point bas corrigé : test 403 du POST web.
+- **Reste ouvert (module 7)** :
+  1. une opération déjà pointée reste modifiable depuis le web ou le mobile sans alerte, ce qui peut faire dériver le solde rapproché ;
+  2. les catégories d'écart sont sélectionnables lors d'une saisie normale ; il faudra les refuser dans les validations.
+- **Non vérifié** : le verrou sur MySQL réel (les tests tournent sous SQLite).
