@@ -8,7 +8,7 @@ Taux de référence : 80 000 FCFA par jour (à titre indicatif) → reste ~13 j 
 | 0 | correctifs-critiques | P1–P4 (2FA, synchro, verrou du solde, SMS en attente) — PR morex_web#1 + morex_mobile#1 | — | non | oui | — | livré (PR ouvertes) |
 | 1 | socle-prod | `APP_DEBUG` coupé, en-têtes de sécurité, Swagger fermé en prod, `/health`, cron `schedule:run`, sauvegarde MySQL quotidienne | 0 | non | oui | 1 j | livré (PR ouverte) |
 | 2 | saisie-rapide | Formulaire mobile « montant d'abord », compte par défaut, catégorie suggérée par libellé, modèles favoris, widget iOS | 0 | oui | non | 2 j | livré (PR ouverte) |
-| 2 bis | saisie-lot | Coller les notes d'une journée (« 1500 taxi », « 22500+12000 night club », entrées incluses) → aperçu avec catégorie et compte suggérés (service du module 2) → validation en une fois ; serveur + API + web | 2 | oui | non | 2 j | en cours |
+| 2 bis | saisie-lot | Coller les notes d'une journée (« 1500 taxi », « 22500+12000 night club », entrées incluses) → aperçu avec catégorie et compte suggérés (service du module 2) → validation en une fois ; serveur + API + web | 2 | oui | non | 2 j | livré (PR ouverte) |
 | 2 ter | saisie-lot-mobile | Écran iPhone de saisie en lot, branché sur l'API du module 2 bis | 2 bis | oui | non | 1 j | à faire |
 | 3 | sms-iphone Jeton Sanctum limité au webhook, Raccourci iOS documenté, `SmsParser` testé sur des SMS réels, validation en lot | 1 | oui | oui | 2 j | à faire |
 | 4 | rapprochement | Serveur + API + écran web : solde du relevé → écart, pointage, opération d'écart tracée ; `adjust-balance` passe par le service | 0 | oui | non | 2 j | livré (PR ouverte) |
@@ -16,7 +16,7 @@ Taux de référence : 80 000 FCFA par jour (à titre indicatif) → reste ~13 j 
 | 5 | suivi-objectifs | Objectif 2 M au 31/12 calculé sur le Compte Epargne (transferts compris) ; plafonds réels (sorties 170k, Emilie 150k, abonnements 90k…) avec alertes ; tontines en transit ; pro/perso ; liste d'achats prévus et règle hors-liste > 30k | 4 | oui | non | 3 j | à faire |
 | 6 | recurrences-serveur | Génération des récurrences par le scheduler (idempotente), plus seulement sur le mobile | 1 | non | non | 1 j | à faire |
 | 8 | bilan-mensuel | Bilan du cycle (réalisé vs budget, discrétionnaire, épargne) et proposition du cycle suivant créée directement dans l'app (plus de CSV à générer) | 5 | oui | non | 2 j | à faire |
-| 7 | dette-qualite | 4 tests mobiles périmés, 9 avertissements `flutter analyze`, CI GitHub Actions, points moyens des revues de sécurité, opérations rapprochées modifiables, catégories d'écart sélectionnables | 0 | non | oui | 1,5 j | à faire |
+| 7 | dette-qualite | 4 tests mobiles périmés, 9 avertissements `flutter analyze`, CI GitHub Actions, points moyens des revues de sécurité, opérations rapprochées modifiables, catégories d'écart à refuser aussi en saisie unitaire et en synchro | 0 | non | oui | 1,5 j | à faire |
 
 Statuts : à faire · analysé · en cours · livré · vérifié. Un module = une session, ≤ 15 fichiers.
 Ordre conseillé : 2 bis → 3 → 5 → 8 ; 4 bis, 6 et 7 se glissent entre deux selon le besoin.

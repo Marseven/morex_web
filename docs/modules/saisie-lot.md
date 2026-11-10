@@ -1,4 +1,4 @@
-# Module saisie-lot                                   statut : analysé · 2026-11-10
+# Module saisie-lot                                   statut : livré · 2026-11-10
 
 **Conclusion** : je colle mes notes d'une ou plusieurs journées telles que je les écris, et Morex les transforme en opérations à vérifier, avec catégorie et compte devinés d'après mon historique. J'enregistre le tout en un clic. Ce module couvre **le serveur (analyse + API) et l'écran web**. L'écran iPhone réutilisera la même API dans un module suivant. Aucune migration.
 
@@ -52,3 +52,33 @@
 3. L'écran iPhone fait-il partie de ce module ? → *Hypothèse : non, il fera l'objet d'un module « saisie-lot-mobile » ajouté au plan, qui appellera la même API.*
 
 **Hors module** : écran iPhone, transferts et retraits dans les notes (module 3), dictée vocale, import de fichiers.
+
+## Livré
+- **Serveur** : `NotesParser` (+ DTO `ParsedNoteLine`), `EntrySuggestionService` (historique de 180 jours, doublons), `BatchEntryService`, `PreviewNotesRequest`.
+- **API** : `POST /api/transactions/notes/preview` (Sanctum, `throttle:30,1`).
+- **Web** : `GET /transactions/batch`, `POST /transactions/notes/preview`, page `Transactions/BatchEntry.vue` (direction A, catégorie obligatoire), lien « Saisie en lot » sur la page Transactions.
+- **Import** (`POST /transactions/import`) :
+  - un compte par ligne possible ;
+  - catégories d'écart de rapprochement refusées (point du module 7 traité ici) ;
+  - montant plafonné à 10¹².
+- **Tests** : 4 fichiers, 51 tests (lecture des notes, suggestions, aperçu 200/401/422, import). Suite complète : 359 au vert.
+- **Vérifié dans le navigateur** sur une instance locale jetable, en desktop et iPhone :
+  - 10 lignes analysées, avec les suggestions attendues : taxi → Transport et Portefeuille, night club → Sorties et Airtel ;
+  - 2 lignes à compléter qui bloquent l'enregistrement, 1 ligne non comprise exclue ;
+  - après enregistrement, les soldes sont exacts : Airtel 155 500, Portefeuille 115 500 ;
+  - « déjà saisie ? » est signalé quand on recolle les mêmes notes.
+- **Revue de code**, points hauts corrigés :
+  - un montant collé à une lettre était mal lu (« 2000F » donnait 200) ;
+  - les séparateurs de milliers étaient mal compris (« 1 500 » donnait 1) ;
+  - le mois n'avançait pas d'une journée à l'autre (31 déc → 1) ;
+  - une catégorie ou un compte absent des listes était compté comme choisi.
+- **Revue de code**, points moyens corrigés :
+  - erreur réelle de l'import affichée ;
+  - corrections propres à chaque ligne ;
+  - lignes retirées rétablissables ;
+  - lignes exclues annoncées près du bouton ;
+  - plafond de montant ;
+  - « 16 oct » n'est plus lu comme 16 FCFA ;
+  - date en fin de ligne acceptée sans tiret, et date impossible signalée.
+- **Écarts avec l'analyse** : `2.5` sans suffixe est refusé (ambigu) ; une date de fin de ligne impossible rend la ligne « non comprise ».
+- **Non vérifié** : MySQL réel ; nouveau passage dans le navigateur après les correctifs de la revue (la logique est couverte par les tests).
