@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Account;
 use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\Category;
-use App\Models\Transaction;
 use Illuminate\Http\Request;
-
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,28 +30,31 @@ class CategoryController extends Controller
 
         $categories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })
+            // Les écarts de rapprochement n'ont pas de budget (RM-4)
+            ->whereNotIn('id', Category::RECONCILIATION_IDS)
         // Alias 'spent_cycle' (et NON 'spent_this_month') : éviter de déclencher l'accesseur
         // getSpentThisMonthAttribute, dont le fallback calendaire fausserait les catégories
         // sans dépense dans le cycle (withSum null → il recalcule le mois courant).
-        ->withSum(['transactions as spent_cycle' => function ($q) use ($user, $startDateStr, $endDateStr) {
-            $q->where('user_id', $user->id)
-              ->where('type', 'expense')
-              ->where('date', '>=', $startDateStr);
-            // Borne haute : end_date du cycle, sinon aujourd'hui (un cycle ouvert ne doit
-            // pas compter de transactions datées dans le futur, ex. récurrences générées).
-            $q->where('date', '<=', $endDateStr ?? now()->format('Y-m-d'));
-        }], 'amount')
-        ->orderBy('type')
-        ->orderBy('order_index')
-        ->get()
-        ->map(function ($category) {
-            // spent_cycle est brut (null si aucune dépense) → on force un entier (0),
-            // ce qui empêche l'accesseur de retomber sur le mois calendaire.
-            $category->spent_this_month = (int) ($category->getAttributes()['spent_cycle'] ?? 0);
-            return $category;
-        });
+            ->withSum(['transactions as spent_cycle' => function ($q) use ($user, $startDateStr, $endDateStr) {
+                $q->where('user_id', $user->id)
+                    ->where('type', 'expense')
+                    ->where('date', '>=', $startDateStr);
+                // Borne haute : end_date du cycle, sinon aujourd'hui (un cycle ouvert ne doit
+                // pas compter de transactions datées dans le futur, ex. récurrences générées).
+                $q->where('date', '<=', $endDateStr ?? now()->format('Y-m-d'));
+            }], 'amount')
+            ->orderBy('type')
+            ->orderBy('order_index')
+            ->get()
+            ->map(function ($category) {
+                // spent_cycle est brut (null si aucune dépense) → on force un entier (0),
+                // ce qui empêche l'accesseur de retomber sur le mois calendaire.
+                $category->spent_this_month = (int) ($category->getAttributes()['spent_cycle'] ?? 0);
+
+                return $category;
+            });
 
         // Vérifier si la période en cours a déjà été clôturée
         $currentMonthClosed = $activeCycle === null;
@@ -159,7 +159,7 @@ class CategoryController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$activeCycle) {
+        if (! $activeCycle) {
             return back()->with('error', 'Aucune période budgétaire active.');
         }
 
@@ -174,7 +174,7 @@ class CategoryController extends Controller
 
         $status = $closure->total_saved >= 0 ? 'Excédent' : 'Déficit';
         $message = "{$periodName} clôturé. {$status}: "
-            . number_format(abs($closure->total_saved), 0, ',', ' ') . " FCFA";
+            .number_format(abs($closure->total_saved), 0, ',', ' ').' FCFA';
 
         return back()->with('success', $message);
     }

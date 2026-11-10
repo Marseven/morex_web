@@ -47,6 +47,8 @@ class BudgetCycle extends Model
     {
         $query = Transaction::where('user_id', $this->user_id)
             ->where('status', '!=', Transaction::STATUS_PENDING)
+            // RM-4 rapprochement : un écart corrige le solde, pas les dépenses du cycle
+            ->where(fn ($q) => $q->whereNull('category_id')->orWhereNotIn('category_id', Category::RECONCILIATION_IDS))
             ->where('date', '>=', $this->start_date);
 
         if ($this->end_date) {
