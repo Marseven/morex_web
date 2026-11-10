@@ -31,6 +31,9 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['account_id', 'external_ref']);
+            // Une opération (ou un frais) n'est liée qu'à une seule ligne de relevé (RM-3), même en concurrence
+            $table->unique('transaction_id');
+            $table->unique('fee_transaction_id');
             $table->index(['account_id', 'date']);
         });
     }
