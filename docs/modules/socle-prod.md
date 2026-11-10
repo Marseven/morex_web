@@ -1,4 +1,4 @@
-# Module socle-prod                                   statut : analysé · 2026-11-10
+# Module socle-prod                                   statut : livré · 2026-11-10
 
 **Conclusion** : 5 garde-fous dans le code et un runbook. Trois actions restent à Richard dans hPanel : couper `APP_DEBUG`, activer le cron, vérifier la sauvegarde Hostinger.
 
@@ -33,3 +33,10 @@
 3. Copie hors serveur ? → *Hypothèse : on s'appuie sur la sauvegarde Hostinger + un téléchargement manuel mensuel ; pas d'envoi externe automatique dans ce module.*
 
 **Hors module** : CSP stricte, CI (module 7), alertes de surveillance, copie de sauvegarde vers un service externe.
+
+## Livré
+- **Code** : `app/Http/Middleware/SecurityHeaders.php` (global ; HSTS et `upgrade-insecure-requests` seulement en HTTPS), `AppServiceProvider` (debug forcé à `false` en production), `config/l5-swagger.php` (`web` + `auth`), `config/session.php` (30 min), `app/Listeners/CheckDatabaseHealth.php` (`/up`), `app/Services/DatabaseBackup.php` + `backup:database` + `config/backup.php`, planification à 03:00 dans `routes/console.php`.
+- **Tests** : 6 fichiers Feature, 21 tests (en-têtes, garde-fou debug, accès à la doc, `/up`, sauvegarde : compression, mot de passe absent de la ligne de commande, rotation, échec, caractères de contrôle, nom aléatoire, permissions, planification). Suite complète au vert.
+- **Écarts avec l'analyse** : `/health` n'est pas créé, `/up` (Laravel) est enrichi à la place ; le nom des sauvegardes porte un suffixe aléatoire (revue de sécurité) ; HSTS n'est envoyé qu'en HTTPS.
+- **Revue de sécurité** : 0 critique. La haute (sauvegardes accessibles par le domaine principal) n'est pas confirmée : `.env` → 403, `storage/` → 403 ou 404. Deux moyennes et quatre basses corrigées.
+- **À faire par Richard (hPanel)** : `APP_DEBUG=false` + `APP_ENV=production`, cron `schedule:run`, vérifier que `mysqldump` est accessible au cron (premier `php artisan backup:database` lancé à la main), sonde UptimeRobot sur `/up`. Voir `docs/runbook.md`.
