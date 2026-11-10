@@ -1,19 +1,19 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BudgetCycleController;
 use App\Http\Controllers\Api\CategoryController;
-use App\Http\Controllers\Api\TransactionController;
-use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\DebtController;
+use App\Http\Controllers\Api\GoalController;
+use App\Http\Controllers\Api\ReconciliationController;
+use App\Http\Controllers\Api\RecurringTransactionController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\SyncController;
-use App\Http\Controllers\Api\RecurringTransactionController;
-use App\Http\Controllers\Api\BudgetCycleController;
+use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\TransferController;
 use App\Http\Controllers\Api\WebhookController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,6 +41,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Comptes
     Route::apiResource('accounts', AccountController::class)->names('api.accounts');
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('api.accounts.adjust-balance');
+    Route::get('/accounts/{account}/reconciliation', [ReconciliationController::class, 'show'])->name('api.accounts.reconciliation');
+    Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('api.accounts.reconciliations.store');
     Route::post('/accounts/reorder', [AccountController::class, 'reorder'])->name('api.accounts.reorder');
 
     // Catégories
@@ -63,9 +65,6 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Transferts
     Route::apiResource('transfers', TransferController::class)->names('api.transfers');
     Route::post('/transfers/multi-hop', [TransferController::class, 'storeMultiHop'])->name('api.transfers.multi-hop');
-
-    // Balance Reset
-    Route::post('/accounts/balance-reset', [AccountController::class, 'balanceReset'])->name('api.accounts.balance-reset');
 
     // Transactions récurrentes
     Route::apiResource('recurring-transactions', RecurringTransactionController::class)->names('api.recurring-transactions');
