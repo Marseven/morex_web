@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SavingsGoalCard from '@/Components/Goals/SavingsGoalCard.vue'
+import BudgetCapCard from '@/Components/Budgets/BudgetCapCard.vue'
 import {
     BanknotesIcon,
     ArrowTrendingUpIcon,
@@ -10,7 +11,6 @@ import {
     ArrowsRightLeftIcon,
     FlagIcon,
     CreditCardIcon,
-    ChartPieIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -24,6 +24,8 @@ const props = defineProps({
     savingsGoal: { type: Object, default: null },
     activeDebts: { type: Array, default: () => [] },
     budgetCategories: { type: Array, default: () => [] },
+    budgetAlerts: { type: Array, default: () => [] },
+    budgetPeriod: { type: Object, default: null },
     currentPeriod: { type: String, default: 'month' },
     periodLabel: { type: String, default: 'Ce mois' },
 })
@@ -255,44 +257,8 @@ const changePeriod = (period) => {
                         </div>
                     </div>
 
-                    <!-- Budgets -->
-                    <div class="glass-card">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-divider">
-                            <div class="flex items-center gap-2">
-                                <ChartPieIcon class="w-4 h-4 text-theme-text-secondary" />
-                                <h2 class="text-sm font-medium text-theme-text-primary">Budgets</h2>
-                            </div>
-                            <Link href="/budgets" class="text-xs text-theme-text-secondary hover:text-[var(--color-accent)] transition-colors">
-                                Voir tout
-                            </Link>
-                        </div>
-                        <div class="p-4 space-y-4">
-                            <div v-if="!budgetCategories || budgetCategories.length === 0" class="py-4 text-center text-sm text-theme-text-secondary">
-                                Aucun budget défini
-                            </div>
-                            <div v-for="cat in budgetCategories" :key="cat.id">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-sm text-theme-text-primary">{{ cat.name }}</span>
-                                    <span
-                                        class="text-xs"
-                                        :class="cat.progress > 90 ? 'text-danger' : 'text-theme-text-secondary'"
-                                    >
-                                        {{ Math.round(cat.progress) }}%
-                                    </span>
-                                </div>
-                                <div class="h-1.5 bg-theme-surface rounded-full overflow-hidden">
-                                    <div
-                                        class="h-full rounded-full"
-                                        :class="cat.progress > 90 ? 'bg-danger' : cat.progress > 70 ? 'bg-warning' : 'bg-success'"
-                                        :style="{ width: Math.min(100, cat.progress) + '%' }"
-                                    ></div>
-                                </div>
-                                <p class="text-xs text-theme-text-muted mt-1">
-                                    {{ formatAmount(cat.spent) }} / {{ formatAmount(cat.budget_limit) }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Plafonds et alertes du cycle (module plafonds-alertes) -->
+                    <BudgetCapCard :caps="budgetCategories" :alerts="budgetAlerts" :period="budgetPeriod" />
                 </div>
             </div>
         </div>
