@@ -44,7 +44,7 @@ final class StatementMatcher
         $rows = [];
 
         foreach ($entries as $i => $entry) {
-            $rows[$i] = $entry->toArray() + ['transaction_id' => null, 'candidates' => [], 'suggested_category_id' => null];
+            $rows[$i] = $entry->toArray() + ['transaction_id' => null, 'transaction' => null, 'candidates' => [], 'suggested_category_id' => null];
             if ($entry->status !== 'ok') {
                 $rows[$i]['status'] = 'unparsed';
             } elseif ($this->alreadyImported($account, $entry)) {
@@ -100,6 +100,7 @@ final class StatementMatcher
             $used[$tx->id] = true;
             $row['status'] = 'matched';
             $row['transaction_id'] = $tx->id;
+            $row['transaction'] = $this->summary($tx);
             $row['fee'] = $fee($tx);
         } elseif ($candidates->count() > 1) {
             $row['status'] = 'to_validate';
