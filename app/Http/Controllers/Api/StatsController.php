@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,8 +83,8 @@ class StatsController extends Controller
         $monthlyTransactions = $user->transactions()
             ->whereBetween('date', [$startOfMonth, $endOfMonth]);
 
-        $monthlyIncome = (clone $monthlyTransactions)->where('type', 'income')->sum('amount');
-        $monthlyExpense = (clone $monthlyTransactions)->where('type', 'expense')->sum('amount');
+        $monthlyIncome = (clone $monthlyTransactions)->counted()->where('type', 'income')->sum('amount');
+        $monthlyExpense = (clone $monthlyTransactions)->counted()->where('type', 'expense')->sum('amount');
 
         // Objectifs actifs
         $activeGoals = $user->goals()->where('status', 'active')->get();
@@ -103,7 +104,7 @@ class StatsController extends Controller
         // Top catégories de dépenses du mois
         $topExpenseCategories = $user->transactions()
             ->with('category')
-            ->where('type', 'expense')
+            ->counted()->where('type', 'expense')
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->selectRaw('category_id, SUM(amount) as total')
             ->groupBy('category_id')
@@ -120,11 +121,13 @@ class StatsController extends Controller
         // Budgets dépassés
         $exceededBudgets = $user->categories()
             ->where('type', 'expense')
+            ->where('nature', '!=', Category::NATURE_TRANSIT)
             ->whereNotNull('budget_limit')
             ->where('budget_limit', '>', 0)
             ->get()
             ->filter(function ($category) use ($user, $startOfMonth, $endOfMonth) {
                 $spent = $user->transactions()
+                    ->counted()
                     ->where('category_id', $category->id)
                     ->whereBetween('date', [$startOfMonth, $endOfMonth])
                     ->sum('amount');
@@ -215,7 +218,7 @@ class StatsController extends Controller
         // Revenus par catégorie
         $incomeByCategory = $user->transactions()
             ->with('category')
-            ->where('type', 'income')
+            ->counted()->where('type', 'income')
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->selectRaw('category_id, SUM(amount) as total')
             ->groupBy('category_id')
@@ -230,7 +233,7 @@ class StatsController extends Controller
         // Dépenses par catégorie avec budget
         $expenseByCategory = $user->transactions()
             ->with('category')
-            ->where('type', 'expense')
+            ->counted()->where('type', 'expense')
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->selectRaw('category_id, SUM(amount) as total')
             ->groupBy('category_id')
@@ -352,12 +355,12 @@ class StatsController extends Controller
             $endOfMonth = $date->copy()->endOfMonth();
 
             $income = $user->transactions()
-                ->where('type', 'income')
+                ->counted()->where('type', 'income')
                 ->whereBetween('date', [$startOfMonth, $endOfMonth])
                 ->sum('amount');
 
             $expense = $user->transactions()
-                ->where('type', 'expense')
+                ->counted()->where('type', 'expense')
                 ->whereBetween('date', [$startOfMonth, $endOfMonth])
                 ->sum('amount');
 

@@ -65,12 +65,12 @@ class AnalyticsController extends Controller
             $endDate = Carbon::create($year, $m, 1)->endOfMonth();
 
             $income = $user->transactions()
-                ->where('type', 'income')
+                ->counted()->where('type', 'income')
                 ->whereBetween('date', [$startDate, $endDate])
                 ->sum('amount');
 
             $expense = $user->transactions()
-                ->where('type', 'expense')
+                ->counted()->where('type', 'expense')
                 ->whereBetween('date', [$startDate, $endDate])
                 ->sum('amount');
 
@@ -90,7 +90,7 @@ class AnalyticsController extends Controller
         $dateRange = $this->getDateRange($period);
 
         $transactions = $user->transactions()
-            ->where('type', 'expense')
+            ->counted()->where('type', 'expense')
             ->whereBetween('date', [$dateRange['start'], $dateRange['end']])
             ->with('category')
             ->get()
@@ -125,7 +125,7 @@ class AnalyticsController extends Controller
         return $categories->map(function ($category) use ($user) {
             $spent = $user->transactions()
                 ->where('category_id', $category->id)
-                ->where('type', 'expense')
+                ->counted()->where('type', 'expense')
                 ->whereMonth('date', now()->month)
                 ->whereYear('date', now()->year)
                 ->sum('amount');
@@ -164,12 +164,12 @@ class AnalyticsController extends Controller
         $dateRange = $this->getDateRange($period);
 
         $income = $user->transactions()
-            ->where('type', 'income')
+            ->counted()->where('type', 'income')
             ->whereBetween('date', [$dateRange['start'], $dateRange['end']])
             ->sum('amount');
 
         $expense = $user->transactions()
-            ->where('type', 'expense')
+            ->counted()->where('type', 'expense')
             ->whereBetween('date', [$dateRange['start'], $dateRange['end']])
             ->sum('amount');
 

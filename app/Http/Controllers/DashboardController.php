@@ -38,11 +38,14 @@ class DashboardController extends Controller
         $totalBalance = $accounts->sum('balance');
 
         // Period data
+        // Hors attente, écarts et transit (module revenus-transit) ; le pro reste compté
         $incomeForPeriod = $user->transactions()
+            ->counted()
             ->where('type', 'income')
             ->whereBetween('date', [$startDate, $endDate])
             ->sum('amount');
         $expenseForPeriod = $user->transactions()
+            ->counted()
             ->where('type', 'expense')
             ->whereBetween('date', [$startDate, $endDate])
             ->sum('amount');
@@ -75,6 +78,7 @@ class DashboardController extends Controller
         })
             ->whereNotNull('budget_limit')
             ->where('budget_limit', '>', 0)
+            ->where('nature', '!=', Category::NATURE_TRANSIT)
             ->get()
             ->map(function ($category) use ($user, $alerts, $capFrom, $capTo) {
                 $spent = $alerts->spent($user, $category->id, $capFrom, $capTo);
@@ -109,6 +113,8 @@ class DashboardController extends Controller
             'periodVariation' => $periodVariation,
             'incomeForPeriod' => $incomeForPeriod,
             'expenseForPeriod' => $expenseForPeriod,
+            'proExpense' => $this->proExpense($user, $startDate, $endDate),
+            'transit' => $this->transitSummary($user, $capFrom, $capTo),
             'accounts' => $accounts,
             'recentTransactions' => $recentTransactions,
             'activeGoals' => $activeGoals,
@@ -130,6 +136,49 @@ class DashboardController extends Controller
             'currentPeriod' => $period,
             'periodLabel' => $this->getPeriodLabel($period),
         ]);
+    }
+
+    /** Dépenses pro de la période, comptées dans le total (null sans catégorie pro). */
+    private function proExpense(User $user, $from, $to): ?int
+    {
+        if (! $this->hasNature($user, Category::NATURE_PRO)) {
+            return null;
+        }
+
+        return (int) $user->transactions()->counted()->ofNature(Category::NATURE_PRO)
+            ->where('type', 'expense')->whereBetween('date', [$from, $to])->sum('amount');
+    }
+
+    /**
+     * Mouvements en transit du cycle (tontines, avances) : hors revenus et dépenses.
+     *
+     * @return array{out: int, in: int, net: int}|null null sans catégorie en transit
+     */
+    private function transitSummary(User $user, Carbon|\DateTimeInterface $from, ?\DateTimeInterface $to): ?array
+    {
+        if (! $this->hasNature($user, Category::NATURE_TRANSIT)) {
+            return null;
+        }
+
+        $totals = $user->transactions()
+            ->ofNature(Category::NATURE_TRANSIT)
+            ->where('status', '!=', \App\Models\Transaction::STATUS_PENDING)
+            ->where('date', '>=', $from->format('Y-m-d'))
+            ->when($to, fn ($q) => $q->where('date', '<=', $to->format('Y-m-d').' 23:59:59'))
+            ->selectRaw('type, SUM(amount) as total')
+            ->groupBy('type')
+            ->pluck('total', 'type');
+
+        $out = (int) ($totals['expense'] ?? 0);
+        $in = (int) ($totals['income'] ?? 0);
+
+        return ['out' => $out, 'in' => $in, 'net' => $in - $out];
+    }
+
+    private function hasNature(User $user, string $nature): bool
+    {
+        return Category::where(fn ($q) => $q->where('user_id', $user->id)->orWhere('is_system', true))
+            ->where('nature', $nature)->exists();
     }
 
     private function getDateRange(string $period): array

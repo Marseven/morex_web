@@ -27,6 +27,10 @@ class TransactionController extends Controller
             $query->where('account_id', $request->account_id);
         }
 
+        if (in_array($request->query('nature'), Category::NATURES, true)) {
+            $query->ofNature($request->query('nature'));
+        }
+
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->category_id);
         }
@@ -76,7 +80,7 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'accounts' => $accounts,
             'categories' => $categories,
-            'filters' => $request->only(['type', 'account_id', 'category_id', 'start_date', 'end_date', 'search']),
+            'filters' => $request->only(['type', 'account_id', 'category_id', 'nature', 'start_date', 'end_date', 'search']),
         ]);
     }
 
