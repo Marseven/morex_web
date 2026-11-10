@@ -49,7 +49,10 @@ const targetLabel = computed(() => props.goal.target_date ? `pour le ${shortDate
                 </p>
 
                 <!-- Projection -->
-                <p v-if="goal.required_per_month !== null" class="text-sm" :class="goal.on_track ? 'text-theme-text-secondary' : 'text-yellow-400'">
+                <p v-if="goal.is_overdue" class="inline-flex items-center gap-1 text-sm text-yellow-400">
+                    <ExclamationTriangleIcon class="w-4 h-4" aria-hidden="true" /> Échéance dépassée : reste {{ formatAmount(goal.target_amount - goal.current_amount) }} FCFA
+                </p>
+                <p v-else-if="goal.required_per_month !== null" class="text-sm" :class="goal.on_track ? 'text-theme-text-secondary' : 'text-yellow-400'">
                     <template v-if="goal.on_track">Rythme suffisant {{ targetLabel }}</template>
                     <template v-else-if="goal.month_target">{{ formatAmount(goal.required_per_month) }} FCFA/mois à verser {{ targetLabel }}</template>
                     <template v-else>Il faudrait {{ formatAmount(goal.required_per_month) }} FCFA/mois {{ targetLabel }}</template>

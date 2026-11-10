@@ -63,7 +63,7 @@ final class GoalProgressService
         $remaining = max(0, $goal->target_amount - $current);
         [$periodStart, $isCycle] = $this->period($goal);
 
-        $paid = $goal->isTracked() ? $this->balanceDelta($goal->account_id, $periodStart) : null;
+        $paid = $goal->isTracked() ? $this->monthPaid($goal, $periodStart) : null;
         $monthly = $goal->monthly_target;
         $monthStatus = match (true) {
             $paid === null || $monthly === null || $monthly === 0 => 'none',
@@ -72,7 +72,8 @@ final class GoalProgressService
             default => 'remaining',
         };
 
-        $required = $this->requiredPerMonth($goal, $remaining);
+        $isOverdue = $goal->target_date !== null && $remaining > 0 && $goal->target_date->lt(CarbonImmutable::today());
+        $required = $isOverdue ? null : $this->requiredPerMonth($goal, $remaining);
         // Pourcentage arrondi au plus proche, comme la carte « Objectifs » existante
 
         return [
@@ -92,6 +93,7 @@ final class GoalProgressService
             'month_remaining' => $paid !== null && $monthly !== null ? max(0, $monthly - $paid) : null,
             'required_per_month' => $required,
             'on_track' => $required === null ? null : ($monthly !== null && $monthly >= $required),
+            'is_overdue' => $isOverdue,
         ];
     }
 
@@ -103,6 +105,19 @@ final class GoalProgressService
         return $cycle !== null
             ? [CarbonImmutable::parse($cycle->start_date)->startOfDay(), true]
             : [CarbonImmutable::now()->startOfMonth(), false];
+    }
+
+    /**
+     * RM-2 : si le suivi a commencé pendant la période, on part du solde au moment du lien
+     * (les mouvements antérieurs ne sont pas des versements pour cet objectif).
+     */
+    private function monthPaid(Goal $goal, CarbonImmutable $periodStart): int
+    {
+        if ($goal->tracked_since !== null && $goal->tracked_since->gte($periodStart)) {
+            return (int) $goal->account?->balance - (int) $goal->tracked_account_balance;
+        }
+
+        return $this->balanceDelta($goal->account_id, $periodStart);
     }
 
     /** Variation du solde depuis une date, lue dans le journal des soldes. */

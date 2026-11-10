@@ -213,4 +213,78 @@ class GoalTrackingTest extends TestCase
         $this->goal->refresh();
         $this->assertSame(['Épargne 2 M', $this->savings->id, 990000], [$this->goal->name, $this->goal->account_id, $this->goal->current_amount]);
     }
+
+    // --- Revue de code ---
+
+    public function test_sync_cannot_switch_the_account_of_a_tracked_goal(): void
+    {
+        $this->track(990000);
+        $other = Account::factory()->for($this->user)->withBalance(9000000)->create();
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/sync/push', ['changes' => [[
+            'type' => 'goal', 'action' => 'update', 'local_id' => 'g', 'server_id' => $this->goal->id,
+            'data' => ['account_id' => $other->id], 'updated_at' => now()->addMinute()->toIso8601String(),
+        ]]])->assertOk();
+
+        $this->goal->refresh();
+        $this->assertSame([$this->savings->id, 990000], [$this->goal->account_id, $this->goal->current_amount]);
+    }
+
+    public function test_deleted_tracked_goals_are_not_resent_forever(): void
+    {
+        $this->track();
+        $this->goal->delete();
+        $this->travel(1)->hours();
+        Sanctum::actingAs($this->user);
+
+        $this->getJson('/api/sync/pull?last_sync='.urlencode(now()->subMinutes(10)->toIso8601String()))
+            ->assertOk()
+            ->assertJsonCount(0, 'goals');
+    }
+
+    public function test_the_month_payment_starts_when_tracking_starts(): void
+    {
+        // Mouvement du compte avant le lien, dans le même mois civil : il ne compte pas
+        $this->savings->adjustBalance(-400000, 'transfer_out', 'transfer', null, 'Avant le suivi');
+        $this->travel(1)->minutes();
+        $this->track();
+        $this->travel(1)->minutes();
+        $this->savings->adjustBalance(100000, 'transfer_in', 'transfer', null, 'Versement');
+
+        $this->assertSame(100000, app(GoalProgressService::class)->status($this->goal->refresh())['month_paid']);
+    }
+
+    public function test_a_past_target_date_is_flagged_instead_of_projected(): void
+    {
+        $this->goal->update(['target_date' => '2026-10-31']);
+        $this->track(1000000, 300000);
+
+        $status = app(GoalProgressService::class)->status($this->goal->refresh());
+
+        $this->assertTrue($status['is_overdue']);
+        $this->assertNull($status['required_per_month']);
+    }
+
+    public function test_api_untrack_of_someone_else_goal_is_forbidden(): void
+    {
+        $this->track();
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->deleteJson("/api/goals/{$this->goal->id}/track")->assertForbidden();
+        $this->assertNotNull($this->goal->refresh()->tracked_since);
+    }
+
+    public function test_reading_progress_does_not_query_the_account_again_and_again(): void
+    {
+        $this->track();
+        $goal = Goal::with('account')->find($this->goal->id);
+
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        $goal->current_amount;
+        $goal->current_amount;
+        $goal->progress_percentage;
+
+        $this->assertCount(0, \Illuminate\Support\Facades\DB::getQueryLog());
+    }
 }
