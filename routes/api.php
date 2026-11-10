@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\DebtController;
 use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\ReconciliationController;
 use App\Http\Controllers\Api\RecurringTransactionController;
+use App\Http\Controllers\Api\StatementController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\TransactionController;
@@ -44,6 +45,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('api.accounts.adjust-balance');
     Route::get('/accounts/{account}/reconciliation', [ReconciliationController::class, 'show'])->name('api.accounts.reconciliation');
     Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('api.accounts.reconciliations.store');
+    Route::post('/accounts/{account}/statement/preview', [StatementController::class, 'preview'])->middleware('throttle:30,1')->name('api.accounts.statement.preview');
+    Route::post('/accounts/{account}/statement', [StatementController::class, 'store'])->name('api.accounts.statement.store');
     Route::post('/transactions/notes/preview', [BatchEntryController::class, 'preview'])->middleware('throttle:30,1')->name('api.transactions.notes.preview');
     Route::post('/accounts/reorder', [AccountController::class, 'reorder'])->name('api.accounts.reorder');
 

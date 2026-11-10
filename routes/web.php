@@ -12,6 +12,7 @@ use App\Http\Controllers\GoalController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReconciliationController;
+use App\Http\Controllers\StatementController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\TwoFactorAuthController;
@@ -47,6 +48,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('accounts.adjust-balance');
     Route::get('/accounts/{account}/reconcile', [ReconciliationController::class, 'show'])->name('accounts.reconcile');
     Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('accounts.reconciliations.store');
+    Route::get('/accounts/{account}/statement', [StatementController::class, 'show'])->name('accounts.statement');
+    Route::post('/accounts/{account}/statement/preview', [StatementController::class, 'preview'])->middleware('throttle:30,1')->name('accounts.statement.preview');
+    Route::post('/accounts/{account}/statement', [StatementController::class, 'store'])->name('accounts.statement.store');
 
     // Transactions
     // (routes spécifiques AVANT la resource pour ne pas être capturées par {transaction})
