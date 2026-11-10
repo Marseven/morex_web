@@ -44,7 +44,8 @@ class Goal extends Model
 
     public function account(): BelongsTo
     {
-        return $this->belongsTo(Account::class);
+        // withTrashed : un compte archivé reste lisible pour la progression suivie
+        return $this->belongsTo(Account::class)->withTrashed();
     }
 
     public function isTracked(): bool
@@ -61,7 +62,8 @@ class Goal extends Model
         if (! $this->isTracked()) {
             return (int) $value;
         }
-        $balance = (int) Account::withTrashed()->whereKey($this->account_id)->value('balance');
+        // Relation (chargée une fois, ou par with('account')) : pas de requête à chaque lecture
+        $balance = (int) $this->account?->balance;
 
         return max(0, $this->tracked_start_amount + $balance - (int) $this->tracked_account_balance);
     }

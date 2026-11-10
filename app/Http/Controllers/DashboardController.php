@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BudgetCycle;
 use App\Models\Category;
+use App\Models\User;
 use App\Services\GoalProgressService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -160,9 +161,9 @@ class DashboardController extends Controller
     }
 
     /** Carte « Objectif » : le premier objectif actif suivi sur un compte (module suivi-objectifs). */
-    private function savingsGoal($user): ?array
+    private function savingsGoal(User $user): ?array
     {
-        $goal = $user->goals()->where('status', 'active')->whereNotNull('tracked_since')->orderBy('target_date')->first();
+        $goal = $user->goals()->where('status', 'active')->whereNotNull('tracked_since')->with('account')->orderBy('target_date')->first();
 
         return $goal ? app(GoalProgressService::class)->status($goal) : null;
     }
