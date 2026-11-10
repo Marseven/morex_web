@@ -172,4 +172,10 @@ class StatementApplyTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.lines.0.amount', -1000);
     }
+
+    public function test_the_statement_page_renders_for_the_owner_only(): void
+    {
+        $this->actingAs($this->user)->get("/accounts/{$this->airtel->id}/statement")->assertOk();
+        $this->actingAs(User::factory()->create())->get("/accounts/{$this->airtel->id}/statement")->assertForbidden();
+    }
 }

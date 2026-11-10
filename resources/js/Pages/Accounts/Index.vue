@@ -163,6 +163,12 @@ const submitAdjust = () => {
                                     >
                                         Rapprocher
                                     </Link>
+                                    <Link
+                                        :href="`/accounts/${account.id}/statement`"
+                                        class="text-xs text-theme-text-secondary hover:text-theme-text-primary"
+                                    >
+                                        Relevé
+                                    </Link>
                                     <button
                                         @click="openAdjust(account)"
                                         class="text-xs text-theme-text-secondary hover:text-theme-text-primary"
