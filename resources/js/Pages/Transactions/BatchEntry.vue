@@ -33,16 +33,23 @@ const analysing = ref(false)
 const saving = ref(false)
 const error = ref('')
 const filter = ref('all')
-const corrections = new Map() // clé ligne|montant|libellé → { category_id, account_id, removed }
+// Corrections conservées après « Modifier le texte » : clé = ligne + date + sens + montant + libellé + rang
+// (deux montants identiques d'une même ligne, « 1500+1500 taxi », gardent chacun leur correction)
+const corrections = new Map()
 
-const rowKey = (r) => `${r.line}|${r.amount}|${r.label ?? ''}|${r.index}`
+const correctionKey = (r) => `${r.line}|${r.date}|${r.type}|${r.amount}|${r.label ?? ''}|${r.rank}`
+const rowKey = (r) => `${correctionKey(r)}|${r.index}`
 const categoriesFor = (type) => props.categories.filter((c) => c.type === type)
+const accountIds = computed(() => new Set(props.accounts.map((a) => a.id)))
+// Une suggestion vers une catégorie ou un compte absent des listes ne compte pas comme choisie
 const statusOf = (r) => {
     if (r.status === 'unparsed') return 'unparsed'
-    return r.label && r.category_id ? 'ok' : 'incomplete'
+    const categoryOk = categoriesFor(r.type).some((c) => c.id === r.category_id)
+    return r.label && categoryOk && accountIds.value.has(r.account_id) ? 'ok' : 'incomplete'
 }
 
 const visibleRows = computed(() => rows.value.filter((r) => !r.removed))
+const removedCount = computed(() => rows.value.filter((r) => r.removed).length)
 const savable = computed(() => visibleRows.value.filter((r) => statusOf(r) !== 'unparsed'))
 const counts = computed(() => ({
     all: visibleRows.value.length,
@@ -66,7 +73,11 @@ const summary = computed(() => step.value === 'review'
     ? `${counts.value.all} lignes, ${counts.value.all - counts.value.incomplete - counts.value.unparsed} prêtes, ${counts.value.incomplete} à compléter, ${counts.value.unparsed} non comprises`
     : '')
 
-const remember = (r) => corrections.set(`${r.line}|${r.amount}|${r.label ?? ''}`, { category_id: r.category_id, account_id: r.account_id, removed: !!r.removed })
+const remember = (r) => corrections.set(correctionKey(r), { category_id: r.category_id, account_id: r.account_id, removed: !!r.removed })
+
+const restoreRemoved = () => {
+    rows.value.filter((r) => r.removed).forEach((r) => { r.removed = false; remember(r) })
+}
 
 const analyse = async () => {
     if (!lineCount.value || tooLong.value) return
@@ -78,9 +89,13 @@ const analyse = async () => {
             reference_date: referenceDate.value,
             default_account_id: defaultAccountId.value,
         })
+        const ranks = new Map()
         rows.value = data.data.lines.map((line, index) => {
-            const kept = corrections.get(`${line.line}|${line.amount}|${line.label ?? ''}`)
-            return { ...line, index, ...(kept ?? {}) }
+            const base = `${line.line}|${line.date}|${line.type}|${line.amount}|${line.label ?? ''}`
+            const rank = ranks.get(base) ?? 0
+            ranks.set(base, rank + 1)
+            const row = { ...line, index, rank }
+            return { ...row, ...(corrections.get(correctionKey(row)) ?? {}) }
         })
         filter.value = 'all'
         step.value = 'review'
@@ -106,6 +121,7 @@ const removeRow = (r) => {
 const save = () => {
     if (!canSave.value) return
     saving.value = true
+    error.value = ''
     router.post('/transactions/import', {
         account_id: defaultAccountId.value,
         rows: savable.value.map((r) => ({
@@ -117,7 +133,7 @@ const save = () => {
             account_id: r.account_id,
         })),
     }, {
-        onError: () => { error.value = 'Compte ou catégorie introuvable. Rechargez la page.' },
+        onError: (errors) => { error.value = Object.values(errors)[0] ?? 'Enregistrement impossible. Vérifiez les lignes.' },
         onFinish: () => { saving.value = false },
     })
 }
@@ -253,8 +269,14 @@ const save = () => {
                     </li>
                 </ul>
 
+                <p v-if="removedCount" class="text-xs text-theme-text-muted">
+                    {{ removedCount }} ligne(s) retirée(s) ·
+                    <button type="button" class="underline" @click="restoreRemoved">rétablir</button>
+                </p>
+
                 <div class="hidden lg:flex items-center justify-end gap-3">
-                    <p v-if="counts.incomplete" class="text-sm text-yellow-400">{{ counts.incomplete }} catégorie(s) à choisir avant d'enregistrer.</p>
+                    <p v-if="counts.unparsed" class="text-sm text-theme-text-secondary">✕ {{ counts.unparsed }} ligne(s) non comprise(s) exclue(s)</p>
+                    <p v-if="counts.incomplete" class="text-sm text-yellow-400">{{ counts.incomplete }} ligne(s) à compléter avant d'enregistrer.</p>
                     <button type="button" class="px-4 py-2 text-sm font-medium rounded-md bg-theme-btn-primary-bg text-theme-btn-primary-text disabled:opacity-50"
                         :disabled="!canSave" @click="save">
                         {{ saving ? 'Enregistrement…' : `Enregistrer ${savable.length} opération(s)` }}
@@ -270,6 +292,7 @@ const save = () => {
                 <span class="flex-1 text-xs text-theme-text-secondary">
                     <template v-if="counts.incomplete"><span class="text-yellow-400">⚠ {{ counts.incomplete }} à compléter</span></template>
                     <template v-else>−{{ formatAmount(totals.expense) }} · +{{ formatAmount(totals.income) }}</template>
+                    <span v-if="counts.unparsed" class="block">✕ {{ counts.unparsed }} exclue(s)</span>
                 </span>
                 <button type="button" class="px-4 py-2 min-h-[44px] text-sm font-medium rounded-md bg-theme-btn-primary-bg text-theme-btn-primary-text disabled:opacity-50"
                     :disabled="!canSave" @click="save">
