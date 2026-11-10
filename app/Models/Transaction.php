@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -54,6 +55,37 @@ class Transaction extends Model
     }
 
     public const STATUS_PENDING = 'pending_validation';
+
+    /**
+     * Opérations comptées dans les revenus et dépenses (module revenus-transit, RM-1) :
+     * hors attente, hors écarts de rapprochement, hors catégories en transit. Le pro reste compté.
+     */
+    public function scopeCounted(Builder $query): Builder
+    {
+        return $query->where('status', '!=', self::STATUS_PENDING)
+            ->where(fn (Builder $q) => $q->whereNull('category_id')->orWhere(fn (Builder $q) => $q
+                ->whereNotIn('category_id', Category::RECONCILIATION_IDS)
+                ->whereNotIn('category_id', self::categoryIdsOfNature(Category::NATURE_TRANSIT))));
+    }
+
+    /** Dépenses perso : comptées et hors pro (RM-2). */
+    public function scopePersonal(Builder $query): Builder
+    {
+        return $query->counted()
+            ->where(fn (Builder $q) => $q->whereNull('category_id')
+                ->orWhereNotIn('category_id', self::categoryIdsOfNature(Category::NATURE_PRO)));
+    }
+
+    public function scopeOfNature(Builder $query, string $nature): Builder
+    {
+        return $query->whereIn('category_id', self::categoryIdsOfNature($nature));
+    }
+
+    /** Sous-requête : une catégorie supprimée garde sa nature pour les opérations passées. */
+    private static function categoryIdsOfNature(string $nature): Builder
+    {
+        return Category::withTrashed()->select('id')->where('nature', $nature);
+    }
 
     /**
      * Une transaction en attente de validation (import SMS) ne compte ni dans le

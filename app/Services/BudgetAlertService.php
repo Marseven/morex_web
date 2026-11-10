@@ -72,7 +72,9 @@ final class BudgetAlertService
     public function checkCategory(User $user, string $categoryId): ?BudgetAlert
     {
         $category = Category::find($categoryId);
-        if ($category === null || (int) $category->budget_limit <= 0 || in_array($category->id, Category::RECONCILIATION_IDS, true)) {
+        // Transit (tontines, avances) : ni plafond ni alerte (module revenus-transit, RM-3)
+        if ($category === null || (int) $category->budget_limit <= 0 || $category->nature === Category::NATURE_TRANSIT
+            || in_array($category->id, Category::RECONCILIATION_IDS, true)) {
             return null;
         }
 
@@ -101,6 +103,7 @@ final class BudgetAlertService
     {
         Category::where(fn ($q) => $q->where('user_id', $user->id)->orWhere('is_system', true))
             ->where('budget_limit', '>', 0)
+            ->where('nature', '!=', Category::NATURE_TRANSIT)
             ->pluck('id')
             ->each(fn (string $id) => $this->checkCategory($user, $id));
     }

@@ -23,9 +23,19 @@ class Category extends Model
     /** Catégorie système des frais bancaires et mobile money (migration 2026_11_12_000002). */
     public const BANK_FEES_ID = '0b9a3c52-7e1d-4f6a-9c2e-5d8f1a7b3e03';
 
+    /** Nature (module revenus-transit) : transit = hors revenus, dépenses et plafonds ; pro = compté, mais à part du budget perso. */
+    public const NATURE_REGULAR = 'regular';
+
+    public const NATURE_TRANSIT = 'transit';
+
+    public const NATURE_PRO = 'pro';
+
+    public const NATURES = [self::NATURE_REGULAR, self::NATURE_TRANSIT, self::NATURE_PRO];
+
     protected $fillable = [
         'name',
         'type',
+        'nature',
         'icon',
         'color',
         'parent_id',

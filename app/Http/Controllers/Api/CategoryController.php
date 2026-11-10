@@ -7,6 +7,7 @@ use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use OpenApi\Attributes as OA;
 
@@ -76,6 +77,7 @@ class CategoryController extends Controller
             'color' => ['nullable', 'string', 'max:7'],
             'parent_id' => ['nullable', 'uuid', 'exists:categories,id'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
+            'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
         ]);
 
         $maxOrder = $request->user()->categories()->max('order_index') ?? -1;
@@ -149,6 +151,7 @@ class CategoryController extends Controller
             'color' => ['nullable', 'string', 'max:7'],
             'parent_id' => ['nullable', 'uuid', 'exists:categories,id'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
+            'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
             'order_index' => ['sometimes', 'integer'],
         ]);
 

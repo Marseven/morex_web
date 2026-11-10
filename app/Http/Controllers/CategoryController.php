@@ -6,6 +6,7 @@ use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -97,6 +98,7 @@ class CategoryController extends Controller
             'icon' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:7'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
+            'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
         ]);
 
         $maxOrder = $request->user()->categories()->max('order_index') ?? -1;
@@ -129,6 +131,7 @@ class CategoryController extends Controller
             'icon' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:7'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
+            'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
         ]);
 
         $category->update($validated);

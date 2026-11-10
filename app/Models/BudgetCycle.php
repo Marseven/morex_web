@@ -45,10 +45,9 @@ class BudgetCycle extends Model
      */
     public function transactions()
     {
+        // Hors attente, écarts de rapprochement et transit (Transaction::counted)
         $query = Transaction::where('user_id', $this->user_id)
-            ->where('status', '!=', Transaction::STATUS_PENDING)
-            // RM-4 rapprochement : un écart corrige le solde, pas les dépenses du cycle
-            ->where(fn ($q) => $q->whereNull('category_id')->orWhereNotIn('category_id', Category::RECONCILIATION_IDS))
+            ->counted()
             ->where('date', '>=', $this->start_date);
 
         if ($this->end_date) {
@@ -65,9 +64,29 @@ class BudgetCycle extends Model
      */
     public function calculateTotalSpent(): int
     {
-        return $this->transactions()
+        // Comparé au budget perso : le pro est suivi à part (module revenus-transit, RM-2)
+        return (int) $this->transactions()
+            ->personal()
             ->where('type', 'expense')
             ->sum('amount');
+    }
+
+    /** Toutes les dépenses comptées, pro compris : l'argent est bien sorti. */
+    public function calculateTotalExpense(): int
+    {
+        return (int) $this->transactions()
+            ->where('type', 'expense')
+            ->sum('amount');
+    }
+
+    /** Somme des plafonds perso (ni transit ni pro). */
+    public function personalBudget(): int
+    {
+        return (int) Category::where(fn ($q) => $q->where('user_id', $this->user_id)->orWhereNull('user_id'))
+            ->where('type', 'expense')
+            ->where('nature', Category::NATURE_REGULAR)
+            ->whereNotNull('budget_limit')
+            ->sum('budget_limit');
     }
 
     /**
@@ -87,14 +106,7 @@ class BudgetCycle extends Model
     {
         $this->total_spent = $this->calculateTotalSpent();
 
-        // Calculer le budget total depuis les catégories
-        $this->total_budget = Category::where(function ($q) {
-            $q->where('user_id', $this->user_id)
-                ->orWhereNull('user_id');
-        })
-            ->where('type', 'expense')
-            ->whereNotNull('budget_limit')
-            ->sum('budget_limit');
+        $this->total_budget = $this->personalBudget();
 
         $this->save();
     }
@@ -124,15 +136,8 @@ class BudgetCycle extends Model
     {
         $totalIncome = $this->calculateTotalIncome();
         $totalSpent = $this->calculateTotalSpent();
-        $totalSaved = $totalIncome - $totalSpent;
-
-        $totalBudget = Category::where(function ($q) {
-            $q->where('user_id', $this->user_id)
-                ->orWhereNull('user_id');
-        })
-            ->where('type', 'expense')
-            ->whereNotNull('budget_limit')
-            ->sum('budget_limit');
+        $totalSaved = $totalIncome - $this->calculateTotalExpense();
+        $totalBudget = $this->personalBudget();
 
         // Détails par catégorie
         $categories = Category::where(function ($q) {
@@ -140,6 +145,7 @@ class BudgetCycle extends Model
                 ->orWhereNull('user_id');
         })
             ->where('type', 'expense')
+            ->where('nature', '!=', Category::NATURE_TRANSIT)
             ->get()
             ->map(function ($category) {
                 $spent = $this->transactions()
