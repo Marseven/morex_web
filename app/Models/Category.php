@@ -20,6 +20,9 @@ class Category extends Model
 
     public const RECONCILIATION_IDS = [self::RECONCILIATION_EXPENSE_ID, self::RECONCILIATION_INCOME_ID];
 
+    /** Catégorie système des frais bancaires et mobile money (migration 2026_11_12_000002). */
+    public const BANK_FEES_ID = '0b9a3c52-7e1d-4f6a-9c2e-5d8f1a7b3e03';
+
     protected $fillable = [
         'name',
         'type',
