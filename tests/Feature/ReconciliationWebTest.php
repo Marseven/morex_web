@@ -93,4 +93,23 @@ class ReconciliationWebTest extends TestCase
                 ->whereNot('accounts.0.last_reconciled_at', null)
             );
     }
+
+    public function test_posting_on_someone_else_account_is_forbidden(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->post("/accounts/{$this->account->id}/reconciliations", ['statement_balance' => 1])
+            ->assertForbidden();
+
+        $this->assertSame(0, Reconciliation::count());
+        $this->assertSame(100000, $this->account->refresh()->balance);
+    }
+
+    public function test_manual_adjust_rejects_out_of_range_amounts(): void
+    {
+        $this->actingAs($this->user)
+            ->post("/accounts/{$this->account->id}/adjust-balance", ['balance' => PHP_INT_MAX])
+            ->assertSessionHasErrors('balance');
+
+        $this->assertSame(100000, $this->account->refresh()->balance);
+    }
 }

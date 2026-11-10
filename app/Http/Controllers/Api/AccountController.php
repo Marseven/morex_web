@@ -220,7 +220,8 @@ class AccountController extends Controller
         $this->authorize('update', $account);
 
         $validated = $request->validate([
-            'balance' => ['required', 'integer'],
+            // Même borne que le rapprochement : évite le débordement et les écarts absurdes
+            'balance' => ['required', 'integer', 'between:-1000000000000,1000000000000'],
         ]);
 
         $account->adjustToBalance($validated['balance']);

@@ -126,4 +126,14 @@ class ReconciliationApiTest extends TestCase
 
         $this->assertSame(100000, $this->account->refresh()->balance);
     }
+
+    public function test_api_manual_adjust_rejects_out_of_range_amounts(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson("/api/accounts/{$this->account->id}/adjust-balance", ['balance' => PHP_INT_MAX])
+            ->assertUnprocessable();
+
+        $this->assertSame(100000, $this->account->refresh()->balance);
+    }
 }
