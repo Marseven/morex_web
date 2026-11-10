@@ -102,13 +102,7 @@ class BudgetCycleController extends Controller
         // Créer le nouveau cycle
         $periodName = BudgetCycle::generatePeriodName($startDate);
 
-        $totalBudget = Category::where(function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-              ->orWhereNull('user_id');
-        })
-        ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->sum('budget_limit');
+        $totalBudget = Category::personalBudgetFor($user->id);
 
         $newCycle = new BudgetCycle([
             'start_date' => $startDate,

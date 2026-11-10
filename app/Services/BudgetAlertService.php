@@ -58,7 +58,7 @@ final class BudgetAlertService
         $query = Transaction::where('user_id', $user->id)
             ->where('category_id', $categoryId)
             ->where('type', 'expense')
-            ->where('status', '!=', Transaction::STATUS_PENDING)
+            ->counted()
             ->where('date', '>=', $from->toDateString());
 
         if ($to !== null) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BudgetAlert;
 use App\Models\BudgetCycle;
 use App\Models\Category;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\BudgetAlertService;
 use App\Services\GoalProgressService;
@@ -162,7 +163,7 @@ class DashboardController extends Controller
 
         $totals = $user->transactions()
             ->ofNature(Category::NATURE_TRANSIT)
-            ->where('status', '!=', \App\Models\Transaction::STATUS_PENDING)
+            ->where('status', '!=', Transaction::STATUS_PENDING)
             ->where('date', '>=', $from->format('Y-m-d'))
             ->when($to, fn ($q) => $q->where('date', '<=', $to->format('Y-m-d').' 23:59:59'))
             ->selectRaw('type, SUM(amount) as total')
@@ -175,10 +176,15 @@ class DashboardController extends Controller
         return ['out' => $out, 'in' => $in, 'net' => $in - $out];
     }
 
+    /** @var array<string, list<string>> natures présentes par utilisateur, lues une fois par requête */
+    private array $natures = [];
+
     private function hasNature(User $user, string $nature): bool
     {
-        return Category::where(fn ($q) => $q->where('user_id', $user->id)->orWhere('is_system', true))
-            ->where('nature', $nature)->exists();
+        $this->natures[$user->id] ??= Category::where(fn ($q) => $q->where('user_id', $user->id)->orWhere('is_system', true))
+            ->where('nature', '!=', Category::NATURE_REGULAR)->distinct()->pluck('nature')->all();
+
+        return in_array($nature, $this->natures[$user->id], true);
     }
 
     private function getDateRange(string $period): array

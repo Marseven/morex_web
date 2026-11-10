@@ -251,6 +251,7 @@ class StatsController extends Controller
 
         // Transactions par jour
         $dailyTransactions = $user->transactions()
+            ->counted()
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->selectRaw('DATE(date) as day, type, SUM(amount) as total')
             ->groupBy('day', 'type')
@@ -264,7 +265,7 @@ class StatsController extends Controller
         // Par compte
         $byAccount = $user->accounts()
             ->with(['transactions' => function ($query) use ($startOfMonth, $endOfMonth) {
-                $query->whereBetween('date', [$startOfMonth, $endOfMonth]);
+                $query->counted()->whereBetween('date', [$startOfMonth, $endOfMonth]);
             }])
             ->get()
             ->map(fn($account) => [

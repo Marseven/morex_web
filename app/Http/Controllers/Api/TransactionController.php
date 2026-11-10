@@ -257,7 +257,9 @@ class TransactionController extends Controller
         $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
         $endDate = $request->end_date ?? now()->endOfMonth()->toDateString();
 
+        // Hors attente, écarts et transit (module revenus-transit)
         $transactions = $request->user()->transactions()
+            ->counted()
             ->whereBetween('date', [$startDate, $endDate]);
 
         $income = (clone $transactions)->where('type', 'income')->sum('amount');
@@ -265,6 +267,7 @@ class TransactionController extends Controller
 
         $byCategory = $request->user()->transactions()
             ->with('category')
+            ->counted()
             ->where('type', 'expense')
             ->whereBetween('date', [$startDate, $endDate])
             ->selectRaw('category_id, SUM(amount) as total')

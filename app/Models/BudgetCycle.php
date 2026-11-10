@@ -82,11 +82,7 @@ class BudgetCycle extends Model
     /** Somme des plafonds perso (ni transit ni pro). */
     public function personalBudget(): int
     {
-        return (int) Category::where(fn ($q) => $q->where('user_id', $this->user_id)->orWhereNull('user_id'))
-            ->where('type', 'expense')
-            ->where('nature', Category::NATURE_REGULAR)
-            ->whereNotNull('budget_limit')
-            ->sum('budget_limit');
+        return Category::personalBudgetFor($this->user_id);
     }
 
     /**

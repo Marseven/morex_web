@@ -31,24 +31,22 @@ class RecomputeBudgetClosures extends Command
             $start = Carbon::create($closure->year, $closure->month, 1)->startOfMonth();
             $end = $start->copy()->endOfMonth();
 
+            // Mêmes règles que BudgetCycle::createClosure (module revenus-transit)
             $income = (int) Transaction::where('user_id', $closure->user_id)
+                ->counted()
                 ->where('type', 'income')
                 ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
                 ->sum('amount');
 
-            $spent = (int) Transaction::where('user_id', $closure->user_id)
+            $expenses = Transaction::where('user_id', $closure->user_id)
                 ->where('type', 'expense')
-                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-                ->sum('amount');
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()]);
+            $spent = (int) (clone $expenses)->counted()->personal()->sum('amount');
+            $allExpenses = (int) (clone $expenses)->counted()->sum('amount');
 
-            $budget = (int) Category::where(function ($q) use ($closure) {
-                    $q->where('user_id', $closure->user_id)->orWhereNull('user_id');
-                })
-                ->where('type', 'expense')
-                ->whereNotNull('budget_limit')
-                ->sum('budget_limit');
+            $budget = Category::personalBudgetFor($closure->user_id);
 
-            $saved = $income - $spent;
+            $saved = $income - $allExpenses;
 
             $rows[] = [
                 "{$closure->year}-" . str_pad($closure->month, 2, '0', STR_PAD_LEFT),

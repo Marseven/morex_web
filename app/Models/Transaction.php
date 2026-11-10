@@ -68,10 +68,10 @@ class Transaction extends Model
                 ->whereNotIn('category_id', self::categoryIdsOfNature(Category::NATURE_TRANSIT))));
     }
 
-    /** Dépenses perso : comptées et hors pro (RM-2). */
+    /** Dépenses perso : hors pro (RM-2). À combiner avec counted() (BudgetCycle::transactions() l'applique déjà). */
     public function scopePersonal(Builder $query): Builder
     {
-        return $query->counted()
+        return $query
             ->where(fn (Builder $q) => $q->whereNull('category_id')
                 ->orWhereNotIn('category_id', self::categoryIdsOfNature(Category::NATURE_PRO)));
     }

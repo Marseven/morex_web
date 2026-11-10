@@ -32,6 +32,16 @@ class Category extends Model
 
     public const NATURES = [self::NATURE_REGULAR, self::NATURE_TRANSIT, self::NATURE_PRO];
 
+    /** Somme des plafonds perso d'un utilisateur : dépenses courantes, ni transit ni pro (module revenus-transit). */
+    public static function personalBudgetFor(int|string $userId): int
+    {
+        return (int) static::where(fn ($q) => $q->where('user_id', $userId)->orWhereNull('user_id'))
+            ->where('type', 'expense')
+            ->where('nature', self::NATURE_REGULAR)
+            ->whereNotNull('budget_limit')
+            ->sum('budget_limit');
+    }
+
     protected $fillable = [
         'name',
         'type',

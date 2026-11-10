@@ -213,4 +213,64 @@ class TransitIncomeTest extends TestCase
         $this->actingAs($this->user)->get('/transactions?nature=transit')
             ->assertInertia(fn ($page) => $page->has('transactions.data', 2));
     }
+
+    // --- Revue de code ---
+
+    public function test_every_stats_endpoint_agrees_on_transit(): void
+    {
+        $this->month();
+        Sanctum::actingAs($this->user);
+
+        $this->getJson('/api/transactions-stats')
+            ->assertOk()
+            ->assertJsonPath('income', 800000)
+            ->assertJsonPath('expense', 162000);
+
+        $monthly = $this->getJson('/api/stats/monthly?month=2026-11')->assertOk()->json();
+        $this->assertSame(800000, (int) collect($monthly['daily'])->sum('income'));
+        $this->assertSame(162000, (int) collect($monthly['daily'])->sum('expense'));
+        $this->assertSame(162000, (int) collect($monthly['by_account'])->sum('expense'));
+    }
+
+    public function test_a_new_cycle_starts_with_the_personal_budget_only(): void
+    {
+        $this->food->update(['budget_limit' => 120000]);
+        $this->tools->update(['budget_limit' => 90000]);
+        $this->tontine->update(['budget_limit' => 50000]);
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/budget-cycles/start', ['start_date' => '2026-11-11'])->assertSuccessful();
+
+        $this->assertSame(120000, (int) BudgetCycle::where('user_id', $this->user->id)->where('status', 'active')->value('total_budget'));
+    }
+
+    public function test_a_closure_saves_income_minus_all_counted_expenses(): void
+    {
+        $cycle = new BudgetCycle(['start_date' => '2026-11-01', 'period_name' => 'Nov', 'status' => 'active']);
+        $cycle->user_id = $this->user->id;
+        $cycle->save();
+        $this->month();
+
+        $cycle->refresh()->close(now()->addDays(2));
+        $closure = $cycle->createClosure();
+
+        $this->assertSame([800000, 100000, 638000], [(int) $closure->total_income, (int) $closure->total_spent, (int) $closure->total_saved]);
+    }
+
+    public function test_uncategorized_operations_stay_counted(): void
+    {
+        $tx = new Transaction(['amount' => 7000, 'type' => 'expense', 'account_id' => $this->account->id, 'date' => now()->toDateString()]);
+        $tx->user_id = $this->user->id;
+        $tx->save();
+
+        $this->assertSame(7000, (int) Transaction::where('user_id', $this->user->id)->counted()->sum('amount'));
+    }
+
+    public function test_a_deleted_transit_category_keeps_its_operations_excluded(): void
+    {
+        $this->add('income', 500000, $this->tontine);
+        $this->tontine->delete();
+
+        $this->assertSame(0, (int) Transaction::where('user_id', $this->user->id)->counted()->sum('amount'));
+    }
 }
