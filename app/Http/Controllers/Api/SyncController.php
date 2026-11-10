@@ -57,8 +57,10 @@ class SyncController extends Controller
 
         // Un objectif suivi change de progression sans être modifié : toujours le renvoyer (suivi-objectifs)
         $goals = Goal::withTrashed()
+            ->with('account')
             ->where('user_id', $user->id)
-            ->where(fn ($q) => $q->where('updated_at', '>', $since)->orWhereNotNull('tracked_since'))
+            ->where(fn ($q) => $q->where('updated_at', '>', $since)
+                ->orWhere(fn ($q) => $q->whereNotNull('tracked_since')->whereNull('deleted_at')))
             ->get();
 
         $debts = Debt::withTrashed()
@@ -536,7 +538,7 @@ class SyncController extends Controller
             $this->captureOriginalSnapshot($existingModel->id, $existingModel);
 
             // Mettre à jour l'existant au lieu de créer un doublon
-            $existingModel->fill($data);
+            $existingModel->fill($this->withoutTrackedGoalFields($existingModel, $data));
             $existingModel->save();
 
             return [
@@ -726,7 +728,7 @@ class SyncController extends Controller
         // (transactions/transferts). Évite le double-comptage lors d'un update.
         $this->captureOriginalSnapshot($serverId, $model);
 
-        $model->fill($data);
+        $model->fill($this->withoutTrackedGoalFields($model, $data));
         $model->save();
 
         // Si était supprimé et qu'on update, on restore
@@ -790,5 +792,21 @@ class SyncController extends Controller
             'status' => 'success',
             'action' => 'deleted',
         ];
+    }
+
+    /**
+     * Objectif suivi sur un compte : le compte et la progression ne se changent que par /track
+     * (module suivi-objectifs), jamais par la synchro.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withoutTrackedGoalFields($model, array $data): array
+    {
+        if ($model instanceof Goal && $model->isTracked()) {
+            unset($data['account_id'], $data['current_amount']);
+        }
+
+        return $data;
     }
 }
