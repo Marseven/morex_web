@@ -37,8 +37,9 @@ final class ReconciliationController extends Controller
             'account_id' => $account->id,
             'balance' => $account->balance,
             'last_reconciliation' => $last ? new ReconciliationResource($last) : null,
+            'older_count' => $this->reconciliations->olderThanWindowCount($account),
             'uncleared' => UnclearedTransactionResource::collection(
-                $this->reconciliations->uncleared($account)->load('category')->take(500)
+                $this->reconciliations->uncleared($account)->load('category')
             ),
         ]]);
     }

@@ -49,7 +49,6 @@ class ReconciliationServiceTest extends TestCase
         $open = $this->tx('expense', 1500);
         $this->tx('expense', 700, ['status' => Transaction::STATUS_PENDING]);
         $this->tx('income', 900)->forceFill(['reconciled_at' => now()])->save();
-        $this->tx('expense', 300, ['date' => now()->addDays(3)->toDateString()]);
         $this->tx('expense', 200)->delete();
         Transaction::factory()->for($this->user)->create(['type' => 'expense', 'amount' => 50]);
 
@@ -149,5 +148,42 @@ class ReconciliationServiceTest extends TestCase
             'account_id' => $this->account->id, 'category_id' => Category::RECONCILIATION_INCOME_ID, 'amount' => 5000,
         ]);
         $this->assertSame(1, Reconciliation::count());
+    }
+
+    public function test_a_future_dated_transaction_is_listed_and_never_becomes_a_gap(): void
+    {
+        $rent = $this->tx('expense', 50000, ['date' => now()->addDay()->toDateString()]);
+        $this->assertSame(50000, $this->account->refresh()->balance);
+
+        $this->assertContains($rent->id, $this->service->uncleared($this->account)->pluck('id')->all());
+
+        // Le relevé ne montre pas encore le loyer de demain : 100 000
+        $reconciliation = $this->service->reconcile($this->account, 100000, []);
+
+        $this->assertSame(0, $reconciliation->difference);
+        $this->assertSame(50000, $this->account->refresh()->balance);
+    }
+
+    public function test_transactions_older_than_the_window_count_as_cleared(): void
+    {
+        ReconciliationService::$windowSize = 2;
+        $oldest = $this->tx('expense', 1000, ['date' => now()->subDays(10)->toDateString()]);
+        $recentA = $this->tx('expense', 200, ['date' => now()->subDays(2)->toDateString()]);
+        $recentB = $this->tx('expense', 300, ['date' => now()->subDay()->toDateString()]);
+
+        try {
+            $listed = $this->service->uncleared($this->account)->pluck('id')->all();
+            $this->assertSame([$recentA->id, $recentB->id], $listed);
+            $this->assertSame(1, $this->service->olderThanWindowCount($this->account));
+
+            // Seul recentA est sur le relevé ; recentB (−300) n'y est pas encore
+            $reconciliation = $this->service->reconcile($this->account, 98800, [$recentA->id]);
+
+            $this->assertSame(0, $reconciliation->difference);
+            $this->assertNotNull($oldest->refresh()->reconciled_at);
+            $this->assertNull($recentB->refresh()->reconciled_at);
+        } finally {
+            ReconciliationService::$windowSize = 500;
+        }
     }
 }

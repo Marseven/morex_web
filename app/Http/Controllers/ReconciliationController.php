@@ -27,8 +27,9 @@ final class ReconciliationController extends Controller
         return Inertia::render('Accounts/Reconcile', [
             'account' => $account->only(['id', 'name', 'balance', 'color']),
             'lastReconciliation' => $last ? (new ReconciliationResource($last))->resolve($request) : null,
+            'olderCount' => $this->reconciliations->olderThanWindowCount($account),
             'uncleared' => UnclearedTransactionResource::collection(
-                $this->reconciliations->uncleared($account)->load('category')->take(500)
+                $this->reconciliations->uncleared($account)->load('category')
             )->resolve($request),
         ]);
     }

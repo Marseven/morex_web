@@ -24,10 +24,23 @@ final class ReconciliationService
 {
     public const GAP_LABEL = 'Écart de rapprochement';
 
-    /** RM-2 : opérations du compte à pointer, de la plus ancienne à la plus récente. */
+    /**
+     * Fenêtre de pointage : seules les N opérations non pointées les plus récentes sont proposées.
+     * Les plus anciennes sont considérées comme passées sur le relevé (RM-3 : base de départ),
+     * ce qui garde l'écart affiché identique à l'écart enregistré.
+     */
+    public static int $windowSize = 500;
+
+    /** RM-2 : opérations du compte à pointer (fenêtre), de la plus ancienne à la plus récente. */
     public function uncleared(Account $account): Collection
     {
-        return $this->unclearedQuery($account)->orderBy('date')->orderBy('created_at')->get();
+        return $this->windowQuery($account)->get()->sortBy([['date', 'asc'], ['created_at', 'asc']])->values();
+    }
+
+    /** Opérations non pointées hors fenêtre, qui seront considérées comme pointées. */
+    public function olderThanWindowCount(Account $account): int
+    {
+        return max(0, $this->unclearedQuery($account)->count() - self::$windowSize);
     }
 
     public function lastReconciliation(Account $account): ?Reconciliation
@@ -42,16 +55,20 @@ final class ReconciliationService
     {
         return DB::transaction(function () use ($account, $statementBalance, $clearedIds, $note) {
             $before = $this->lockedBalance($account);
-            $cleared = $this->checkedTransactions($account, $clearedIds);
+            $window = $this->windowQuery($account)->get();
+            $cleared = $this->checkedTransactions($window, $clearedIds);
 
-            $pendingOnStatement = $this->unclearedQuery($account)
-                ->whereNotIn('id', $cleared->modelKeys())
-                ->get()
+            // RM-5 : ne restent « pas encore sur le relevé » que les opérations de la fenêtre non cochées
+            $pendingOnStatement = $window
+                ->reject(fn (Transaction $t) => $cleared->contains($t))
                 ->sum(fn (Transaction $t) => $t->type === 'income' ? $t->amount : -$t->amount);
 
             $difference = $statementBalance - ($before - $pendingOnStatement);
 
-            return $this->record($account, $statementBalance, $before, $difference, $cleared, $note);
+            // Hors fenêtre : considérées comme passées (base de départ)
+            $older = $this->unclearedQuery($account)->whereNotIn('id', $window->modelKeys())->get();
+
+            return $this->record($account, $statementBalance, $before, $difference, $cleared->merge($older), $note);
         });
     }
 
@@ -119,14 +136,14 @@ final class ReconciliationService
     }
 
     /**
-     * Chaque opération cochée doit être une opération à pointer de CE compte (protection IDOR).
+     * Chaque opération cochée doit être une opération proposée pour CE compte (protection IDOR).
      *
      * @param  list<string>  $ids
      */
-    private function checkedTransactions(Account $account, array $ids): Collection
+    private function checkedTransactions(Collection $window, array $ids): Collection
     {
         $ids = array_values(array_unique($ids));
-        $found = $ids === [] ? new Collection : $this->unclearedQuery($account)->whereKey($ids)->get();
+        $found = $window->whereIn('id', $ids)->values();
 
         if ($found->count() !== count($ids)) {
             throw ValidationException::withMessages([
@@ -144,7 +161,15 @@ final class ReconciliationService
             ->where('user_id', $account->user_id)
             ->whereIn('type', ['income', 'expense'])
             ->where('status', '!=', Transaction::STATUS_PENDING)
-            ->whereNull('reconciled_at')
-            ->whereDate('date', '<=', now()->toDateString());
+            // Pas de borne de date : une opération future confirmée compte déjà dans le solde
+            ->whereNull('reconciled_at');
+    }
+
+    private function windowQuery(Account $account): Builder
+    {
+        return $this->unclearedQuery($account)
+            ->orderByDesc('date')
+            ->orderByDesc('created_at')
+            ->limit(self::$windowSize);
     }
 }

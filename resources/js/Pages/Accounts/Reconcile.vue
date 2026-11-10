@@ -8,6 +8,7 @@ const props = defineProps({
     account: { type: Object, required: true },
     lastReconciliation: { type: Object, default: null },
     uncleared: { type: Array, default: () => [] },
+    olderCount: { type: Number, default: 0 },
 })
 
 const formatAmount = (amount) => new Intl.NumberFormat('fr-FR').format(amount)
@@ -204,6 +205,9 @@ const submit = () => {
                     </ul>
                     <p v-if="uncleared.length" class="px-4 py-2 text-xs text-theme-text-muted border-t border-theme-border">
                         Cochées : {{ form.cleared_ids.length }} / {{ uncleared.length }}
+                    </p>
+                    <p v-if="olderCount" class="px-4 py-2 text-xs text-theme-text-muted border-t border-theme-border">
+                        {{ olderCount }} opération(s) plus ancienne(s) seront considérées comme pointées (point de départ).
                     </p>
                 </section>
             </div>
