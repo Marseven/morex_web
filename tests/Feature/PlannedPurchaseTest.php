@@ -1,0 +1,167 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Contracts\PushNotifier;
+use App\Models\Account;
+use App\Models\BudgetCycle;
+use App\Models\Category;
+use App\Models\PlannedPurchase;
+use App\Models\Transaction;
+use App\Models\User;
+use App\Services\PlannedPurchaseService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * Module achats-prevus (5d) : RM-1 à RM-5.
+ */
+class PlannedPurchaseTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $user;
+
+    private Account $account;
+
+    private Category $clothes;
+
+    private PlannedPurchaseService $service;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->travelTo(now()->setDate(2026, 11, 11)->setTime(10, 0));
+        $this->app->instance(PushNotifier::class, new class implements PushNotifier
+        {
+            public function sendToUser(User $user, array $payload): int
+            {
+                return 0;
+            }
+        });
+        $this->user = User::factory()->create();
+        $this->account = Account::factory()->for($this->user)->withBalance(2000000)->create();
+        $this->clothes = Category::factory()->create(['user_id' => $this->user->id, 'name' => 'Habillement', 'type' => 'expense']);
+        $this->service = app(PlannedPurchaseService::class);
+    }
+
+    private function spend(int $amount, ?Category $category = null, array $extra = []): Transaction
+    {
+        $tx = new Transaction($extra + [
+            'amount' => $amount, 'type' => 'expense', 'category_id' => ($category ?? $this->clothes)->id,
+            'account_id' => $this->account->id, 'date' => now()->toDateString(), 'beneficiary' => 'boutique',
+        ]);
+        $tx->user_id = $this->user->id;
+        $tx->save();
+
+        return $tx;
+    }
+
+    private function plan(string $name = 'Chaussures', int $amount = 45000, ?string $for = null): PlannedPurchase
+    {
+        return $this->service->plan($this->user, ['name' => $name, 'estimated_amount' => $amount, 'category_id' => $this->clothes->id, 'planned_for' => $for]);
+    }
+
+    public function test_a_purchase_is_planned_for_the_current_period_by_default(): void
+    {
+        $purchase = $this->plan();
+
+        $this->assertSame(['2026-11-01', 'planned'], [$purchase->planned_for->toDateString(), $purchase->status]);
+    }
+
+    public function test_postponing_targets_the_day_after_the_cycle_end(): void
+    {
+        $cycle = new BudgetCycle(['start_date' => '2026-10-27', 'end_date' => '2026-11-26', 'period_name' => 'Nov', 'status' => 'active']);
+        $cycle->user_id = $this->user->id;
+        $cycle->save();
+
+        $purchase = $this->service->postpone($this->user, ['name' => 'Montre', 'estimated_amount' => 60000, 'category_id' => $this->clothes->id]);
+
+        $this->assertSame('2026-11-27', $purchase->planned_for->toDateString());
+    }
+
+    public function test_postponing_without_a_known_end_targets_next_month(): void
+    {
+        $purchase = $this->service->postpone($this->user, ['name' => 'Montre', 'estimated_amount' => 60000]);
+
+        $this->assertSame('2026-12-01', $purchase->planned_for->toDateString());
+    }
+
+    public function test_only_big_regular_unlinked_expenses_are_out_of_list(): void
+    {
+        $transit = Category::factory()->create(['user_id' => $this->user->id, 'type' => 'expense']);
+        $transit->forceFill(['nature' => 'transit'])->save();
+        $big = $this->spend(60000);
+        $this->spend(29999);
+        $this->spend(80000, $transit);
+        $this->spend(90000, extra: ['status' => Transaction::STATUS_PENDING]);
+        $linked = $this->spend(45000);
+        $this->service->link($this->plan(), $linked);
+
+        $this->assertSame([$big->id], $this->service->outOfList($this->user)->pluck('id')->all());
+    }
+
+    public function test_linking_marks_the_purchase_bought(): void
+    {
+        $purchase = $this->plan();
+        $tx = $this->spend(47000);
+
+        $this->service->link($purchase, $tx);
+
+        $purchase->refresh();
+        $this->assertSame([PlannedPurchase::STATUS_BOUGHT, $tx->id, false], [$purchase->status, $purchase->transaction_id, $purchase->unplanned]);
+    }
+
+    public function test_an_operation_cannot_be_linked_twice(): void
+    {
+        $tx = $this->spend(45000);
+        $this->service->link($this->plan(), $tx);
+
+        $this->expectException(\DomainException::class);
+        $this->service->link($this->plan('Sac'), $tx);
+    }
+
+    public function test_accepting_an_unplanned_purchase_keeps_a_trace(): void
+    {
+        $tx = $this->spend(60000);
+
+        $this->service->acceptUnplanned($tx);
+
+        $this->assertTrue(PlannedPurchase::where('transaction_id', $tx->id)->value('unplanned'));
+        $this->assertCount(0, $this->service->outOfList($this->user));
+        $this->assertSame(1, $this->service->summary($this->user)['unplanned_count']);
+    }
+
+    public function test_candidates_match_open_purchases_of_the_same_category_up_to_now(): void
+    {
+        $this->plan('Chaussures');
+        $this->plan('Veste', 70000, '2026-12-01'); // cycle suivant : pas encore permis
+        $other = Category::factory()->create(['user_id' => $this->user->id, 'type' => 'expense']);
+
+        $this->assertSame(['Chaussures'], $this->service->candidates($this->user, $this->clothes->id)->pluck('name')->all());
+        $this->assertCount(0, $this->service->candidates($this->user, $other->id));
+    }
+
+    public function test_summary_counts_the_period(): void
+    {
+        $this->service->link($this->plan('Chaussures', 45000), $this->spend(47000));
+        $this->plan('Sac', 35000);
+        $this->spend(60000);
+
+        $summary = $this->service->summary($this->user);
+
+        $this->assertSame([2, 1, 80000, 47000, 1, 60000], [
+            $summary['planned_count'], $summary['bought_count'], $summary['planned_total'],
+            $summary['spent_total'], $summary['out_of_list_count'], $summary['out_of_list_total'],
+        ]);
+    }
+
+    public function test_late_purchases_come_from_previous_periods(): void
+    {
+        $this->plan('Lunettes', 50000, '2026-10-01');
+
+        $this->assertSame(['Lunettes'], $this->service->summary($this->user)['late']->pluck('name')->all());
+    }
+}
