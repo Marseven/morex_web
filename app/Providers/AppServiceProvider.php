@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\PushNotifier;
+use App\Services\WebPushNotifier;
 use Illuminate\Support\ServiceProvider;
+use Minishlink\WebPush\WebPush;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -11,7 +14,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(PushNotifier::class, WebPushNotifier::class);
+        $this->app->bind(WebPush::class, fn () => WebPushNotifier::makeClient());
     }
 
     /**

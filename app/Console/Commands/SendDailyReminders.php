@@ -4,9 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\PushSubscription;
 use App\Models\Transaction;
+use App\Services\WebPushNotifier;
 use Illuminate\Console\Command;
-use Minishlink\WebPush\Subscription;
-use Minishlink\WebPush\WebPush;
 
 class SendDailyReminders extends Command
 {
@@ -16,18 +15,14 @@ class SendDailyReminders extends Command
 
     public function handle(): int
     {
-        if (!config('webpush.public_key') || !config('webpush.private_key')) {
+        if (! config('webpush.public_key') || ! config('webpush.private_key')) {
             $this->warn('Clés VAPID non configurées — rappels ignorés.');
+
             return self::SUCCESS;
         }
 
-        $webPush = new WebPush([
-            'VAPID' => [
-                'subject' => config('webpush.subject'),
-                'publicKey' => config('webpush.public_key'),
-                'privateKey' => config('webpush.private_key'),
-            ],
-        ]);
+        $notifier = app(WebPushNotifier::class);
+        $webPush = $notifier->client(); // envoi partagé avec les alertes de plafond (timeout court)
 
         $payload = json_encode([
             'title' => 'MR Money',
@@ -39,9 +34,9 @@ class SendDailyReminders extends Command
         $sent = 0;
 
         // Un enregistrement par navigateur ; on ne notifie que les utilisateurs sans saisie aujourd'hui.
-        PushSubscription::with('user')->chunk(100, function ($subscriptions) use ($webPush, $payload, &$sent) {
+        PushSubscription::with('user')->chunk(100, function ($subscriptions) use ($notifier, $webPush, $payload, &$sent) {
             foreach ($subscriptions as $sub) {
-                if (!$sub->user) {
+                if (! $sub->user) {
                     continue;
                 }
 
@@ -53,28 +48,16 @@ class SendDailyReminders extends Command
                     continue;
                 }
 
-                $webPush->queueNotification(
-                    Subscription::create([
-                        'endpoint' => $sub->endpoint,
-                        'keys' => ['p256dh' => $sub->public_key, 'auth' => $sub->auth_token],
-                    ]),
-                    $payload
-                );
+                $webPush->queueNotification($notifier->subscription($sub), $payload);
                 $sent++;
             }
 
             // Envoi + nettoyage des abonnements expirés (410/404).
-            foreach ($webPush->flush() as $report) {
-                if (!$report->isSuccess()) {
-                    $code = $report->getResponse()?->getStatusCode();
-                    if (in_array($code, [404, 410], true)) {
-                        PushSubscription::where('endpoint', $report->getRequest()->getUri()->__toString())->delete();
-                    }
-                }
-            }
+            $notifier->flush($webPush);
         });
 
         $this->info("Rappels envoyés : {$sent}");
+
         return self::SUCCESS;
     }
 }
