@@ -36,8 +36,12 @@ Catégories et cycles budgétaires : créés/calculés sur le web uniquement.
 - `app/Console/Commands/` — commandes ponctuelles (rattrapages).
 - `tests/Feature/` — un test de non-régression par bug corrigé.
 
-## Objectifs financiers (contexte des écrans de suivi)
-Fonds d'urgence 2 610 000 FCFA · épargne 25 % des revenus · sorties ≤ 50 000 FCFA/mois · dons ≤ 30 000 FCFA/mois · revenus projets → 100 % investissement.
+## Objectifs financiers (référence au 2026-11-10)
+- Épargne Investissement : 2 000 000 FCFA au 31/12/2026, 300 000 FCFA/mois virés **le jour du salaire** (fonds d'urgence déjà atteint). L'épargne passe par des **transferts** vers « Compte Epargne » : la progression doit les compter.
+- Plafonds mensuels : Sorties/Loisirs 170 000 (une soirée club par mois) · Emilie/Courses 150 000 · Abonnements 90 000 (perso, outils pro à part) · Alimentation 110–120 000 · Dîmes ≈ 10 % des revenus.
+- Règle d'achat : tout achat > 30 000 hors de la liste prévue attend le cycle suivant.
+- Revenus : salaire fixe + freelance irrégulier ; **tontines = transit** (ni revenu ni dépense) ; un remboursement n'est pas un revenu.
+- Comptes réels : Compte Courant, Compte Bgfi Mobile, Compte Airtel Money, Portefeuille (espèces), Compte Epargne.
 
 ## Façon de travailler
 - Socle MDF (`~/.claude`) : mode Express pour un bug, `/cadrage` puis `/module` pour une évolution. Plan courant : `docs/plan.md`.

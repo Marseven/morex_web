@@ -1,19 +1,21 @@
-# Plan — Morex phase 2            VALIDÉ le 2026-11-10
+# Plan — Morex phase 2            VALIDÉ le 2026-11-10 · ajusté le 2026-11-10
 
-**Conclusion** : on commence par `socle-prod` (une faille en production, sans dépendance), puis `saisie-rapide`, qui sert tous les jours.
-Taux de référence : 80 000 FCFA par jour (projet personnel, à titre indicatif) → ~11,5 j ≈ 920 000 FCFA.
+**Conclusion** : 0, 1, 2 et 4 sont livrés (PR ouvertes). Ajustement d'après les analyses mensuelles de Richard : la priorité devient **2 bis saisie-lot** (remplace la génération de CSV par un assistant externe), puis **3 relevés** (rapprochement notes ↔ relevés), puis **5 objectifs** avec l'épargne réelle.
+Taux de référence : 80 000 FCFA par jour (à titre indicatif) → reste ~13 j ≈ 1 040 000 FCFA.
 
 | # | Module | Contenu (1 ligne) | Dépend de | UI ? | Sensible ? | Est. | Statut |
 |---|---|---|---|---|---|---|---|
 | 0 | correctifs-critiques | P1–P4 (2FA, synchro, verrou du solde, SMS en attente) — PR morex_web#1 + morex_mobile#1 | — | non | oui | — | livré (PR ouvertes) |
 | 1 | socle-prod | `APP_DEBUG` coupé, en-têtes de sécurité, Swagger fermé en prod, `/health`, cron `schedule:run`, sauvegarde MySQL quotidienne | 0 | non | oui | 1 j | livré (PR ouverte) |
 | 2 | saisie-rapide | Formulaire mobile « montant d'abord », compte par défaut, catégorie suggérée par libellé, modèles favoris, widget iOS | 0 | oui | non | 2 j | livré (PR ouverte) |
-| 3 | sms-iphone | Jeton Sanctum limité au webhook, Raccourci iOS documenté, `SmsParser` testé sur des SMS réels, validation en lot | 1 | oui | oui | 2 j | à faire |
+| 2 bis | saisie-lot | Coller les notes d'une journée (« 1500 taxi », « 22500+12000 night club », entrées incluses) → aperçu avec catégorie et compte suggérés (service du module 2) → validation en une fois ; web puis mobile | 2 | oui | non | 2 j | à faire |
+| 3 | sms-iphone Jeton Sanctum limité au webhook, Raccourci iOS documenté, `SmsParser` testé sur des SMS réels, validation en lot | 1 | oui | oui | 2 j | à faire |
 | 4 | rapprochement | Serveur + API + écran web : solde du relevé → écart, pointage, opération d'écart tracée ; `adjust-balance` passe par le service | 0 | oui | non | 2 j | livré (PR ouverte) |
 | 4 bis | rapprochement-mobile | Écran de rapprochement sur l'iPhone, branché sur l'API du module 4 | 4 | oui | non | 1 j | à faire |
-| 5 | suivi-objectifs | Tableau de bord des 5 objectifs (fonds d'urgence, épargne 25 %, plafonds sorties et dons, projets), alertes de plafond | 4 | oui | non | 2 j | à faire |
+| 5 | suivi-objectifs | Objectif 2 M au 31/12 calculé sur le Compte Epargne (transferts compris) ; plafonds réels (sorties 170k, Emilie 150k, abonnements 90k…) avec alertes ; tontines en transit ; pro/perso ; liste d'achats prévus et règle hors-liste > 30k | 4 | oui | non | 3 j | à faire |
 | 6 | recurrences-serveur | Génération des récurrences par le scheduler (idempotente), plus seulement sur le mobile | 1 | non | non | 1 j | à faire |
+| 8 | bilan-mensuel | Bilan du cycle (réalisé vs budget, discrétionnaire, épargne) et proposition du cycle suivant créée directement dans l'app (plus de CSV à générer) | 5 | oui | non | 2 j | à faire |
 | 7 | dette-qualite | 4 tests mobiles périmés, 9 avertissements `flutter analyze`, CI GitHub Actions, points moyens des revues de sécurité, opérations rapprochées modifiables, catégories d'écart sélectionnables | 0 | non | oui | 1,5 j | à faire |
 
 Statuts : à faire · analysé · en cours · livré · vérifié. Un module = une session, ≤ 15 fichiers.
-Les modules 2, 4 et 7 sont indépendants entre eux et peuvent se faire dans n'importe quel ordre après le 1.
+Ordre conseillé : 2 bis → 3 → 5 → 8 ; 4 bis, 6 et 7 se glissent entre deux selon le besoin.

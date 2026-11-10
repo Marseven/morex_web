@@ -1,17 +1,21 @@
 # Cadrage — Morex, phase 2 : saisie, rapprochement, suivi            2026-11-10
 
-**Conclusion** : 7 modules, environ 11 jours. On commence par sécuriser la production (`APP_DEBUG` est activé), puis on réduit la saisie à quelques secondes depuis l'iPhone, avant d'outiller le rapprochement des soldes et le suivi des objectifs.
+**Conclusion** : 11 modules (4 livrés). Production sécurisée, saisie rapide et rapprochement de solde sont faits ; restent la saisie en lot, le rapprochement avec les relevés, le suivi de l'objectif 2 M avec l'épargne réelle et le bilan mensuel.
 
-**Objectif** : que Richard saisisse chaque dépense en moins de 10 secondes, rapproche chaque compte avec son solde réel en moins de 2 minutes par semaine, et voie d'un coup d'œil où il en est de ses 5 objectifs financiers.
+**Objectif** : que Richard saisisse chaque dépense en moins de 10 secondes (et une journée de notes en une fois), rapproche ses notes avec ses relevés Airtel/BGFI, et voie d'un coup d'œil où il en est de l'objectif 2 M au 31/12 et de ses plafonds — sans passer par un assistant externe pour générer des CSV.
 
-**Acteurs** : Richard (seul utilisateur, iPhone + navigateur) · l'app Raccourcis d'iOS (envoi des SMS) · Airtel Money, Moov Money et les banques (SMS) · Hostinger (hébergement, cron, MySQL).
+**Ajusté le 2026-11-10** d'après les analyses mensuelles de Richard (juillet → octobre) : la saisie se fait en notes texte par journée, le vrai rapprochement est notes ↔ relevés (frais inclus), l'épargne circule par transferts, les tontines faussent revenus et dépenses. Modules 2 bis, 3 (élargi), 5 (enrichi) et 8 ajoutés ou revus.
+
+**Acteurs** : Richard (seul utilisateur, iPhone + navigateur) · l'app Raccourcis d'iOS (envoi des SMS) · Airtel Money, BGFI et BGFI Mobile (relevés, SMS) · Hostinger (hébergement, cron, MySQL).
 
 **Périmètre V2**
 - Production sûre : debug coupé, en-têtes de sécurité, Swagger fermé, sauvegarde MySQL quotidienne, `/health`.
 - Saisie rapide sur mobile : montant d'abord, compte par défaut, catégorie suggérée d'après le libellé, modèles favoris, widget iOS.
-- SMS sur iPhone : un Raccourci iOS envoie le SMS au webhook, le serveur le parse, la validation se fait en lot dans l'app.
+- Saisie en lot : coller les notes d'une journée (« 1500 taxi », « 22500+12000 night club ») → aperçu catégorisé → validation.
+- Relevés et SMS : import des relevés Airtel/BGFI (et SMS via Raccourci iOS), rapprochement automatique avec les écritures (montant + frais, même jour), non rapprochés soumis à validation.
 - Rapprochement : je saisis le solde réel, l'app montre l'écart et les opérations non pointées, l'écart devient une transaction tracée (jamais un ajustement silencieux).
-- Suivi : tableau de bord centré sur les objectifs (fonds d'urgence, épargne 25 %, plafonds sorties et dons, revenus de projets), alertes à l'approche d'un plafond.
+- Suivi : objectif Épargne Investissement 2 M au 31/12 mesuré sur le Compte Epargne (transferts compris), versement de 300k du mois, plafonds réels avec alertes, tontines en transit, pro/perso, liste d'achats prévus.
+- Bilan mensuel : réalisé vs budget et proposition du cycle suivant, directement dans l'app.
 - Récurrences générées par le serveur (cron), plus seulement quand le téléphone est ouvert.
 - Qualité : tests mobiles réparés, CI GitHub Actions minimale, points moyens restants de la revue de sécurité.
 
