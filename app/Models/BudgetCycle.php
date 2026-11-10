@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
 
 class BudgetCycle extends Model
 {
@@ -46,6 +46,7 @@ class BudgetCycle extends Model
     public function transactions()
     {
         $query = Transaction::where('user_id', $this->user_id)
+            ->where('status', '!=', Transaction::STATUS_PENDING)
             ->where('date', '>=', $this->start_date);
 
         if ($this->end_date) {
@@ -87,11 +88,11 @@ class BudgetCycle extends Model
         // Calculer le budget total depuis les catégories
         $this->total_budget = Category::where(function ($q) {
             $q->where('user_id', $this->user_id)
-              ->orWhereNull('user_id');
+                ->orWhereNull('user_id');
         })
-        ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->sum('budget_limit');
+            ->where('type', 'expense')
+            ->whereNotNull('budget_limit')
+            ->sum('budget_limit');
 
         $this->save();
     }
@@ -107,7 +108,7 @@ class BudgetCycle extends Model
     /**
      * Clôture le cycle
      */
-    public function close(Carbon $endDate = null): void
+    public function close(?Carbon $endDate = null): void
     {
         $this->end_date = $endDate ?? now()->subDay();
         $this->status = 'closed';
@@ -125,35 +126,35 @@ class BudgetCycle extends Model
 
         $totalBudget = Category::where(function ($q) {
             $q->where('user_id', $this->user_id)
-              ->orWhereNull('user_id');
+                ->orWhereNull('user_id');
         })
-        ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->sum('budget_limit');
+            ->where('type', 'expense')
+            ->whereNotNull('budget_limit')
+            ->sum('budget_limit');
 
         // Détails par catégorie
         $categories = Category::where(function ($q) {
             $q->where('user_id', $this->user_id)
-              ->orWhereNull('user_id');
+                ->orWhereNull('user_id');
         })
-        ->where('type', 'expense')
-        ->get()
-        ->map(function ($category) {
-            $spent = $this->transactions()
-                ->where('type', 'expense')
-                ->where('category_id', $category->id)
-                ->sum('amount');
+            ->where('type', 'expense')
+            ->get()
+            ->map(function ($category) {
+                $spent = $this->transactions()
+                    ->where('type', 'expense')
+                    ->where('category_id', $category->id)
+                    ->sum('amount');
 
-            return [
-                'id' => $category->id,
-                'name' => $category->name,
-                'budget_limit' => $category->budget_limit ?? 0,
-                'spent' => (int) $spent,
-            ];
-        })
-        ->filter(fn ($cat) => $cat['spent'] > 0 || $cat['budget_limit'] > 0)
-        ->values()
-        ->toArray();
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'budget_limit' => $category->budget_limit ?? 0,
+                    'spent' => (int) $spent,
+                ];
+            })
+            ->filter(fn ($cat) => $cat['spent'] > 0 || $cat['budget_limit'] > 0)
+            ->values()
+            ->toArray();
 
         // Snapshot des soldes de comptes
         $accountsSnapshot = Account::where('user_id', $this->user_id)
@@ -205,7 +206,7 @@ class BudgetCycle extends Model
         $months = [
             1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
             5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
-            9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+            9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre',
         ];
 
         // Si on commence après le 15, c'est le budget du mois suivant
@@ -215,6 +216,6 @@ class BudgetCycle extends Model
             $targetDate = $startDate;
         }
 
-        return $months[$targetDate->month] . ' ' . $targetDate->year;
+        return $months[$targetDate->month].' '.$targetDate->year;
     }
 }

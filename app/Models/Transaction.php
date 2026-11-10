@@ -52,9 +52,25 @@ class Transaction extends Model
         return $this->belongsTo(Account::class, 'transfer_to_account_id');
     }
 
+    public const STATUS_PENDING = 'pending_validation';
+
+    /**
+     * Une transaction en attente de validation (import SMS) ne compte ni dans le
+     * solde ni dans les cycles tant qu'elle n'est pas confirmée.
+     */
+    public function affectsBalance(): bool
+    {
+        return $this->status !== self::STATUS_PENDING;
+    }
+
+    private function affectedBalanceBeforeUpdate(): bool
+    {
+        return $this->getOriginal('status') !== self::STATUS_PENDING;
+    }
+
     public function getFormattedAmountAttribute(): string
     {
-        return number_format($this->amount, 0, ',', ' ') . ' FCFA';
+        return number_format($this->amount, 0, ',', ' ').' FCFA';
     }
 
     public function getSignedAmountAttribute(): int
@@ -75,7 +91,7 @@ class Transaction extends Model
                     ->whereDate('start_date', '<=', $transaction->date)
                     ->where(function ($q) use ($transaction) {
                         $q->whereNull('end_date')
-                          ->orWhereDate('end_date', '>=', $transaction->date);
+                            ->orWhereDate('end_date', '>=', $transaction->date);
                     })
                     ->first();
                 $activeCycle?->updateTotals();
@@ -148,6 +164,9 @@ class Transaction extends Model
         };
 
         static::created(function (Transaction $transaction) use ($updateBudgetCycle, $applyAdjustments) {
+            if (! $transaction->affectsBalance()) {
+                return;
+            }
             $applyAdjustments($transaction);
             $updateBudgetCycle($transaction);
         });
@@ -158,20 +177,34 @@ class Transaction extends Model
                 || $transaction->wasChanged('account_id')
                 || $transaction->wasChanged('transfer_to_account_id');
 
-            if ($relevantChanged) {
+            $wasCounted = $transaction->affectedBalanceBeforeUpdate();
+            $isCounted = $transaction->affectsBalance();
+
+            if ($wasCounted && $isCounted && $relevantChanged) {
                 $reverseOldAdjustments($transaction);
                 $applyAdjustments($transaction);
+            } elseif (! $wasCounted && $isCounted) {
+                // Validation d'une transaction en attente : premier passage au solde
+                $applyAdjustments($transaction, desc: 'Validation transaction');
+            } elseif ($wasCounted && ! $isCounted) {
+                $reverseOldAdjustments($transaction);
             }
 
             $updateBudgetCycle($transaction);
         });
 
         static::deleted(function (Transaction $transaction) use ($updateBudgetCycle, $applyAdjustments) {
+            if (! $transaction->affectsBalance()) {
+                return;
+            }
             $applyAdjustments($transaction, reverse: true, desc: 'Suppression transaction');
             $updateBudgetCycle($transaction);
         });
 
         static::restored(function (Transaction $transaction) use ($updateBudgetCycle, $applyAdjustments) {
+            if (! $transaction->affectsBalance()) {
+                return;
+            }
             $applyAdjustments($transaction, desc: 'Restauration transaction');
             $updateBudgetCycle($transaction);
         });
