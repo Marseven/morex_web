@@ -28,7 +28,7 @@
 - RM-2 : sont « non pointées » les transactions confirmées, non supprimées, du compte, avec `reconciled_at` NULL et une date ≤ aujourd'hui. Les transferts sont hors pointage en V1.
 - RM-3 : le premier rapprochement d'un compte sert de base datée ; aucun audit rétroactif.
 - RM-4 : l'opération d'écart est **exclue des cycles budgétaires et des plafonds** (sorties, dons), mais compte dans le solde et apparaît dans l'historique.
-- RM-5 : montants en FCFA entiers ; écart = solde du relevé − solde Morex au moment de la validation (relu sous verrou).
+- RM-5 : montants en FCFA entiers ; écart = solde du relevé − (solde Morex − somme signée des opérations **non cochées**), recalculé par le serveur sous verrou. Les opérations non cochées ne sont pas compensées : elles restent à pointer (décision du 2026-11-10, voir `docs/design/rapprochement.md`).
 
 **Sécurité** : Policy sur le compte, plus vérification que chaque `cleared_id` appartient bien au compte (protection IDOR) ; Form Request stricte (`integer`, `uuid`, `max:500` pour la note) ; journaux sans montant ni note.
 
