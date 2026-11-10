@@ -50,7 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('accounts.reconciliations.store');
     Route::get('/accounts/{account}/statement', [StatementController::class, 'show'])->name('accounts.statement');
     Route::post('/accounts/{account}/statement/preview', [StatementController::class, 'preview'])->middleware('throttle:30,1')->name('accounts.statement.preview');
-    Route::post('/accounts/{account}/statement', [StatementController::class, 'store'])->name('accounts.statement.store');
+    Route::post('/accounts/{account}/statement', [StatementController::class, 'store'])->middleware('throttle:30,1')->name('accounts.statement.store');
 
     // Transactions
     // (routes spécifiques AVANT la resource pour ne pas être capturées par {transaction})
