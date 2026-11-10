@@ -73,13 +73,14 @@ final class GoalProgressService
         };
 
         $required = $this->requiredPerMonth($goal, $remaining);
+        // Pourcentage arrondi au plus proche, comme la carte « Objectifs » existante
 
         return [
             'id' => $goal->id,
             'name' => $goal->name,
             'current_amount' => $current,
             'target_amount' => $goal->target_amount,
-            'percent' => $goal->target_amount > 0 ? min(100, (int) floor($current * 100 / $goal->target_amount)) : 0,
+            'percent' => $goal->target_amount > 0 ? min(100, (int) round($current * 100 / $goal->target_amount)) : 0,
             'target_date' => $goal->target_date?->toDateString(),
             'is_tracked' => $goal->isTracked(),
             'is_achieved' => $current >= $goal->target_amount,
