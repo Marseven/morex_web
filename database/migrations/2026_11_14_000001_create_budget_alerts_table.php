@@ -21,7 +21,8 @@ return new class extends Migration
             $table->bigInteger('limit');
             $table->timestamp('created_at');
 
-            $table->unique(['category_id', 'cycle_start', 'threshold']);
+            // user_id inclus : une catégorie système (Frais bancaires) est partagée entre utilisateurs
+            $table->unique(['user_id', 'category_id', 'cycle_start', 'threshold']);
             $table->index(['user_id', 'cycle_start']);
         });
     }
