@@ -47,6 +47,10 @@ class PushSafetyTest extends TestCase
             'localhost' => ['https://localhost/push'],
             'hôte inconnu' => ['https://evil.example/push'],
             'suffixe piégé' => ['https://fcm.googleapis.com.evil.example/x'],
+            'port explicite' => ['https://fcm.googleapis.com:443/x'],
+            'utilisateur' => ['https://user@fcm.googleapis.com/x'],
+            'point final' => ['https://fcm.googleapis.com./x'],
+            'adresse IP' => ['https://142.250.0.1/x'],
         ];
     }
 

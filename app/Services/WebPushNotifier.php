@@ -52,7 +52,7 @@ final class WebPushNotifier implements PushNotifier
                 'publicKey' => config('webpush.public_key'),
                 'privateKey' => config('webpush.private_key'),
             ],
-        ], [], self::TIMEOUT_SECONDS);
+        ], [], self::TIMEOUT_SECONDS, ['allow_redirects' => false]);
     }
 
     public function subscription(PushSubscription $sub): Subscription
