@@ -29,6 +29,7 @@ class Transaction extends Model
         return [
             'amount' => 'integer',
             'date' => 'date',
+            'reconciled_at' => 'datetime',
         ];
     }
 

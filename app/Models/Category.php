@@ -13,6 +13,13 @@ class Category extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
+    /** Catégories système des opérations d'écart de rapprochement (migration 2026_11_11_000003). */
+    public const RECONCILIATION_EXPENSE_ID = '0b9a3c52-7e1d-4f6a-9c2e-5d8f1a7b3e01';
+
+    public const RECONCILIATION_INCOME_ID = '0b9a3c52-7e1d-4f6a-9c2e-5d8f1a7b3e02';
+
+    public const RECONCILIATION_IDS = [self::RECONCILIATION_EXPENSE_ID, self::RECONCILIATION_INCOME_ID];
+
     protected $fillable = [
         'name',
         'type',
@@ -74,10 +81,11 @@ class Category extends Model
 
     public function getBudgetProgressAttribute(): float
     {
-        if (!$this->budget_limit || $this->budget_limit === 0) {
+        if (! $this->budget_limit || $this->budget_limit === 0) {
             return 0;
         }
         $spent = $this->spent_this_month ?? 0;
+
         return min(100, ($spent / $this->budget_limit) * 100);
     }
 }
