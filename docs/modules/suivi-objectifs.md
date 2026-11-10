@@ -1,4 +1,4 @@
-# Module suivi-objectifs (5a : objectif d'épargne réel)    statut : analysé · 2026-11-11
+# Module suivi-objectifs (5a : objectif d'épargne réel)    statut : livré · 2026-11-11
 
 **Conclusion** : un objectif peut être **suivi sur un compte** (Compte Epargne). Sa progression se calcule alors seule à partir du solde de ce compte : versements et transferts entrants comptent, et les retraits (les 700 000 repartis vers le Courant, par exemple) se déduisent. Fini les « contributions » saisies à la main et l'écart 390 000 / 3,18 M. S'y ajoutent le **versement du mois** (300 000 attendus, versé ou non) et la **projection** au 31/12. Pour rester sous 15 fichiers, le module est scindé :
 - **5a** : ce module ;
@@ -49,3 +49,30 @@
 3. Le versement du mois se mesure-t-il sur le cycle budgétaire (de salaire à salaire) ou sur le mois civil ? → *Hypothèse : sur le cycle actif, sinon sur le mois civil.*
 
 **Hors module** : plafonds et alertes (5b), tontines et pro/perso (5c), achats prévus (5d), écran mobile dédié (la carte arrive par la synchro existante).
+
+## Livré (5a)
+- **Serveur** :
+  - migration réversible (`tracked_since`, `tracked_start_amount`, `tracked_account_balance`, `monthly_target`), rollback testé ;
+  - accesseur `Goal::current_amount` (RM-1, lit le compte par la relation) ;
+  - `GoalProgressService` (lier, délier, versement du mois, projection, échéance dépassée) ;
+  - `TrackGoalRequest`.
+- **Routes** : `POST|DELETE /goals/{id}/track` (web) et `/api/goals/{id}/track` (API).
+- **Synchro** :
+  - les objectifs suivis non supprimés sont toujours renvoyés au pull ;
+  - le compte et la progression d'un objectif suivi ne sont jamais modifiés par un push.
+- **Web** :
+  - carte `SavingsGoalCard` sur le tableau de bord (direction A) ;
+  - bloc « Suivre sur un compte » sur la fiche objectif, qui remplace le sélecteur « Compte associé » ;
+  - « Suivi automatique » à la place de « + Ajouter » dans la liste.
+- **Tests** : `GoalTrackingTest`, 21 tests. Suite complète : 424 au vert.
+- **Vérifié dans le navigateur** sur une instance locale jetable :
+  - lien avec un départ de 1 590 000 et un versement visé de 300 000 ;
+  - après un virement de 300 000, la carte affiche 1 890 000 / 2 000 000, « Ce mois-ci 300 000 / 300 000 ✓ Atteint » et « Rythme suffisant pour le 31/12 ».
+- **Correctifs voisins** :
+  - le compte d'un objectif est maintenant limité à son propriétaire (`store`/`update` web acceptaient n'importe quel compte, ce qui aurait permis de lire un solde étranger via le suivi) ;
+  - `balance_history.created_at` est posé par l'application (horloge cohérente).
+- **Revue de code**, points hauts corrigés : changement de compte d'un objectif suivi par la synchro ; une requête par lecture de la progression.
+- **Revue de code**, points moyens corrigés : objectifs supprimés renvoyés sans fin ; versement du mois compté depuis le début du suivi ; tests 403 et validation.
+- **Revue de code**, points bas corrigés : échéance dépassée signalée ; `forceCreate` ; typage.
+- **Décision maintenue (RM-4)** : pas de passage automatique au statut `completed`. La carte affiche « Atteint » ; le statut reste à changer par Richard.
+- **Non vérifié** : MySQL réel ; comportement de l'app iPhone face aux objectifs suivis renvoyés à chaque pull (attendu : simple mise à jour).
