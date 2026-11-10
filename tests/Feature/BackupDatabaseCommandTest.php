@@ -133,4 +133,44 @@ class BackupDatabaseCommandTest extends TestCase
         $this->assertNotNull($event);
         $this->assertSame('0 3 * * *', $event->expression);
     }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('passwordsWithControlCharacters')]
+    public function test_it_refuses_a_password_that_would_break_the_options_file(string $password): void
+    {
+        config(['database.connections.mysql.password' => $password]);
+        Process::fake();
+
+        $this->artisan('backup:database')->assertFailed();
+
+        Process::assertNothingRan();
+    }
+
+    /** @return array<string, array{string}> */
+    public static function passwordsWithControlCharacters(): array
+    {
+        return [
+            'retour à la ligne' => ["abc\nplugin-dir=/tmp"],
+            'retour chariot' => ["abc\rdef"],
+            'octet nul' => ["abc\0def"],
+        ];
+    }
+
+    public function test_backup_names_carry_a_random_suffix(): void
+    {
+        $this->fakeDump();
+
+        $this->artisan('backup:database')->assertSuccessful();
+
+        $this->assertMatchesRegularExpression('/morex-\d{8}-\d{6}-[0-9a-f]{12}\.sql\.gz$/', $this->backups()[0]);
+    }
+
+    public function test_backup_files_are_private(): void
+    {
+        $this->fakeDump();
+
+        $this->artisan('backup:database')->assertSuccessful();
+
+        $this->assertSame('600', substr(sprintf('%o', fileperms($this->backups()[0])), -3));
+        $this->assertSame('700', substr(sprintf('%o', fileperms($this->dir)), -3));
+    }
 }

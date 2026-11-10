@@ -26,15 +26,22 @@ final class DatabaseBackup
             throw new RuntimeException('Sauvegarde possible uniquement sur une connexion MySQL/MariaDB.');
         }
 
+        $defaultsFile = $this->writeDefaultsFile($connection);
+
         $directory = config('backup.path');
         File::ensureDirectoryExists($directory, 0700);
+        chmod($directory, 0700);
 
-        $base = $directory.'/morex-'.now()->format('Ymd-His');
-        $defaultsFile = $this->writeDefaultsFile($connection);
+        // Suffixe aléatoire : le nom d'une sauvegarde ne se devine pas à partir de l'heure du cron.
+        $base = $directory.'/morex-'.now()->format('Ymd-His').'-'.bin2hex(random_bytes(6));
 
         try {
             $this->dump($connection['database'], $defaultsFile, $base.'.sql');
             $this->compress($base.'.sql', $base.'.sql.gz');
+        } catch (\Throwable $e) {
+            File::delete($base.'.sql.gz');
+
+            throw $e instanceof RuntimeException ? $e : new RuntimeException('Compression de la sauvegarde impossible.', 0, $e);
         } finally {
             File::delete([$defaultsFile, $base.'.sql']);
         }
@@ -79,8 +86,15 @@ final class DatabaseBackup
 
     private function compress(string $source, string $target): void
     {
+        touch($target);
+        chmod($target, 0600);
+
         $in = fopen($source, 'rb');
         $out = gzopen($target, 'wb6');
+
+        if ($in === false || $out === false) {
+            throw new RuntimeException('Impossible d\'ouvrir les fichiers de sauvegarde.');
+        }
 
         while (! feof($in)) {
             gzwrite($out, (string) fread($in, 1 << 20));
@@ -88,21 +102,27 @@ final class DatabaseBackup
 
         fclose($in);
         gzclose($out);
-        chmod($target, 0600);
     }
 
     /** @param  array<string, mixed>  $connection */
     private function writeDefaultsFile(array $connection): string
     {
-        $file = tempnam(sys_get_temp_dir(), 'morex-backup-');
-        chmod($file, 0600);
-
         $lines = ['[client]'];
         foreach (['user' => 'username', 'password' => 'password', 'host' => 'host', 'port' => 'port', 'socket' => 'unix_socket'] as $option => $key) {
             if (filled($connection[$key] ?? null)) {
-                $lines[] = $option.'="'.addcslashes((string) $connection[$key], '"\\').'"';
+                $value = (string) $connection[$key];
+
+                // Un retour à la ligne ou un NUL couperait la valeur et injecterait une option [client].
+                if (preg_match('/[\r\n\0]/', $value)) {
+                    throw new RuntimeException("Valeur de connexion « {$option} » invalide pour mysqldump (caractère de contrôle).");
+                }
+
+                $lines[] = $option.'="'.addcslashes($value, '"\\').'"';
             }
         }
+
+        $file = tempnam(sys_get_temp_dir(), 'morex-backup-');
+        chmod($file, 0600);
 
         file_put_contents($file, implode("\n", $lines)."\n");
 
