@@ -183,9 +183,6 @@ class SyncController extends Controller
             }
 
             DB::commit();
-
-            // Plafonds (module plafonds-alertes) : les événements étaient désactivés pendant le push
-            app(BudgetAlertService::class)->checkUser($user);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Sync push error', ['error' => $e->getMessage()]);
@@ -194,6 +191,14 @@ class SyncController extends Controller
                 'message' => 'Erreur lors de la synchronisation',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+
+        // Plafonds (module plafonds-alertes) : les événements étaient désactivés pendant le push.
+        // Les données sont validées : une erreur ici ne doit pas faire rejouer la synchro.
+        try {
+            app(BudgetAlertService::class)->checkUser($user);
+        } catch (\Throwable $e) {
+            report($e);
         }
 
         return response()->json([

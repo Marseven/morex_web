@@ -25,10 +25,25 @@ final class BudgetAlertService
 {
     public const THRESHOLDS = [100, 80];
 
+    /** @var array<string, array{0: CarbonImmutable, 1: ?CarbonImmutable, 2: bool}> période par utilisateur et par jour */
+    private array $periods = [];
+
     public function __construct(private readonly PushNotifier $push) {}
+
+    /** Un cycle a changé : la période doit être relue. */
+    public function forgetPeriods(): void
+    {
+        $this->periods = [];
+    }
 
     /** @return array{0: CarbonImmutable, 1: ?CarbonImmutable, 2: bool} début, fin incluse, « est un cycle » */
     public function period(User $user): array
+    {
+        return $this->periods[$user->id.'|'.now()->toDateString()] ??= $this->loadPeriod($user);
+    }
+
+    /** @return array{0: CarbonImmutable, 1: ?CarbonImmutable, 2: bool} */
+    private function loadPeriod(User $user): array
     {
         $cycle = BudgetCycle::where('user_id', $user->id)->where('status', 'active')->latest('start_date')->first();
         if ($cycle !== null) {
@@ -70,7 +85,11 @@ final class BudgetAlertService
                 continue;
             }
 
-            // RM-2 : seul le seuil le plus haut franchi est envisagé
+            // RM-2 : seul le seuil le plus haut franchi est envisagé ; « 80 % » n'a plus de sens après « dépassé »
+            if ($threshold < 100 && $this->alreadyAlerted($user, $category, $from, 100)) {
+                return null;
+            }
+
             return $this->record($user, $category, $from, $to, $threshold, $spent, $limit);
         }
 
@@ -100,9 +119,20 @@ final class BudgetAlertService
             return null; // RM-3 : déjà alerté pour ce seuil et cette période
         }
 
-        $this->push->sendToUser($user, $this->message($category, $threshold, $spent, $limit, $to));
+        // L'alerte est enregistrée : un échec d'envoi ne doit jamais faire échouer la dépense
+        try {
+            $this->push->sendToUser($user, $this->message($category, $threshold, $spent, $limit, $to));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return $alert;
+    }
+
+    private function alreadyAlerted(User $user, Category $category, CarbonImmutable $from, int $threshold): bool
+    {
+        return BudgetAlert::where('user_id', $user->id)->where('category_id', $category->id)
+            ->whereDate('cycle_start', $from->toDateString())->where('threshold', $threshold)->exists();
     }
 
     /** @return array{title: string, body: string, url: string, tag: string} */

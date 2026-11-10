@@ -184,4 +184,64 @@ class BudgetAlertTest extends TestCase
                 ->where('budgetCategories.0.spent', 150000)
             );
     }
+
+    // --- Revue de code ---
+
+    private function failingPush(): void
+    {
+        $this->app->instance(PushNotifier::class, new class implements PushNotifier
+        {
+            public function sendToUser(User $user, array $payload): int
+            {
+                throw new \RuntimeException('VAPID invalide');
+            }
+        });
+    }
+
+    public function test_a_failing_push_never_breaks_saving_the_expense(): void
+    {
+        $this->failingPush();
+
+        $tx = $this->spend(160000);
+
+        $this->assertTrue($tx->exists);
+        $this->assertSame(1, BudgetAlert::count());
+    }
+
+    public function test_a_failing_push_after_sync_still_returns_ok(): void
+    {
+        $this->failingPush();
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/sync/push', ['changes' => [[
+            'type' => 'transaction', 'action' => 'create', 'local_id' => 'l1',
+            'data' => ['amount' => 175000, 'type' => 'expense', 'account_id' => $this->account->id, 'category_id' => $this->outings->id, 'date' => now()->toDateString()],
+            'updated_at' => now()->toIso8601String(),
+        ]]])->assertOk();
+
+        $this->assertDatabaseHas('transactions', ['amount' => 175000]);
+    }
+
+    public function test_no_eighty_percent_alert_after_an_overrun_in_the_same_period(): void
+    {
+        $tx = $this->spend(180000);
+        $tx->update(['amount' => 145000]);
+
+        $this->assertSame([100], BudgetAlert::pluck('threshold')->all());
+        $this->assertCount(1, $this->sent);
+    }
+
+    public function test_bulk_saves_do_not_repeat_period_queries(): void
+    {
+        // période du service lue une fois (l'événement de Transaction a sa propre requête, hors module)
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        foreach (range(1, 10) as $i) {
+            $this->spend(1000);
+        }
+        $periodQueries = collect(\Illuminate\Support\Facades\DB::getQueryLog())
+            ->filter(fn ($q) => str_contains($q['query'], 'budget_cycles') && str_contains($q['query'], 'order by "start_date" desc'))
+            ->count();
+
+        $this->assertLessThanOrEqual(1, $periodQueries);
+    }
 }

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\PushNotifier;
+use App\Models\BudgetCycle;
 use App\Models\Transaction;
 use App\Services\BudgetAlertService;
 use App\Services\WebPushNotifier;
@@ -17,6 +18,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(PushNotifier::class, WebPushNotifier::class);
+        $this->app->scoped(BudgetAlertService::class);
         $this->app->bind(WebPush::class, fn () => WebPushNotifier::makeClient());
     }
 
@@ -32,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Plafonds (module plafonds-alertes) : toute dépense confirmée recalcule le plafond de sa catégorie.
         // La synchro désactive ces événements et vérifie tout l'utilisateur après validation.
+        // Un cycle créé, clôturé ou supprimé change la période des plafonds
+        BudgetCycle::saved(fn () => app(BudgetAlertService::class)->forgetPeriods());
+        BudgetCycle::deleted(fn () => app(BudgetAlertService::class)->forgetPeriods());
+
         Transaction::saved(function (Transaction $transaction) {
             $relevant = $transaction->wasRecentlyCreated
                 || $transaction->wasChanged(['amount', 'category_id', 'status', 'date', 'type']);
