@@ -77,6 +77,11 @@ class Account extends Model
         return $this->hasMany(Transfer::class, 'from_account_id');
     }
 
+    public function reconciliations(): HasMany
+    {
+        return $this->hasMany(Reconciliation::class);
+    }
+
     public function incomingTransfers(): HasMany
     {
         return $this->hasMany(Transfer::class, 'to_account_id');

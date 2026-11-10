@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\ReconciliationController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\GoalController;
@@ -43,6 +44,8 @@ Route::middleware('auth')->group(function () {
     // Comptes
     Route::resource('accounts', AccountController::class)->except(['show']);
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('accounts.adjust-balance');
+    Route::get('/accounts/{account}/reconcile', [ReconciliationController::class, 'show'])->name('accounts.reconcile');
+    Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('accounts.reconciliations.store');
 
     // Transactions
     // (routes spécifiques AVANT la resource pour ne pas être capturées par {transaction})
