@@ -131,6 +131,8 @@ class Account extends Model
                 'reference_type' => $refType,
                 'reference_id' => $refId,
                 'description' => $desc,
+                // Horloge de l'application (et non CURRENT_TIMESTAMP de la base) : cohérent avec les dates métier
+                'created_at' => now(),
             ]);
 
             $this->balance = $newBalance;
