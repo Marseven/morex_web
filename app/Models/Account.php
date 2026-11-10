@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Account extends Model
 {
@@ -93,30 +94,42 @@ class Account extends Model
     /**
      * Ajuste le solde du compte de manière incrémentale et crée une entrée dans le journal.
      *
-     * @param int $delta Montant à ajouter (positif) ou soustraire (négatif)
-     * @param string $type Type d'opération (income, expense, transfer_in, transfer_out, adjustment, creation)
-     * @param string|null $refType Type de référence (transaction, transfer, manual)
-     * @param string|null $refId UUID de la transaction/transfert source
-     * @param string|null $desc Description optionnelle
+     * @param  int  $delta  Montant à ajouter (positif) ou soustraire (négatif)
+     * @param  string  $type  Type d'opération (income, expense, transfer_in, transfer_out, adjustment, creation)
+     * @param  string|null  $refType  Type de référence (transaction, transfer, manual)
+     * @param  string|null  $refId  UUID de la transaction/transfert source
+     * @param  string|null  $desc  Description optionnelle
      */
     public function adjustBalance(int $delta, string $type, ?string $refType = null, ?string $refId = null, ?string $desc = null): void
     {
-        $balanceBefore = $this->balance;
-        $newBalance = $this->balance + $delta;
+        // Lecture du solde EN BASE sous verrou (et non de la copie en mémoire) :
+        // deux requêtes concurrentes ne peuvent plus s'écraser mutuellement.
+        DB::transaction(function () use ($delta, $type, $refType, $refId, $desc) {
+            $balanceBefore = (int) static::withTrashed()
+                ->whereKey($this->getKey())
+                ->lockForUpdate()
+                ->value('balance');
+            $newBalance = $balanceBefore + $delta;
 
-        BalanceHistory::create([
-            'account_id' => $this->id,
-            'type' => $type,
-            'amount' => abs($delta),
-            'balance_before' => $balanceBefore,
-            'balance_after' => $newBalance,
-            'reference_type' => $refType,
-            'reference_id' => $refId,
-            'description' => $desc,
-        ]);
+            static::withTrashed()->whereKey($this->getKey())->update([
+                'balance' => $newBalance,
+                'updated_at' => now(),
+            ]);
 
-        $this->balance = $newBalance;
-        $this->save();
+            BalanceHistory::create([
+                'account_id' => $this->id,
+                'type' => $type,
+                'amount' => abs($delta),
+                'balance_before' => $balanceBefore,
+                'balance_after' => $newBalance,
+                'reference_type' => $refType,
+                'reference_id' => $refId,
+                'description' => $desc,
+            ]);
+
+            $this->balance = $newBalance;
+            $this->syncOriginalAttribute('balance');
+        });
     }
 
     /**
