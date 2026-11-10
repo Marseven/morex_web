@@ -178,4 +178,109 @@ class StatementApplyTest extends TestCase
         $this->actingAs($this->user)->get("/accounts/{$this->airtel->id}/statement")->assertOk();
         $this->actingAs(User::factory()->create())->get("/accounts/{$this->airtel->id}/statement")->assertForbidden();
     }
+
+    // --- Revue de sécurité : le serveur ne croit pas le client sur montant, frais et date ---
+
+    private function matchLine(Transaction $tx, array $override = []): array
+    {
+        return $override + ['date' => '2026-10-24', 'amount' => -$tx->amount, 'fee' => 0, 'label' => 'L', 'reference' => null, 'action' => 'match', 'transaction_id' => $tx->id];
+    }
+
+    /** @return array<string, array{array<string, mixed>}> */
+    public static function forgedMatches(): array
+    {
+        return [
+            'montant sans rapport' => [['amount' => -900000]],
+            'frais au-delà du plafond' => [['fee' => 5000]],
+            'date hors tolérance' => [['date' => '2026-10-30']],
+            'mauvais sens' => [['amount' => 2000]],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('forgedMatches')]
+    public function test_a_forged_match_is_refused(array $override): void
+    {
+        $note = $this->note(2000);
+        $before = $this->airtel->refresh()->balance;
+        Sanctum::actingAs($this->user);
+
+        $this->postJson($this->url(), ['lines' => [$this->matchLine($note, $override)]])->assertUnprocessable();
+
+        $this->assertSame($before, $this->airtel->refresh()->balance);
+        $this->assertNull($note->refresh()->reconciled_at);
+    }
+
+    public function test_the_server_computes_the_fee_from_the_gap(): void
+    {
+        $note = $this->note(15500);
+        Sanctum::actingAs($this->user);
+
+        // Le client prétend 0 de frais pour une ligne de 16 047 : le serveur retient 547
+        $this->postJson($this->url(), ['lines' => [$this->matchLine($note, ['amount' => -16047, 'fee' => 0])]])
+            ->assertOk()->assertJsonPath('data.fees_total', 547);
+    }
+
+    public function test_pending_operations_and_existing_fees_cannot_be_matched(): void
+    {
+        $pending = $this->note(2000);
+        $pending->forceFill(['status' => Transaction::STATUS_PENDING])->saveQuietly();
+        Sanctum::actingAs($this->user);
+
+        $this->postJson($this->url(), ['lines' => [$this->matchLine($pending)]])->assertUnprocessable();
+
+        $note = $this->note(3000);
+        $this->postJson($this->url(), ['lines' => [$this->matchLine($note, ['fee' => 300, 'reference' => 'R-FEE'])]])->assertOk();
+        $feeId = StatementLine::sole()->fee_transaction_id;
+        $this->postJson($this->url(), ['lines' => [['date' => '2026-10-24', 'amount' => -300, 'fee' => 0, 'label' => 'F', 'reference' => 'R-2', 'action' => 'match', 'transaction_id' => $feeId]]])
+            ->assertUnprocessable();
+    }
+
+    public function test_a_created_line_cannot_carry_absurd_fees(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson($this->url(), ['lines' => [[
+            'date' => '2026-10-18', 'amount' => -1000, 'fee' => 900000, 'label' => 'X', 'reference' => null,
+            'action' => 'create', 'category_id' => $this->outings->id,
+        ]]])->assertUnprocessable();
+    }
+
+    public function test_a_replayed_submission_without_reference_moves_the_balance_once(): void
+    {
+        Sanctum::actingAs($this->user);
+        $payload = ['lines' => [[
+            'date' => '2026-10-18', 'amount' => -35855, 'fee' => 0, 'label' => 'BAMBOO PAY', 'reference' => null,
+            'action' => 'create', 'category_id' => $this->outings->id,
+        ]]];
+        $before = $this->airtel->balance;
+
+        $this->postJson($this->url(), $payload)->assertOk();
+        $this->postJson($this->url(), $payload)->assertUnprocessable();
+
+        $this->assertSame($before - 35855, $this->airtel->refresh()->balance);
+    }
+
+    public function test_a_category_of_the_wrong_type_is_refused(): void
+    {
+        $income = Category::factory()->create(['user_id' => $this->user->id, 'type' => 'income']);
+        Sanctum::actingAs($this->user);
+
+        $this->postJson($this->url(), ['lines' => [[
+            'date' => '2026-10-18', 'amount' => -5000, 'fee' => 0, 'label' => 'X', 'reference' => null,
+            'action' => 'create', 'category_id' => $income->id,
+        ]]])->assertUnprocessable();
+    }
+
+    public function test_one_operation_can_only_be_linked_once_in_the_database(): void
+    {
+        $note = $this->note(2000);
+        $make = function (string $ref) use ($note) {
+            $line = new StatementLine(['account_id' => $this->airtel->id, 'date' => '2026-10-24', 'amount' => -2000, 'label' => 'T', 'external_ref' => $ref, 'source' => 'paste']);
+            $line->forceFill(['user_id' => $this->user->id, 'transaction_id' => $note->id])->save();
+        };
+        $make('A');
+
+        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        $make('B');
+    }
 }

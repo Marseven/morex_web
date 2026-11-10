@@ -32,6 +32,12 @@ final class StatementMatcher
 
     public function __construct(private readonly EntrySuggestionService $suggestions) {}
 
+    /** RM-1 : frais acceptables pour une opération de ce montant. */
+    public static function feeCeiling(int $amount): int
+    {
+        return max(self::MIN_FEE_CEILING, (int) floor($amount * self::FEE_RATE));
+    }
+
     /**
      * @param  list<StatementEntry>  $entries
      * @return array{lines: list<array<string, mixed>>, missing: list<array<string, mixed>>}
@@ -71,7 +77,7 @@ final class StatementMatcher
             $withFee = $this->candidates($pool, $entry, $used, function (Transaction $t) use ($entry) {
                 $gap = abs($entry->amount) - $t->amount;
 
-                return $gap > 0 && $gap <= max(self::MIN_FEE_CEILING, (int) floor($t->amount * self::FEE_RATE));
+                return $gap > 0 && $gap <= self::feeCeiling($t->amount);
             });
             $this->decide($rows[$i], $withFee, $used, fn (Transaction $t) => abs($entry->amount) - $t->amount);
 
