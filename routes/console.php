@@ -12,3 +12,9 @@ Artisan::command('inspire', function () {
 Schedule::command('reminders:daily')
     ->dailyAt('20:00')
     ->timezone(config('app.timezone'));
+
+// Sauvegarde MySQL nocturne (rotation 14 jours), voir docs/runbook.md.
+Schedule::command('backup:database')
+    ->dailyAt('03:00')
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping();
