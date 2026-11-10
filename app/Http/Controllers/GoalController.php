@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Goal;
 use App\Services\GoalProgressService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,7 +52,7 @@ class GoalController extends Controller
             'target_amount' => ['required', 'integer', 'min:1'],
             'current_amount' => ['nullable', 'integer', 'min:0'],
             'target_date' => ['nullable', 'date', 'after:today'],
-            'account_id' => ['nullable', 'uuid', 'exists:accounts,id'],
+            'account_id' => ['nullable', 'uuid', Rule::exists('accounts', 'id')->where('user_id', $request->user()->id)],
             'color' => ['nullable', 'string', 'max:7'],
             'icon' => ['nullable', 'string', 'max:50'],
         ]);
@@ -93,11 +94,17 @@ class GoalController extends Controller
             'target_amount' => ['required', 'integer', 'min:1'],
             'current_amount' => ['required', 'integer', 'min:0'],
             'target_date' => ['nullable', 'date'],
-            'account_id' => ['nullable', 'uuid', 'exists:accounts,id'],
+            // Seuls les comptes de l'utilisateur (le suivi lit le solde du compte lié)
+            'account_id' => ['nullable', 'uuid', Rule::exists('accounts', 'id')->where('user_id', $request->user()->id)],
             'status' => ['required', 'in:active,completed,cancelled'],
             'color' => ['nullable', 'string', 'max:7'],
             'icon' => ['nullable', 'string', 'max:50'],
         ]);
+
+        // Objectif suivi : compte et progression se gèrent par « Suivre sur un compte », pas par ce formulaire
+        if ($goal->isTracked()) {
+            unset($validated['account_id'], $validated['current_amount']);
+        }
 
         $goal->update($validated);
 

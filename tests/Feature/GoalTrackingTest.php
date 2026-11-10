@@ -194,4 +194,23 @@ class GoalTrackingTest extends TestCase
                 ->has('savingsGoal.month_status')
             );
     }
+
+    public function test_editing_a_tracked_goal_keeps_its_account_and_computed_progress(): void
+    {
+        $this->track(990000);
+        $foreign = Account::factory()->for(User::factory())->withBalance(9000000)->create();
+
+        $this->actingAs($this->user)->put("/goals/{$this->goal->id}", [
+            'name' => 'Épargne Investissement', 'type' => 'savings', 'target_amount' => 2000000,
+            'current_amount' => 5, 'target_date' => '2026-12-31', 'account_id' => $foreign->id, 'status' => 'active',
+        ])->assertSessionHasErrors('account_id');
+
+        $this->actingAs($this->user)->put("/goals/{$this->goal->id}", [
+            'name' => 'Épargne 2 M', 'type' => 'savings', 'target_amount' => 2000000,
+            'current_amount' => 5, 'target_date' => '2026-12-31', 'account_id' => null, 'status' => 'active',
+        ])->assertRedirect();
+
+        $this->goal->refresh();
+        $this->assertSame(['Épargne 2 M', $this->savings->id, 990000], [$this->goal->name, $this->goal->account_id, $this->goal->current_amount]);
+    }
 }

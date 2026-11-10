@@ -169,6 +169,11 @@ class GoalController extends Controller
             'icon' => ['nullable', 'string', 'max:50'],
         ]);
 
+        // Objectif suivi : compte et progression se gèrent par /track (module suivi-objectifs)
+        if ($goal->isTracked()) {
+            unset($validated['account_id'], $validated['current_amount']);
+        }
+
         $goal->update($validated);
 
         if (isset($validated['current_amount']) && $validated['current_amount'] >= $goal->target_amount) {
