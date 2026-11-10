@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BatchEntryController;
 use App\Http\Controllers\Api\BudgetCycleController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DebtController;
@@ -43,6 +44,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('api.accounts.adjust-balance');
     Route::get('/accounts/{account}/reconciliation', [ReconciliationController::class, 'show'])->name('api.accounts.reconciliation');
     Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('api.accounts.reconciliations.store');
+    Route::post('/transactions/notes/preview', [BatchEntryController::class, 'preview'])->middleware('throttle:30,1')->name('api.transactions.notes.preview');
     Route::post('/accounts/reorder', [AccountController::class, 'reorder'])->name('api.accounts.reorder');
 
     // Catégories

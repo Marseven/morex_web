@@ -1,19 +1,20 @@
 <?php
 
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BatchEntryController;
+use App\Http\Controllers\BudgetCycleController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DebtController;
+use App\Http\Controllers\GoalController;
+use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReconciliationController;
 use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\GoalController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\DebtController;
-use App\Http\Controllers\AnalyticsController;
-use App\Http\Controllers\PasswordResetController;
-use App\Http\Controllers\TwoFactorAuthController;
-use App\Http\Controllers\BudgetCycleController;
 use App\Http\Controllers\TransferController;
+use App\Http\Controllers\TwoFactorAuthController;
 use Illuminate\Support\Facades\Route;
 
 // Routes d'authentification (publiques)
@@ -50,6 +51,8 @@ Route::middleware('auth')->group(function () {
     // Transactions
     // (routes spécifiques AVANT la resource pour ne pas être capturées par {transaction})
     Route::get('/transactions/pending', [TransactionController::class, 'pending'])->name('transactions.pending');
+    Route::get('/transactions/batch', [BatchEntryController::class, 'show'])->name('transactions.batch');
+    Route::post('/transactions/notes/preview', [BatchEntryController::class, 'preview'])->middleware('throttle:30,1')->name('transactions.notes.preview');
     Route::post('/transactions/{transaction}/validate', [TransactionController::class, 'validateTransaction'])->name('transactions.validate');
     Route::get('/transactions/import', [TransactionController::class, 'showImport'])->name('transactions.import');
     Route::post('/transactions/import', [TransactionController::class, 'import'])->name('transactions.import.store');
