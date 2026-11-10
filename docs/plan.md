@@ -1,4 +1,4 @@
-# Plan — Morex phase 2
+# Plan — Morex phase 2            VALIDÉ le 2026-11-10
 
 **Conclusion** : on commence par `socle-prod` (une faille en production, sans dépendance), puis `saisie-rapide`, qui sert tous les jours.
 Taux de référence : 80 000 FCFA par jour (projet personnel, à titre indicatif) → ~11,5 j ≈ 920 000 FCFA.
