@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BudgetAlert;
 use App\Models\BudgetCycle;
 use App\Models\Category;
 use App\Models\User;
+use App\Services\BudgetAlertService;
 use App\Services\GoalProgressService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -62,8 +64,10 @@ class DashboardController extends Controller
             ->get();
 
         // Catégories avec budget pour la période budgétaire active
-        $budgetStartStr = $budgetStartDate->format('Y-m-d');
-        $budgetEndStr = $budgetEndDate?->format('Y-m-d');
+
+        // Plafonds (module plafonds-alertes) : même calcul que les alertes (hors en attente et écarts)
+        $alerts = app(BudgetAlertService::class);
+        [$capFrom, $capTo, $capIsCycle] = $alerts->period($user);
 
         $budgetCategories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
@@ -72,32 +76,25 @@ class DashboardController extends Controller
             ->whereNotNull('budget_limit')
             ->where('budget_limit', '>', 0)
             ->get()
-            ->map(function ($category) use ($user, $budgetStartStr, $budgetEndStr) {
-                $query = $user->transactions()
-                    ->where('category_id', $category->id)
-                    ->where('type', 'expense')
-                    ->where('date', '>=', $budgetStartStr);
-
-                if ($budgetEndStr) {
-                    $query->where('date', '<=', $budgetEndStr);
-                }
-
-                $spent = (int) $query->sum('amount');
+            ->map(function ($category) use ($user, $alerts, $capFrom, $capTo) {
+                $spent = $alerts->spent($user, $category->id, $capFrom, $capTo);
+                $limit = (int) $category->budget_limit;
+                $percent = (int) floor($spent * 100 / $limit);
 
                 return [
                     'id' => $category->id,
                     'name' => $category->name,
                     'color' => $category->color,
                     'icon' => $category->icon,
-                    'budget_limit' => $category->budget_limit,
+                    'budget_limit' => $limit,
                     'spent' => $spent,
-                    'progress' => $category->budget_limit > 0
-                        ? min(100, ($spent / $category->budget_limit) * 100)
-                        : 0,
+                    'progress' => min(100, $percent),
+                    'percent' => $percent,
+                    'status' => $percent >= 100 ? 'over' : ($percent >= 80 ? 'warning' : 'ok'),
+                    'remaining' => $limit - $spent,
                 ];
             })
-            ->sortByDesc('spent')
-            ->take(5)
+            ->sortByDesc('percent')
             ->values();
 
         // Dettes actives
@@ -116,6 +113,18 @@ class DashboardController extends Controller
             'recentTransactions' => $recentTransactions,
             'activeGoals' => $activeGoals,
             'savingsGoal' => $this->savingsGoal($user),
+            'budgetPeriod' => ['start' => $capFrom->toDateString(), 'end' => $capTo?->toDateString(), 'is_cycle' => $capIsCycle],
+            'budgetAlerts' => BudgetAlert::with('category:id,name')
+                ->where('user_id', $user->id)
+                ->where('cycle_start', '>=', $capFrom->toDateString())
+                ->latest('created_at')
+                ->limit(10)
+                ->get()
+                ->map(fn (BudgetAlert $a) => [
+                    'id' => $a->id, 'category_id' => $a->category_id, 'category' => $a->category?->name,
+                    'threshold' => $a->threshold, 'spent' => $a->spent, 'limit' => $a->limit,
+                    'created_at' => $a->created_at?->toDateString(),
+                ]),
             'activeDebts' => $activeDebts,
             'budgetCategories' => $budgetCategories,
             'currentPeriod' => $period,

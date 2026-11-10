@@ -13,6 +13,7 @@ use App\Models\Goal;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Models\Transfer;
+use App\Services\BudgetAlertService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -182,6 +183,9 @@ class SyncController extends Controller
             }
 
             DB::commit();
+
+            // Plafonds (module plafonds-alertes) : les événements étaient désactivés pendant le push
+            app(BudgetAlertService::class)->checkUser($user);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Sync push error', ['error' => $e->getMessage()]);

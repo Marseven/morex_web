@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Contracts\PushNotifier;
+use App\Models\Transaction;
+use App\Services\BudgetAlertService;
 use App\Services\WebPushNotifier;
 use Illuminate\Support\ServiceProvider;
 use Minishlink\WebPush\WebPush;
@@ -27,5 +29,20 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             config(['app.debug' => false]);
         }
+
+        // Plafonds (module plafonds-alertes) : toute dépense confirmée recalcule le plafond de sa catégorie.
+        // La synchro désactive ces événements et vérifie tout l'utilisateur après validation.
+        Transaction::saved(function (Transaction $transaction) {
+            $relevant = $transaction->wasRecentlyCreated
+                || $transaction->wasChanged(['amount', 'category_id', 'status', 'date', 'type']);
+
+            if ($relevant
+                && $transaction->type === 'expense'
+                && $transaction->status !== Transaction::STATUS_PENDING
+                && $transaction->category_id !== null
+                && $transaction->user !== null) {
+                app(BudgetAlertService::class)->checkCategory($transaction->user, $transaction->category_id);
+            }
+        });
     }
 }
