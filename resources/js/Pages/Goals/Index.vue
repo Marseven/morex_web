@@ -147,7 +147,11 @@ const getTypeLabel = (type) => {
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2">
+                                    <span v-if="goal.tracked_since" class="text-xs text-theme-text-secondary">
+                                        Suivi automatique<span v-if="goal.account"> · {{ goal.account.name }}</span>
+                                    </span>
                                     <button
+                                        v-else
                                         @click="openContribute(goal)"
                                         class="px-2 py-1 text-xs bg-theme-surface border border-theme-border rounded hover:border-white transition-colors"
                                     >

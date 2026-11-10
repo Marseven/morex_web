@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import SavingsGoalCard from '@/Components/Goals/SavingsGoalCard.vue'
 import {
     BanknotesIcon,
     ArrowTrendingUpIcon,
@@ -20,6 +21,7 @@ const props = defineProps({
     accounts: { type: Array, default: () => [] },
     recentTransactions: { type: Array, default: () => [] },
     activeGoals: { type: Array, default: () => [] },
+    savingsGoal: { type: Object, default: null },
     activeDebts: { type: Array, default: () => [] },
     budgetCategories: { type: Array, default: () => [] },
     currentPeriod: { type: String, default: 'month' },
@@ -186,6 +188,9 @@ const changePeriod = (period) => {
 
                 <!-- Right column -->
                 <div class="space-y-6">
+                    <!-- Objectif suivi sur un compte (module suivi-objectifs) -->
+                    <SavingsGoalCard v-if="savingsGoal" :goal="savingsGoal" />
+
                     <!-- Goals -->
                     <div class="glass-card">
                         <div class="flex items-center justify-between px-4 py-3 border-b border-theme-divider">
