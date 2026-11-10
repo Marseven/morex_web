@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ReconciliationService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -136,12 +137,9 @@ class Account extends Model
      * Ajuste le solde réel du compte directement (ajustement manuel).
      * Crée une entrée d'ajustement dans le journal.
      */
+    /** Atteint le solde voulu par une opération d'écart tracée (module rapprochement, RM-1). */
     public function adjustToBalance(int $desiredBalance): void
     {
-        $delta = $desiredBalance - $this->balance;
-
-        if ($delta !== 0) {
-            $this->adjustBalance($delta, 'adjustment', 'manual', null, 'Ajustement manuel du solde');
-        }
+        app(ReconciliationService::class)->adjustTo($this, $desiredBalance);
     }
 }
