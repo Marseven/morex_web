@@ -1,4 +1,4 @@
-# Module revenus-transit (5c)                       statut : en cours · 2026-11-11
+# Module revenus-transit (5c)                       statut : livré · 2026-11-11
 
 **Conclusion** : chaque catégorie reçoit une **nature** : `courante` (par défaut), `transit` (tontines, remboursements, avances) ou `pro` (outils MRTECH). Les catégories en transit sortent des revenus, des dépenses, des cycles, des statistiques et des plafonds ; un encart « En transit » montre ce qui est sorti et revenu, et le net. Le pro reste compté dans le total, mais il est affiché à part et exclu du budget perso. Un seul filtre central remplace les exclusions dispersées.
 
@@ -45,3 +45,32 @@
 3. Faut-il reclasser l'historique ? → *Hypothèse : non. Il suffit de changer la nature des catégories et tout se recalcule ; les cycles déjà clôturés gardent leurs chiffres.*
 
 **Hors module** : nature par opération, suivi nominatif des dettes de tontine (le module Dettes existe), refacturation pro, écran mobile dédié.
+
+## Livré (5c)
+- **Données** : migration réversible `categories.nature` (`regular`, `transit` ou `pro`, indexée), rollback testé.
+- **Règles** :
+  - scopes `Transaction::counted()` (hors attente, écarts et transit), `personal()` (hors pro) et `ofNature()` ;
+  - `Category::personalBudgetFor()`, partagé par les cycles, leur création et la commande `budget:recompute-closures`.
+- **Branché sur** :
+  - cycles (dépensé perso face aux plafonds perso ; épargne = revenus − toutes les dépenses comptées) ;
+  - tableau de bord ;
+  - Analytics ;
+  - `/api/stats/*` ;
+  - `/api/transactions-stats` ;
+  - alertes de plafond (transit ignoré).
+- **API** : `nature` validée (`in`) et exposée par la Resource ; filtre `/transactions?nature=transit`.
+- **Web** (direction A) :
+  - sélecteur `NatureField` dans Budgets/Create et Edit ;
+  - carte `TransitCard` sur le tableau de bord ;
+  - ligne « Pro (MRTECH) » sous les dépenses.
+- **Tests** : `TransitIncomeTest`, 16 tests. Suite complète : 468 au vert.
+- **Vérifié dans le navigateur**, au format iPhone, sur une instance locale jetable : sélecteur, carte transit (+350 000), ligne pro, filtre « Voir tout ».
+- **Revue de code, points hauts corrigés** : `/api/transactions-stats` et les séries de `/api/stats/monthly` passent par `counted()` ; création de cycle et recalcul des clôtures sur le budget perso.
+- **Revue de code, points moyens corrigés** : alertes via `counted()` ; natures lues une fois ; tests (sans catégorie, catégorie supprimée, clôture).
+- **Écart avec l'analyse** :
+  - les totaux du tableau de bord excluent désormais aussi les opérations en attente et les écarts de rapprochement ;
+  - changer la nature reclasse l'historique à la lecture, mais les clôtures déjà créées restent figées (RM-4).
+- **Hors module** (signalé par la revue, antérieur au module) : le dépensé par catégorie des listes Budgets et Cycles compte encore les opérations en attente. À traiter avec le module 7 (dette qualité).
+- **Non vérifié** :
+  - MySQL réel ;
+  - l'app iPhone face au champ `nature` (attendu : ignoré).
