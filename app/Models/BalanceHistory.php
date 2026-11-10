@@ -23,7 +23,6 @@ class BalanceHistory extends Model
         'reference_type',
         'reference_id',
         'description',
-        'created_at',
     ];
 
     protected function casts(): array

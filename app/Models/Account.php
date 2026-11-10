@@ -122,7 +122,7 @@ class Account extends Model
                 'updated_at' => now(),
             ]);
 
-            BalanceHistory::create([
+            BalanceHistory::forceCreate([
                 'account_id' => $this->id,
                 'type' => $type,
                 'amount' => abs($delta),
