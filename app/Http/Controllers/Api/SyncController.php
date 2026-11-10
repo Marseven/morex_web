@@ -55,9 +55,10 @@ class SyncController extends Controller
             ->where('updated_at', '>', $since)
             ->get();
 
+        // Un objectif suivi change de progression sans être modifié : toujours le renvoyer (suivi-objectifs)
         $goals = Goal::withTrashed()
             ->where('user_id', $user->id)
-            ->where('updated_at', '>', $since)
+            ->where(fn ($q) => $q->where('updated_at', '>', $since)->orWhereNotNull('tracked_since'))
             ->get();
 
         $debts = Debt::withTrashed()
