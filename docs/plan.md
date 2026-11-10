@@ -9,7 +9,8 @@ Taux de référence : 80 000 FCFA par jour (projet personnel, à titre indicatif
 | 1 | socle-prod | `APP_DEBUG` coupé, en-têtes de sécurité, Swagger fermé en prod, `/health`, cron `schedule:run`, sauvegarde MySQL quotidienne | 0 | non | oui | 1 j | livré (PR ouverte) |
 | 2 | saisie-rapide | Formulaire mobile « montant d'abord », compte par défaut, catégorie suggérée par libellé, modèles favoris, widget iOS | 0 | oui | non | 2 j | livré (PR ouverte) |
 | 3 | sms-iphone | Jeton Sanctum limité au webhook, Raccourci iOS documenté, `SmsParser` testé sur des SMS réels, validation en lot | 1 | oui | oui | 2 j | à faire |
-| 4 | rapprochement | Saisie du solde réel → écart, opérations non pointées, transaction d'écart tracée, historique ; remplace `adjustToBalance` | 0 | oui | non | 2 j | livré (PR ouverte) |
+| 4 | rapprochement | Serveur + API + écran web : solde du relevé → écart, pointage, opération d'écart tracée ; `adjust-balance` passe par le service | 0 | oui | non | 2 j | livré (PR ouverte) |
+| 4 bis | rapprochement-mobile | Écran de rapprochement sur l'iPhone, branché sur l'API du module 4 | 4 | oui | non | 1 j | à faire |
 | 5 | suivi-objectifs | Tableau de bord des 5 objectifs (fonds d'urgence, épargne 25 %, plafonds sorties et dons, projets), alertes de plafond | 4 | oui | non | 2 j | à faire |
 | 6 | recurrences-serveur | Génération des récurrences par le scheduler (idempotente), plus seulement sur le mobile | 1 | non | non | 1 j | à faire |
 | 7 | dette-qualite | 4 tests mobiles périmés, 9 avertissements `flutter analyze`, CI GitHub Actions, points moyens de la revue de sécurité | 0 | non | oui | 1,5 j | à faire |
