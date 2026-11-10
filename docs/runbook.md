@@ -4,6 +4,7 @@
 
 ## 1. Vérifications du `.env` de production (une fois, puis à chaque changement)
 - `APP_ENV=production` : c'est la condition du garde-fou qui force le debug à off.
+- Contrôle d'ensemble : `php artisan about --only=environment` doit afficher l'environnement `production` et le debug `OFF`.
 - `APP_DEBUG=false` : test rapide, `https://morex.mebodorichard.com/api/route-inexistante` ne doit renvoyer que `{"message": "Not Found."}`, sans `exception` ni `file`.
 - `SESSION_LIFETIME` : absent (30 min par défaut) ou `30`. `SESSION_SECURE_COOKIE=true`.
 - Facultatif : `BACKUP_MYSQLDUMP` (chemin complet si `mysqldump` est introuvable depuis le cron), `BACKUP_KEEP_DAYS` (14 par défaut).
@@ -29,12 +30,13 @@ Ensuite : lancer les commandes ponctuelles listées dans la PR livrée (par exem
 
 ## 4. Cron (hPanel → Avancé → Tâches Cron), toutes les minutes
 ```
-/usr/bin/php /home/u626597620/domains/mebodorichard.com/public_html/morex/artisan schedule:run >> /dev/null 2>&1
+/usr/bin/php ~/domains/mebodorichard.com/public_html/morex/artisan schedule:run >> /dev/null 2>&1
 ```
+(Remplacer `~` par le chemin absolu du compte si hPanel l'exige.)
 Le cron exécute le rappel de saisie à 20 h et la sauvegarde à 3 h. Vérification : `php artisan schedule:list`.
 
 ## 5. Sauvegardes
-- Automatiques à 3 h dans `storage/app/private/backups/morex-AAAAMMJJ-HHMMSS.sql.gz`, conservées 14 jours. Lancement manuel : `php artisan backup:database`.
+- Automatiques à 3 h dans `storage/app/private/backups/morex-AAAAMMJJ-HHMMSS-<aléa>.sql.gz` (fichiers 0600, dossier 0700), conservées 14 jours. Lancement manuel : `php artisan backup:database`.
 - En cas d'échec, le journal contient `BACKUP_FAILED`, avec le code de sortie de `mysqldump`.
 - **Copie hors serveur** : chaque mois, télécharger la plus récente (gestionnaire de fichiers hPanel). Les sauvegardes propres à Hostinger s'y ajoutent, sans les remplacer.
 
