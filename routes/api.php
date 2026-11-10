@@ -61,6 +61,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Objectifs
     Route::apiResource('goals', GoalController::class)->names('api.goals');
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'addContribution'])->name('api.goals.contribute');
+    Route::post('/goals/{goal}/track', [GoalController::class, 'track'])->name('api.goals.track');
+    Route::delete('/goals/{goal}/track', [GoalController::class, 'untrack'])->name('api.goals.untrack');
 
     // Dettes et créances
     Route::apiResource('debts', DebtController::class)->names('api.debts');

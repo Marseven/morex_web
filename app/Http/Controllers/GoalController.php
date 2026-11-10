@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\TrackGoalRequest;
+use App\Models\Account;
 use App\Models\Goal;
+use App\Services\GoalProgressService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -112,9 +115,10 @@ class GoalController extends Controller
             ->with('success', 'Objectif supprimé avec succès.');
     }
 
-    public function contribute(Request $request, Goal $goal)
+    public function contribute(Request $request, Goal $goal, GoalProgressService $progress)
     {
         $this->authorize('update', $goal);
+        $progress->assertManual($goal);
 
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
@@ -123,5 +127,22 @@ class GoalController extends Controller
         $goal->addAmount($validated['amount']);
 
         return back()->with('success', 'Contribution ajoutée avec succès.');
+    }
+
+    /** Suivre l'objectif sur un compte : la progression devient automatique (module suivi-objectifs). */
+    public function track(TrackGoalRequest $request, Goal $goal, GoalProgressService $progress)
+    {
+        $account = Account::findOrFail($request->validated('account_id'));
+        $progress->track($goal, $account, (int) $request->validated('start_amount'), $request->validated('monthly_target'));
+
+        return back()->with('success', 'Suivi activé : la progression suit le solde de « '.$account->name.' ».');
+    }
+
+    public function untrack(Request $request, Goal $goal, GoalProgressService $progress)
+    {
+        $this->authorize('update', $goal);
+        $progress->untrack($goal);
+
+        return back()->with('success', 'Suivi arrêté : la progression redevient manuelle.');
     }
 }

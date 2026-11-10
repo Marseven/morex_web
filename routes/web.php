@@ -79,6 +79,8 @@ Route::middleware('auth')->group(function () {
     // Objectifs
     Route::resource('goals', GoalController::class)->except(['show']);
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'contribute'])->name('goals.contribute');
+    Route::post('/goals/{goal}/track', [GoalController::class, 'track'])->name('goals.track');
+    Route::delete('/goals/{goal}/track', [GoalController::class, 'untrack'])->name('goals.untrack');
 
     // Transferts
     Route::get('/transfers/import', [TransferController::class, 'showImport'])->name('transfers.import');

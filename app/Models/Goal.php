@@ -30,6 +30,10 @@ class Goal extends Model
             'target_amount' => 'integer',
             'current_amount' => 'integer',
             'target_date' => 'date',
+            'tracked_since' => 'date',
+            'tracked_start_amount' => 'integer',
+            'tracked_account_balance' => 'integer',
+            'monthly_target' => 'integer',
         ];
     }
 
@@ -43,11 +47,31 @@ class Goal extends Model
         return $this->belongsTo(Account::class);
     }
 
+    public function isTracked(): bool
+    {
+        return $this->tracked_since !== null && $this->account_id !== null && $this->tracked_start_amount !== null;
+    }
+
+    /**
+     * RM-1 : un objectif suivi tire sa progression du solde de son compte (départ + variation du solde),
+     * jamais négative. Sinon, la valeur saisie (contributions manuelles).
+     */
+    public function getCurrentAmountAttribute(?int $value): int
+    {
+        if (! $this->isTracked()) {
+            return (int) $value;
+        }
+        $balance = (int) Account::withTrashed()->whereKey($this->account_id)->value('balance');
+
+        return max(0, $this->tracked_start_amount + $balance - (int) $this->tracked_account_balance);
+    }
+
     public function getProgressPercentageAttribute(): float
     {
         if ($this->target_amount === 0) {
             return 0;
         }
+
         return min(100, ($this->current_amount / $this->target_amount) * 100);
     }
 
@@ -58,9 +82,10 @@ class Goal extends Model
 
     public function getDaysRemainingAttribute(): ?int
     {
-        if (!$this->target_date) {
+        if (! $this->target_date) {
             return null;
         }
+
         return max(0, now()->diffInDays($this->target_date, false));
     }
 
