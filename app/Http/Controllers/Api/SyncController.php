@@ -45,7 +45,7 @@ class SyncController extends Controller
         $categories = Category::withTrashed()
             ->where(function ($q) use ($user) {
                 $q->where('user_id', $user->id)
-                  ->orWhereNull('user_id'); // Catégories système
+                    ->orWhereNull('user_id'); // Catégories système
             })
             ->where('updated_at', '>', $since)
             ->get();
@@ -89,15 +89,15 @@ class SyncController extends Controller
             ->get();
 
         return response()->json([
-            'accounts' => $accounts->map(fn($a) => $this->formatForSync($a)),
-            'categories' => $categories->map(fn($c) => $this->formatForSync($c)),
-            'transactions' => $transactions->map(fn($t) => $this->formatForSync($t)),
-            'goals' => $goals->map(fn($g) => $this->formatForSync($g)),
-            'debts' => $debts->map(fn($d) => $this->formatForSync($d)),
-            'transfers' => $transfers->map(fn($t) => $this->formatForSync($t)),
-            'debt_payments' => $debtPayments->map(fn($dp) => $this->formatForSync($dp)),
-            'recurring_transactions' => $recurringTransactions->map(fn($r) => $this->formatForSync($r)),
-            'budget_cycles' => $budgetCycles->map(fn($b) => $this->formatBudgetCycleForSync($b)),
+            'accounts' => $accounts->map(fn ($a) => $this->formatForSync($a)),
+            'categories' => $categories->map(fn ($c) => $this->formatForSync($c)),
+            'transactions' => $transactions->map(fn ($t) => $this->formatForSync($t)),
+            'goals' => $goals->map(fn ($g) => $this->formatForSync($g)),
+            'debts' => $debts->map(fn ($d) => $this->formatForSync($d)),
+            'transfers' => $transfers->map(fn ($t) => $this->formatForSync($t)),
+            'debt_payments' => $debtPayments->map(fn ($dp) => $this->formatForSync($dp)),
+            'recurring_transactions' => $recurringTransactions->map(fn ($r) => $this->formatForSync($r)),
+            'budget_cycles' => $budgetCycles->map(fn ($b) => $this->formatBudgetCycleForSync($b)),
             'budget_closures' => $budgetClosures,
             'sync_timestamp' => now()->toIso8601String(),
         ]);
@@ -169,7 +169,9 @@ class SyncController extends Controller
             // Appliquer tous les ajustements de solde accumulés
             foreach ($this->pendingAdjustments as $accountId => $adjustments) {
                 $account = Account::find($accountId);
-                if (!$account) continue;
+                if (! $account) {
+                    continue;
+                }
 
                 foreach ($adjustments as $adj) {
                     $account->adjustBalance($adj['delta'], $adj['type'], $adj['refType'] ?? null, $adj['refId'] ?? null, $adj['desc'] ?? null);
@@ -200,6 +202,7 @@ class SyncController extends Controller
     {
         $data = $model->toArray();
         $data['is_deleted'] = $model->trashed();
+
         return $data;
     }
 
@@ -239,7 +242,7 @@ class SyncController extends Controller
 
         $modelClass = $this->getModelClass($type);
 
-        if (!$modelClass) {
+        if (! $modelClass) {
             return [
                 'local_id' => $localId,
                 'type' => $type,
@@ -261,8 +264,13 @@ class SyncController extends Controller
             };
 
             // Collecter les ajustements de solde pour les transactions et transferts
-            if (in_array($type, ['transaction', 'transfer', 'debt_payment']) && $result['status'] === 'success') {
-                $this->collectAdjustments($action, $data, $result['server_id'] ?? null, $type);
+            // Un delete ne reverse le solde que s'il vient réellement de supprimer la ligne
+            // ('deleted'), jamais pour 'already_deleted' : rejeu, ou server_id d'autrui.
+            $isEffectiveChange = $action !== 'delete' || ($result['action'] ?? null) === 'deleted';
+            // Un create lié à une ligne existante (create rejoué) s'ajuste comme un update
+            $adjustmentAction = ($result['action'] ?? null) === 'linked' ? 'update' : $action;
+            if (in_array($type, ['transaction', 'transfer', 'debt_payment']) && $result['status'] === 'success' && $isEffectiveChange) {
+                $this->collectAdjustments($adjustmentAction, $data, $result['server_id'] ?? null, $type);
             }
 
             // Ajouter le type à la réponse pour que le mobile puisse identifier la table
@@ -288,6 +296,7 @@ class SyncController extends Controller
         if ($action === 'delete') {
             // Pour les suppressions, reverser le mouvement
             $this->collectDeleteAdjustments($serverId, $type);
+
             return;
         }
 
@@ -301,12 +310,12 @@ class SyncController extends Controller
         if ($type === 'transaction' && $serverId) {
             $transaction = Transaction::withTrashed()->find($serverId);
             // Ne comptabiliser que si la transaction est active (non supprimée)
-            if ($transaction && !$transaction->trashed()) {
+            if ($transaction && ! $transaction->trashed() && $transaction->affectsBalance()) {
                 $this->applyTransactionMovement($transaction->account_id, $transaction->type, (int) $transaction->amount, $serverId, false);
             }
         } elseif ($type === 'transfer' && $serverId) {
             $transfer = Transfer::withTrashed()->find($serverId);
-            if ($transfer && !$transfer->trashed()) {
+            if ($transfer && ! $transfer->trashed()) {
                 $this->addPendingAdjustment($transfer->from_account_id, -$transfer->amount, 'transfer_out', 'transfer', $serverId);
                 $this->addPendingAdjustment($transfer->to_account_id, $transfer->amount, 'transfer_in', 'transfer', $serverId);
             }
@@ -320,7 +329,8 @@ class SyncController extends Controller
     {
         if ($model instanceof Transaction) {
             $this->originalSnapshots[$serverId] = [
-                'was_trashed' => $model->trashed(),
+                // Une transaction en attente de validation n'a jamais touché le solde
+                'was_trashed' => $model->trashed() || ! $model->affectsBalance(),
                 'account_id' => $model->account_id,
                 'type' => $model->type,
                 'amount' => (int) $model->amount,
@@ -342,7 +352,7 @@ class SyncController extends Controller
     private function reverseOriginalSnapshot(string $type, string $serverId): void
     {
         $orig = $this->originalSnapshots[$serverId] ?? null;
-        if (!$orig || !empty($orig['was_trashed'])) {
+        if (! $orig || ! empty($orig['was_trashed'])) {
             return;
         }
 
@@ -379,11 +389,13 @@ class SyncController extends Controller
      */
     private function collectDeleteAdjustments(?string $serverId, string $type): void
     {
-        if (!$serverId) return;
+        if (! $serverId) {
+            return;
+        }
 
         if ($type === 'transaction') {
             $transaction = Transaction::withTrashed()->find($serverId);
-            if ($transaction) {
+            if ($transaction && $transaction->affectsBalance()) {
                 $delta = match ($transaction->type) {
                     'income' => -$transaction->amount,
                     'expense' => $transaction->amount,
@@ -434,12 +446,12 @@ class SyncController extends Controller
         // Champs FK pointant vers un compte de l'utilisateur
         $accountFields = ['account_id', 'from_account_id', 'to_account_id', 'transfer_to_account_id', 'salary_account_id'];
         foreach ($accountFields as $field) {
-            if (!empty($data[$field])) {
+            if (! empty($data[$field])) {
                 $ok = Account::withTrashed()
                     ->whereKey($data[$field])
                     ->where('user_id', $user->id)
                     ->exists();
-                if (!$ok) {
+                if (! $ok) {
                     throw new \RuntimeException("Compte non autorisé pour le champ {$field}");
                 }
             }
@@ -447,31 +459,31 @@ class SyncController extends Controller
 
         // Champs FK pointant vers une catégorie (privée à l'utilisateur ou système)
         foreach (['category_id', 'salary_category_id', 'parent_id'] as $field) {
-            if (!empty($data[$field])) {
+            if (! empty($data[$field])) {
                 $ok = Category::withTrashed()
                     ->whereKey($data[$field])
                     ->where(function ($q) use ($user) {
                         $q->where('user_id', $user->id)->orWhereNull('user_id');
                     })
                     ->exists();
-                if (!$ok) {
+                if (! $ok) {
                     throw new \RuntimeException("Catégorie non autorisée pour le champ {$field}");
                 }
             }
         }
 
         // Dette de l'utilisateur
-        if (!empty($data['debt_id'])) {
+        if (! empty($data['debt_id'])) {
             $ok = Debt::withTrashed()->whereKey($data['debt_id'])->where('user_id', $user->id)->exists();
-            if (!$ok) {
+            if (! $ok) {
                 throw new \RuntimeException('Dette non autorisée');
             }
         }
 
         // Transaction de l'utilisateur (ex. debt_payment.transaction_id)
-        if (!empty($data['transaction_id'])) {
+        if (! empty($data['transaction_id'])) {
             $ok = Transaction::withTrashed()->whereKey($data['transaction_id'])->where('user_id', $user->id)->exists();
-            if (!$ok) {
+            if (! $ok) {
                 throw new \RuntimeException('Transaction non autorisée');
             }
         }
@@ -508,7 +520,7 @@ class SyncController extends Controller
 
         // Pour les comptes, s'assurer que balance = initial_balance si non fourni
         if ($modelClass === Account::class) {
-            if (!isset($data['balance']) && isset($data['initial_balance'])) {
+            if (! isset($data['balance']) && isset($data['initial_balance'])) {
                 $data['balance'] = $data['initial_balance'];
             }
         }
@@ -517,6 +529,11 @@ class SyncController extends Controller
         $existingModel = $this->findExistingModel($user, $modelClass, $data);
 
         if ($existingModel) {
+            // Mouvement déjà comptabilisé : on le capture pour que l'ajustement
+            // traite ce lien comme un update (reverser l'ancien, appliquer le nouveau),
+            // jamais comme une seconde création (create rejoué → double comptage).
+            $this->captureOriginalSnapshot($existingModel->id, $existingModel);
+
             // Mettre à jour l'existant au lieu de créer un doublon
             $existingModel->fill($data);
             $existingModel->save();
@@ -552,18 +569,18 @@ class SyncController extends Controller
         switch ($modelClass) {
             case Account::class:
                 // Un compte avec le même nom
-                if (!empty($data['name'])) {
+                if (! empty($data['name'])) {
                     return $query->where('name', $data['name'])->first();
                 }
                 break;
 
             case Category::class:
                 // Une catégorie avec le même nom et type
-                if (!empty($data['name']) && !empty($data['type'])) {
+                if (! empty($data['name']) && ! empty($data['type'])) {
                     // D'abord chercher dans les catégories de l'utilisateur
                     $userCategory = $query->where('name', $data['name'])
-                                ->where('type', $data['type'])
-                                ->first();
+                        ->where('type', $data['type'])
+                        ->first();
                     if ($userCategory) {
                         return $userCategory;
                     }
@@ -571,9 +588,9 @@ class SyncController extends Controller
                     // Ensuite chercher dans les catégories système (user_id = NULL)
                     // Utiliser LOWER/TRIM pour matching insensible à la casse
                     $systemCategory = Category::whereNull('user_id')
-                                ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$data['name']])
-                                ->where('type', $data['type'])
-                                ->first();
+                        ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$data['name']])
+                        ->where('type', $data['type'])
+                        ->first();
 
                     return $systemCategory;
                 }
@@ -581,59 +598,59 @@ class SyncController extends Controller
 
             case Goal::class:
                 // Un objectif avec le même nom
-                if (!empty($data['name'])) {
+                if (! empty($data['name'])) {
                     return $query->where('name', $data['name'])->first();
                 }
                 break;
 
             case Debt::class:
                 // Une dette avec le même nom
-                if (!empty($data['name'])) {
+                if (! empty($data['name'])) {
                     return $query->where('name', $data['name'])->first();
                 }
                 break;
 
             case RecurringTransaction::class:
                 // Transaction récurrente avec même montant, compte, catégorie et fréquence
-                if (!empty($data['amount']) && !empty($data['account_id']) && !empty($data['frequency'])) {
+                if (! empty($data['amount']) && ! empty($data['account_id']) && ! empty($data['frequency'])) {
                     return $query->where('amount', $data['amount'])
-                                ->where('account_id', $data['account_id'])
-                                ->where('frequency', $data['frequency'])
-                                ->first();
+                        ->where('account_id', $data['account_id'])
+                        ->where('frequency', $data['frequency'])
+                        ->first();
                 }
                 break;
 
             case Transaction::class:
                 // Les transactions normales peuvent être dupliquées (même montant, même jour = possible)
                 // On ne déduplique pas les transactions sauf si elles ont exactement les mêmes données
-                if (!empty($data['amount']) && !empty($data['date']) && !empty($data['account_id'])) {
+                if (! empty($data['amount']) && ! empty($data['date']) && ! empty($data['account_id'])) {
                     return $query->where('amount', $data['amount'])
-                                ->where('date', $data['date'])
-                                ->where('account_id', $data['account_id'])
-                                ->where('category_id', $data['category_id'] ?? null)
-                                ->where('beneficiary', $data['beneficiary'] ?? null)
-                                ->where('description', $data['description'] ?? null)
-                                ->first();
+                        ->whereDate('date', $data['date'])
+                        ->where('account_id', $data['account_id'])
+                        ->where('category_id', $data['category_id'] ?? null)
+                        ->where('beneficiary', $data['beneficiary'] ?? null)
+                        ->where('description', $data['description'] ?? null)
+                        ->first();
                 }
                 break;
 
             case Transfer::class:
-                if (!empty($data['amount']) && !empty($data['date']) && !empty($data['from_account_id']) && !empty($data['to_account_id'])) {
+                if (! empty($data['amount']) && ! empty($data['date']) && ! empty($data['from_account_id']) && ! empty($data['to_account_id'])) {
                     return $query->where('amount', $data['amount'])
-                                ->where('date', $data['date'])
-                                ->where('from_account_id', $data['from_account_id'])
-                                ->where('to_account_id', $data['to_account_id'])
-                                ->first();
+                        ->whereDate('date', $data['date'])
+                        ->where('from_account_id', $data['from_account_id'])
+                        ->where('to_account_id', $data['to_account_id'])
+                        ->first();
                 }
                 break;
 
             case DebtPayment::class:
-                if (!empty($data['amount']) && !empty($data['date']) && !empty($data['debt_id'])) {
+                if (! empty($data['amount']) && ! empty($data['date']) && ! empty($data['debt_id'])) {
                     return $query->where('amount', $data['amount'])
-                                ->where('date', $data['date'])
-                                ->where('debt_id', $data['debt_id'])
-                                ->where('account_id', $data['account_id'] ?? null)
-                                ->first();
+                        ->whereDate('date', $data['date'])
+                        ->where('debt_id', $data['debt_id'])
+                        ->where('account_id', $data['account_id'] ?? null)
+                        ->first();
                 }
                 break;
         }
@@ -646,7 +663,7 @@ class SyncController extends Controller
      */
     private function handleUpdate($user, string $modelClass, ?string $serverId, ?string $localId, array $data, Carbon $clientUpdatedAt): array
     {
-        if (!$serverId) {
+        if (! $serverId) {
             return [
                 'local_id' => $localId,
                 'status' => 'error',
@@ -661,7 +678,7 @@ class SyncController extends Controller
             ->first();
 
         // Pour les catégories, vérifier aussi les catégories système
-        if (!$model && $modelClass === Category::class) {
+        if (! $model && $modelClass === Category::class) {
             $systemCategory = Category::where('id', $serverId)
                 ->whereNull('user_id')
                 ->first();
@@ -678,7 +695,7 @@ class SyncController extends Controller
             }
         }
 
-        if (!$model) {
+        if (! $model) {
             return [
                 'local_id' => $localId,
                 'server_id' => $serverId,
@@ -729,7 +746,7 @@ class SyncController extends Controller
      */
     private function handleDelete($user, string $modelClass, ?string $serverId, ?string $localId, Carbon $clientUpdatedAt): array
     {
-        if (!$serverId) {
+        if (! $serverId) {
             return [
                 'local_id' => $localId,
                 'status' => 'error',
@@ -742,8 +759,9 @@ class SyncController extends Controller
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$model) {
-            // Déjà supprimé ou n'existe pas, c'est OK
+        // Déjà supprimé, inexistant ou appartenant à autrui : succès idempotent,
+        // sans nouveau delete() (sinon le solde serait reversé une seconde fois).
+        if (! $model || $model->trashed()) {
             return [
                 'local_id' => $localId,
                 'server_id' => $serverId,
@@ -753,7 +771,7 @@ class SyncController extends Controller
         }
 
         // Last-write-wins pour delete aussi
-        if ($model->updated_at > $clientUpdatedAt && !$model->trashed()) {
+        if ($model->updated_at > $clientUpdatedAt) {
             return [
                 'local_id' => $localId,
                 'server_id' => $serverId,
