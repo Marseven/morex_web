@@ -7,6 +7,7 @@ use App\Models\Transaction;
 use App\Rules\OwnedOrSystemCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -34,10 +35,10 @@ class TransactionController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('beneficiary', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('category', function ($q2) use ($search) {
-                      $q2->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('category', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -68,7 +69,7 @@ class TransactionController extends Controller
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
         $categories = Category::where(function ($q) use ($request) {
             $q->where('user_id', $request->user()->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
 
         return Inertia::render('Transactions/Index', [
@@ -84,7 +85,7 @@ class TransactionController extends Controller
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
         $categories = Category::where(function ($q) use ($request) {
             $q->where('user_id', $request->user()->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
 
         return Inertia::render('Transactions/Create', [
@@ -107,7 +108,7 @@ class TransactionController extends Controller
             'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:account_id'],
         ]);
 
-        if ($validated['type'] === 'transfer' && !isset($validated['transfer_to_account_id'])) {
+        if ($validated['type'] === 'transfer' && ! isset($validated['transfer_to_account_id'])) {
             return back()->withErrors([
                 'transfer_to_account_id' => 'Le compte de destination est requis pour un transfert.',
             ]);
@@ -126,7 +127,7 @@ class TransactionController extends Controller
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
         $categories = Category::where(function ($q) use ($request) {
             $q->where('user_id', $request->user()->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
 
         $transaction->load(['category', 'account', 'transferToAccount']);
@@ -184,7 +185,7 @@ class TransactionController extends Controller
         $query = $request->user()->transactions()->with(['category', 'account']);
         $this->applyFilters($query, $request);
 
-        $filename = 'transactions-' . now()->format('Y-m-d') . '.csv';
+        $filename = 'transactions-'.now()->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
@@ -240,7 +241,9 @@ class TransactionController extends Controller
             'rows.*.type' => ['required', 'in:expense,income'],
             'rows.*.beneficiary' => ['nullable', 'string', 'max:255'],
             'rows.*.description' => ['nullable', 'string', 'max:1000'],
-            'rows.*.category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            // Saisie en lot : un compte par ligne possible ; jamais une catégorie d'écart de rapprochement
+            'rows.*.account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId},deleted_at,NULL"],
+            'rows.*.category_id' => ['nullable', 'uuid', Rule::notIn(Category::RECONCILIATION_IDS), new OwnedOrSystemCategory($userId)],
         ]);
 
         DB::transaction(function () use ($validated, $userId) {
@@ -248,7 +251,7 @@ class TransactionController extends Controller
                 $tx = new Transaction([
                     'amount' => $row['amount'],
                     'type' => $row['type'],
-                    'account_id' => $validated['account_id'],
+                    'account_id' => $row['account_id'] ?? $validated['account_id'],
                     'category_id' => $row['category_id'] ?? null,
                     'beneficiary' => $row['beneficiary'] ?? null,
                     'description' => $row['description'] ?? null,
@@ -260,7 +263,7 @@ class TransactionController extends Controller
         });
 
         return redirect()->route('transactions.index')
-            ->with('success', count($validated['rows']) . ' transaction(s) importée(s).');
+            ->with('success', count($validated['rows']).' transaction(s) importée(s).');
     }
 
     /**
