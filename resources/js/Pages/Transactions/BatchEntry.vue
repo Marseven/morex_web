@@ -225,11 +225,14 @@ const save = () => {
                         </template>
 
                         <template v-else>
-                            <span class="text-sm text-theme-text-secondary">{{ shortDate(r.date) }}</span>
-                            <span class="text-sm whitespace-nowrap" :class="r.type === 'income' ? 'text-green-400' : 'text-theme-text-primary'">
-                                {{ r.type === 'income' ? '+' : '−' }}{{ formatAmount(r.amount) }}
-                            </span>
-                            <span class="text-sm text-theme-text-primary truncate">{{ r.label || '(sans libellé)' }}</span>
+                            <!-- iPhone : date, montant et libellé sur une ligne ; desktop : trois colonnes -->
+                            <div class="flex items-baseline gap-3 min-w-0 sm:contents">
+                                <span class="text-sm text-theme-text-secondary">{{ shortDate(r.date) }}</span>
+                                <span class="text-sm whitespace-nowrap" :class="r.type === 'income' ? 'text-green-400' : 'text-theme-text-primary'">
+                                    {{ r.type === 'income' ? '+' : '−' }}{{ formatAmount(r.amount) }}
+                                </span>
+                                <span class="text-sm text-theme-text-primary truncate">{{ r.label || '(sans libellé)' }}</span>
+                            </div>
                             <select v-model="r.category_id" @change="remember(r)"
                                 :aria-label="`Catégorie, ligne ${r.line} : ${r.label ?? 'sans libellé'}, ${longDate(r.date)}`"
                                 class="w-full bg-theme-surface border rounded-md px-2 py-2 text-base sm:text-sm text-theme-text-primary outline-none focus:border-white"
