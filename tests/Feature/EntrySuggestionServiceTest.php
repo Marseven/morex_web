@@ -129,4 +129,18 @@ class EntrySuggestionServiceTest extends TestCase
 
         $this->assertSame(['unparsed', null, null, 'Tontine Zara'], [$row['status'], $row['category_id'], $row['account_id'], $row['raw']]);
     }
+
+    public function test_a_deleted_category_or_account_is_never_suggested(): void
+    {
+        $this->past('taxi', $this->transport, $this->airtel);
+        $this->transport->delete();
+        $this->past('repas', $this->outings, $this->airtel);
+        $this->airtel->delete();
+
+        $taxi = $this->suggest($this->line('taxi'));
+        $meal = $this->suggest($this->line('repas'));
+
+        $this->assertNull($taxi['category_id']);
+        $this->assertSame($this->cash->id, $meal['account_id']);
+    }
 }

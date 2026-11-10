@@ -147,4 +147,79 @@ class NotesParserTest extends TestCase
     {
         $this->assertSame('unparsed', $this->parse('0 taxi')[0]->status);
     }
+
+    // --- Revue de code : lectures silencieusement fausses ---
+
+    /** @return array<string, array{string}> */
+    public static function glued(): array
+    {
+        return [
+            'lettre collée' => ['2000F taxi'],
+            'libellé collé' => ['1500taxi'],
+            'décimale sans suffixe' => ['2.5 café'],
+        ];
+    }
+
+    #[DataProvider('glued')]
+    public function test_an_ambiguous_amount_is_flagged_not_misread(string $line): void
+    {
+        $this->assertSame('unparsed', $this->parse($line)[0]->status);
+    }
+
+    /** @return array<string, array{string, int}> */
+    public static function thousands(): array
+    {
+        return [
+            'espace' => ['1 500 taxi', 1500],
+            'point' => ['1.000 taxi', 1000],
+            'virgule' => ['1,000 taxi', 1000],
+            'grand nombre' => ['1 000 000 ordi avance', 1000000],
+        ];
+    }
+
+    #[DataProvider('thousands')]
+    public function test_thousand_separators_are_understood(string $line, int $amount): void
+    {
+        $parsed = $this->parse($line)[0];
+
+        $this->assertSame([$amount, 'ok'], [$parsed->amount, $parsed->status]);
+    }
+
+    public function test_a_unit_letter_separated_by_a_space_stays_in_the_label(): void
+    {
+        $parsed = $this->parse('1500 m taxi')[0];
+
+        $this->assertSame([1500, 'm taxi'], [$parsed->amount, $parsed->label]);
+    }
+
+    public function test_a_header_without_month_moves_to_the_next_month_and_year(): void
+    {
+        $parser = new NotesParser;
+        $lines = $parser->parse("Jeudi 31 dec\n2000 taxi\nVendredi 1\n1000 taxi", CarbonImmutable::parse('2027-01-05'));
+
+        $this->assertSame(['2026-12-31', '2027-01-01'], array_map(fn ($l) => $l->date, $lines));
+    }
+
+    public function test_amounts_above_the_ceiling_are_refused(): void
+    {
+        $this->assertSame('unparsed', $this->parse('99999999999999999999 taxi')[0]->status);
+        $this->assertSame('unparsed', $this->parse('2000000M taxi')[0]->status);
+    }
+
+    public function test_a_date_written_as_a_line_is_not_an_amount(): void
+    {
+        $this->assertSame('unparsed', $this->parse('16 oct')[0]->status);
+    }
+
+    public function test_an_inline_date_without_dash_is_understood(): void
+    {
+        $parsed = $this->parse('2000 taxi 12/10')[0];
+
+        $this->assertSame(['2026-10-12', 'taxi'], [$parsed->date, $parsed->label]);
+    }
+
+    public function test_an_impossible_inline_date_is_flagged(): void
+    {
+        $this->assertSame('unparsed', $this->parse('2000 taxi - 31/02')[0]->status);
+    }
 }

@@ -21,7 +21,14 @@ use Illuminate\Support\Str;
  */
 final class NotesParser
 {
-    private const AMOUNT = '\d+(?:[.,]\d+)?\s*[kKmM]?(?![a-zA-Z])';
+    /**
+     * Un montant : groupé par milliers (« 1 500 », « 1.000 ») ou simple, décimale permise seulement
+     * avec suffixe (« 1.5M », « 2,5k »), et toujours suivi d'un séparateur : « 2000F » n'est pas un montant.
+     */
+    private const AMOUNT = '(?:\d{1,3}(?:[ .,]\d{3})+|\d+(?:[.,]\d+)?)[kKmM]?(?=$|[\s+:\x{2013}-])';
+
+    /** Plafond de sécurité (cohérent avec la validation de l'import). */
+    public const MAX_AMOUNT = 1_000_000_000_000;
 
     /** Préfixes de mois, du plus spécifique au plus court. */
     private const MONTHS = [
@@ -34,7 +41,7 @@ final class NotesParser
     public function parse(string $notes, CarbonImmutable $reference): array
     {
         $date = $reference->startOfDay();
-        $month = null;
+        $lastHeader = null;
         $type = 'expense';
         $result = [];
 
@@ -45,8 +52,8 @@ final class NotesParser
             }
             $plain = Str::lower(Str::ascii($line));
 
-            if ($header = $this->dayHeader($plain, $reference, $month)) {
-                [$date, $month] = $header;
+            if ($header = $this->dayHeader($plain, $reference, $lastHeader)) {
+                $date = $lastHeader = $header;
                 $type = 'expense';
 
                 continue;
@@ -68,25 +75,34 @@ final class NotesParser
         return $result;
     }
 
-    /** @return array{CarbonImmutable, int}|null */
-    private function dayHeader(string $plain, CarbonImmutable $reference, ?int $currentMonth): ?array
+    /**
+     * En-tête de jour. Sans mois, on reprend celui de l'en-tête précédent, et on passe au mois
+     * suivant (année comprise) quand le jour recule : « Jeudi 31 déc » puis « Vendredi 1 » → 1er janvier.
+     */
+    private function dayHeader(string $plain, CarbonImmutable $reference, ?CarbonImmutable $last): ?CarbonImmutable
     {
         if (! preg_match('/^(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+(\d{1,2})(?:\s+([a-z]+)\.?)?(?:\s+(\d{4}))?\s*:?$/', $plain, $m)) {
             return null;
         }
-
-        $month = isset($m[2]) && $m[2] !== '' ? $this->month($m[2]) : ($currentMonth ?? $reference->month);
-        if ($month === null) {
-            return null;
-        }
-
+        $day = (int) $m[1];
         $year = isset($m[3]) && $m[3] !== '' ? (int) $m[3] : null;
-        $date = $this->safeDate($year ?? $reference->year, $month, (int) $m[1]);
-        if ($date === null) {
-            return null;
+
+        if (isset($m[2]) && $m[2] !== '') {
+            $month = $this->month($m[2]);
+            $date = $month === null ? null : $this->safeDate($year ?? $reference->year, $month, $day);
+
+            return $date === null || $year !== null ? $date : $this->closestYear($date, $reference);
         }
 
-        return [$year === null ? $this->closestYear($date, $reference) : $date, $month];
+        if ($last !== null) {
+            $base = $day < $last->day ? $last->startOfMonth()->addMonth() : $last;
+
+            return $this->safeDate($base->year, $base->month, $day);
+        }
+
+        $date = $this->safeDate($reference->year, $reference->month, $day);
+
+        return $date === null ? null : $this->closestYear($date, $reference);
     }
 
     /** @return list<ParsedNoteLine> */
@@ -94,14 +110,16 @@ final class NotesParser
     {
         $unparsed = [new ParsedNoteLine($lineNumber, $line, null, null, null, null, 'unparsed')];
 
+        // Date en fin de ligne, avec ou sans tiret : « - 11/09 », « 12/10 »
         $body = $line;
-        if (preg_match('#\s*[-–]\s*(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\s*$#u', $body, $d, PREG_OFFSET_CAPTURE)) {
+        if (preg_match('#(?:\s*[-\x{2013}]\s*|\s+)(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\s*$#u', $body, $d, PREG_OFFSET_CAPTURE)) {
             $year = isset($d[3]) ? (int) $d[3][0] : null;
             $inline = $this->safeDate($year === null ? $reference->year : ($year < 100 ? 2000 + $year : $year), (int) $d[2][0], (int) $d[1][0]);
-            if ($inline !== null) {
-                $date = $year === null ? $this->closestYear($inline, $reference) : $inline;
-                $body = substr($body, 0, $d[0][1]);
+            if ($inline === null) {
+                return $unparsed; // « 31/02 » : signalé plutôt qu'ignoré
             }
+            $date = $year === null ? $this->closestYear($inline, $reference) : $inline;
+            $body = substr($body, 0, $d[0][1]);
         }
 
         if (! preg_match('/^(?<amounts>'.self::AMOUNT.'(?:\s*\+\s*'.self::AMOUNT.')*)(?<label>.*)$/u', $body, $m)) {
@@ -117,8 +135,13 @@ final class NotesParser
             $amounts[] = $amount;
         }
 
-        $label = trim($m['label'], " \t-–:");
+        $label = trim($m['label'], " \t-\u{2013}:");
         $label = $label === '' ? null : $label;
+
+        // « 16 oct » est une date oubliée, pas 16 FCFA d'« oct »
+        if ($label !== null && preg_match('/^[a-z]+\.?$/', $plainLabel = Str::lower(Str::ascii($label))) && $this->month($plainLabel) !== null) {
+            return $unparsed;
+        }
 
         return array_map(
             fn (int $amount) => new ParsedNoteLine($lineNumber, $line, $date->toDateString(), $type, $amount, $label, $label === null ? 'incomplete' : 'ok'),
@@ -128,19 +151,33 @@ final class NotesParser
 
     private function amount(string $token): ?int
     {
-        if (! preg_match('/^(\d+(?:[.,]\d+)?)\s*([kKmM]?)$/', $token, $m)) {
+        if (! preg_match('/^([\d .,]+?)([kKmM]?)$/', $token, $m)) {
             return null;
         }
+        [, $number, $suffix] = $m;
 
-        $multiplier = match (strtolower($m[2])) {
-            'k' => 1_000,
-            'm' => 1_000_000,
-            default => 1,
-        };
-        $value = (float) str_replace(',', '.', $m[1]) * $multiplier;
-        $rounded = (int) round($value);
+        if ($suffix === '') {
+            // Sans suffixe : entier simple ou groupé par milliers ; « 2.5 » est ambigu, donc refusé
+            if (preg_match('/^\d{1,3}(?:[ .,]\d{3})+$/', $number)) {
+                $number = preg_replace('/[ .,]/', '', $number);
+            }
+            if (! preg_match('/^\d{1,13}$/', $number)) {
+                return null;
+            }
+            $value = (int) $number;
+        } else {
+            $decimal = str_replace([' ', ','], ['', '.'], $number);
+            if (! preg_match('/^\d{1,10}(?:\.\d+)?$/', $decimal)) {
+                return null;
+            }
+            $float = (float) $decimal * (strtolower($suffix) === 'k' ? 1_000 : 1_000_000);
+            if ($float >= self::MAX_AMOUNT || abs($float - round($float)) > 1e-6) {
+                return null;
+            }
+            $value = (int) round($float);
+        }
 
-        return $rounded > 0 && abs($value - $rounded) < 1e-6 ? $rounded : null;
+        return $value > 0 && $value < self::MAX_AMOUNT ? $value : null;
     }
 
     private function month(string $word): ?int
