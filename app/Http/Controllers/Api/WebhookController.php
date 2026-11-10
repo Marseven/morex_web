@@ -15,8 +15,8 @@ class WebhookController extends Controller
     public function sms(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'message' => ['required', 'string'],
-            'sender' => ['nullable', 'string'],
+            'message' => ['required', 'string', 'max:2000'],
+            'sender' => ['nullable', 'string', 'max:100'],
             'account_id' => ['nullable', 'uuid'],
         ]);
 

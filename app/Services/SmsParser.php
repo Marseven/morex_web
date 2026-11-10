@@ -54,7 +54,7 @@ class SmsParser
         }
 
         // Le motif le plus précis d'abord : « Vous avez recu … du NUMÉRO, NOM » donne le nom, pas le numéro
-        if (preg_match('/Vous\s+avez\s+recu\s+(\d+)\s*F\s+du\s+(\d+)\s*,\s*([^.]+)/i', $body, $match)) {
+        if (preg_match('/Vous\s+avez\s+recu\s+(\d+)\s*F\s+du\s+(\d+)\s*,\s*([^.\n]{1,100})/i', $body, $match)) {
             return [
                 'amount' => (int) $match[1],
                 'is_income' => true,

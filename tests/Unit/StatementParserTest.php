@@ -102,4 +102,11 @@ class StatementParserTest extends TestCase
 
         $this->assertSame(['unparsed', 'unparsed'], array_map(fn ($e) => $e->status, $lines));
     }
+
+    public function test_the_sender_name_stops_at_the_end_of_the_line(): void
+    {
+        $line = $this->parse("Vous avez recu 5000F du 077000000 , JEAN NGUEMA\nNouveau solde 125000F")[0];
+
+        $this->assertSame('JEAN NGUEMA', $line->label);
+    }
 }
