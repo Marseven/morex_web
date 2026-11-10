@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import { computed } from 'vue'
 
 const props = defineProps({
     goal: { type: Object, required: true },
@@ -20,13 +21,13 @@ const form = useForm({
 })
 
 // Suivi sur un compte (module suivi-objectifs) : la progression suit le solde du compte
-const isTracked = !!props.goal.tracked_since
+const isTracked = computed(() => !!props.goal.tracked_since)
 const trackForm = useForm({
     account_id: props.goal.account_id || props.accounts.find((a) => /epargne/i.test(a.name.normalize('NFD').replace(/\p{Diacritic}/gu, '')))?.id || props.accounts[0]?.id || '',
     start_amount: props.goal.current_amount,
     monthly_target: props.goal.monthly_target ?? null,
 })
-const trackedAccount = props.accounts.find((a) => a.id === props.goal.account_id)
+const trackedAccount = computed(() => props.accounts.find((a) => a.id === props.goal.account_id))
 const formatAmount = (amount) => new Intl.NumberFormat('fr-FR').format(amount ?? 0)
 const startTracking = () => trackForm.post(`/goals/${props.goal.id}/track`, { preserveScroll: true })
 const stopTracking = () => {
