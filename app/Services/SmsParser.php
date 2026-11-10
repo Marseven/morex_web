@@ -53,21 +53,22 @@ class SmsParser
             ];
         }
 
-        if (preg_match('/Recu\s+(\d+(?:\.\d+)?)\s*(?:FCFA|F)\s+du\s+([A-Z0-9]+)/i', $body, $match)) {
-            return [
-                'amount' => $this->parseAmount($match[1]),
-                'is_income' => true,
-                'beneficiary' => $match[2],
-                'reference' => $reference,
-                'source' => 'Airtel Money',
-            ];
-        }
-
+        // Le motif le plus précis d'abord : « Vous avez recu … du NUMÉRO, NOM » donne le nom, pas le numéro
         if (preg_match('/Vous\s+avez\s+recu\s+(\d+)\s*F\s+du\s+(\d+)\s*,\s*([^.]+)/i', $body, $match)) {
             return [
                 'amount' => (int) $match[1],
                 'is_income' => true,
                 'beneficiary' => trim($match[3]) ?: $match[2],
+                'reference' => $reference,
+                'source' => 'Airtel Money',
+            ];
+        }
+
+        if (preg_match('/Recu\s+(\d+(?:\.\d+)?)\s*(?:FCFA|F)\s+du\s+([A-Z0-9]+)/i', $body, $match)) {
+            return [
+                'amount' => $this->parseAmount($match[1]),
+                'is_income' => true,
+                'beneficiary' => $match[2],
                 'reference' => $reference,
                 'source' => 'Airtel Money',
             ];
