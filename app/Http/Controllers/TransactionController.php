@@ -237,7 +237,7 @@ class TransactionController extends Controller
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'rows' => ['required', 'array', 'min:1', 'max:500'],
             'rows.*.date' => ['required', 'date'],
-            'rows.*.amount' => ['required', 'integer', 'min:1'],
+            'rows.*.amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'rows.*.type' => ['required', 'in:expense,income'],
             'rows.*.beneficiary' => ['nullable', 'string', 'max:255'],
             'rows.*.description' => ['nullable', 'string', 'max:1000'],

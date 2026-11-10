@@ -139,4 +139,12 @@ class BatchEntryTest extends TestCase
             'rows' => [['date' => '2026-10-16', 'amount' => 500, 'type' => 'expense', 'category_id' => Category::RECONCILIATION_EXPENSE_ID]],
         ])->assertSessionHasErrors('rows.0.category_id');
     }
+
+    public function test_import_refuses_absurd_amounts(): void
+    {
+        $this->actingAs($this->user)->post('/transactions/import', [
+            'account_id' => $this->cash->id,
+            'rows' => [['date' => '2026-10-16', 'amount' => PHP_INT_MAX, 'type' => 'expense']],
+        ])->assertSessionHasErrors('rows.0.amount');
+    }
 }
