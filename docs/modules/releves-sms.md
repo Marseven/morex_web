@@ -1,4 +1,4 @@
-# Module releves-sms (3a : rapprochement avec les relevés)    statut : analysé · 2026-11-11
+# Module releves-sms (3a : rapprochement avec les relevés)    statut : livré · 2026-11-11
 
 **Conclusion** : je colle le relevé d'un compte (historique Airtel Money ou export BGFI), Morex associe chaque ligne du relevé à l'opération que j'ai saisie (même montant ou montant + frais, à ±1 jour), crée les frais à part, et me soumet seulement ce qui ne correspond pas. C'est la « validation d'écriture » faite aujourd'hui à la main avec un assistant externe. Le module est **scindé** pour rester sous 15 fichiers :
 - **3a (ce module)** : relevés, correspondance, frais, écran web ;
@@ -49,3 +49,26 @@
 3. Le découpage 3a / 3b / 3c vous convient-il ? → *Hypothèse : oui, et 3b (SMS iPhone) passe juste après.*
 
 **Hors module** : Raccourci iOS et SMS automatiques (3b), transferts avec frais (3c), lecture de PDF ou de captures d'écran, connexion bancaire.
+
+## Livré (3a)
+- **Serveur** :
+  - migrations réversibles `statement_lines` et catégorie système « Frais bancaires » (`Category::BANK_FEES_ID`), avec rollback testé ;
+  - `StatementParser` (SMS Airtel et BGFI via `SmsParser`, CSV avec en-tête détecté) ;
+  - `StatementMatcher` (RM-1, RM-3, opérations absentes) et `StatementService` (frais, création, pointage, atomicité).
+- **API** : `POST /api/accounts/{id}/statement/preview` et `POST /api/accounts/{id}/statement`. **Web** : page `Accounts/Statement.vue` (direction A, accordéon), lien « Relevé » sur la page Comptes.
+- **Tests** : 4 fichiers, 47 tests. Suite complète : 404 au vert.
+- **Vérifié dans le navigateur** sur une instance locale jetable :
+  - 5 SMS collés → 2 lignes rapprochées avec frais (547 et 450), 1 à valider (deux taxis), 1 sans opération (Bamboo), 1 non comprise, 1 opération absente du relevé (courses) ;
+  - après validation, solde exact : 125 648 ;
+  - le même relevé recollé ressort en « déjà importé ».
+- **Écarts avec l'analyse** :
+  - `SmsParser` corrigé : motif précis en premier, nom borné à une ligne ;
+  - la page Budgets affiche « Frais bancaires », pour pouvoir lui fixer un plafond ;
+  - le plan avait une ligne 3 cassée, réparée et découpée en 3a/3b/3c.
+- **Revue de sécurité** :
+  - point haut corrigé : le serveur revérifie chaque paire relevé ↔ opération (montant, ±1 jour, plafond de frais), recalcule les frais et refuse les opérations en attente comme les frais déjà créés ;
+  - points moyens corrigés : index uniques sur l'opération et sur le frais liés ; rejeu sans référence refusé ;
+  - points bas corrigés : seuls les doublons sont traduits en `ALREADY_MATCHED`, limite de requêtes sur l'envoi web, catégorie du bon sens, webhook borné (2 000 caractères).
+- **Non vérifié** :
+  - les vrais relevés BGFI, faute de lignes réelles : les en-têtes reconnus sont une hypothèse ;
+  - MySQL réel (tests sous SQLite).

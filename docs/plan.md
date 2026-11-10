@@ -10,7 +10,7 @@ Taux de référence : 80 000 FCFA par jour (à titre indicatif) → reste ~13 j 
 | 2 | saisie-rapide | Formulaire mobile « montant d'abord », compte par défaut, catégorie suggérée par libellé, modèles favoris, widget iOS | 0 | oui | non | 2 j | livré (PR ouverte) |
 | 2 bis | saisie-lot | Coller les notes d'une journée (« 1500 taxi », « 22500+12000 night club », entrées incluses) → aperçu avec catégorie et compte suggérés (service du module 2) → validation en une fois ; serveur + API + web | 2 | oui | non | 2 j | livré (PR ouverte) |
 | 2 ter | saisie-lot-mobile | Écran iPhone de saisie en lot, branché sur l'API du module 2 bis | 2 bis | oui | non | 1 j | à faire |
-| 3a | releves-sms | Relevés Airtel (SMS collés) / BGFI (CSV) ; rapprochement automatique ligne ↔ opération (montant + frais, ±1 j) ; frais isolés ; non rapprochés à valider ; écran web + API | 2 bis | oui | oui | 2 j | en cours |
+| 3a | releves-sms | Relevés Airtel (SMS collés) / BGFI (CSV) ; rapprochement automatique ligne ↔ opération (montant + frais, ±1 j) ; frais isolés ; non rapprochés à valider ; écran web + API | 2 bis | oui | oui | 2 j | livré (PR ouverte) |
 | 3b | sms-iphone | Raccourci iOS → webhook → lignes de relevé (même moteur que 3a) ; jeton Sanctum limité au webhook | 3a | non | oui | 1 j | à faire |
 | 3c | transferts-frais | Transferts entre comptes avec frais (retraits Airtel, GIMAC), import compris | 3a | oui | non | 1 j | à faire |
 | 4 | rapprochement | Serveur + API + écran web : solde du relevé → écart, pointage, opération d'écart tracée ; `adjust-balance` passe par le service | 0 | oui | non | 2 j | livré (PR ouverte) |
