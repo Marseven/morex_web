@@ -1,4 +1,4 @@
-# Module plafonds-alertes (5b)                      statut : analysé · 2026-11-11
+# Module plafonds-alertes (5b)                      statut : livré · 2026-11-11
 
 **Conclusion** : les plafonds par catégorie existent déjà (`budget_limit`). Les alertes actuelles ne vivent que sur l'iPhone et ne voient que ce qui y est saisi. Ce module les déplace **côté serveur** : toute dépense comptée dans le cycle (saisie web, saisie en lot, relevé, synchro) recalcule le plafond de sa catégorie. **Une seule alerte par seuil (80 %, 100 %) et par cycle** est enregistrée et envoyée en notification push. Le tableau de bord montre les plafonds avec un statut lisible.
 
@@ -16,7 +16,7 @@
   - pas de clé push configurée → alerte enregistrée et visible dans l'app, sans envoi ;
   - un abonnement push expiré (410) est supprimé.
 
-**Données** (migration réversible) : `budget_alerts` (`id`, `user_id`, `category_id`, `cycle_start` date, `threshold` 80|100, `spent`, `limit`, `created_at`), avec un index unique (`category_id`, `cycle_start`, `threshold`) qui empêche tout doublon.
+**Données** (migration réversible) : `budget_alerts` (`id`, `user_id`, `category_id`, `cycle_start` date, `threshold` 80|100, `spent`, `limit`, `created_at`), avec un index unique (`user_id`, `category_id`, `cycle_start`, `threshold`) qui empêche tout doublon.
 
 **API / écrans**
 - `GET /api/budget-alerts` (alertes du cycle actif, Sanctum) ;
@@ -47,3 +47,30 @@
 3. Faut-il aussi des alertes sur l'iPhone à partir du serveur ? → *Hypothèse : non. Les notifications web push suffisent ici, et l'iPhone garde ses alertes locales. L'envoi APNs relève d'un autre chantier.*
 
 **Hors module** : plafond combiné, réglage des seuils, notifications APNs (iPhone natif), règle « une soirée club par mois ».
+
+## Livré (5b)
+- **Serveur** :
+  - migration réversible `budget_alerts` (index unique `user_id`, `category_id`, `cycle_start`, `threshold`) ;
+  - `BudgetAlertService` (période, dépensé, seuils, enregistrement, texte des notifications) ;
+  - contrat `PushNotifier` et `WebPushNotifier`, partagés avec `SendDailyReminders` (timeout de 5 s, sans redirection).
+- **Déclenchement** :
+  - `Transaction::saved` sur une dépense confirmée (création, montant, catégorie, statut, date) ;
+  - synchro : vérification de l'utilisateur après validation, hors de la transaction.
+- **API** : `GET /api/budget-alerts`, réservé au propriétaire.
+- **Web** : carte `BudgetCapCard` (direction A : barres triées par pourcentage, statut en texte et en icône, liste « Alertes du cycle »).
+- **Tests** : `BudgetAlertTest` (15), `PushSafetyTest`, `SendDailyRemindersTest`. Suite complète : 452 au vert.
+- **Vérifié dans le navigateur** sur une instance locale jetable.
+- **Revue de sécurité, corrigé** :
+  - isolation par utilisateur sur les catégories système partagées ;
+  - notifications envoyées seulement aux services push connus (Google, Mozilla, Apple, Microsoft), sur l'abonnement comme à l'envoi.
+- **Revue de code, corrigé** :
+  - un échec d'envoi ne casse ni l'enregistrement ni la synchro (qui renvoie 200) ;
+  - pas d'alerte 80 % après un dépassement dans la même période ;
+  - période lue une fois par requête.
+- **Écarts avec l'analyse** :
+  - la carte du tableau de bord montre toutes les catégories plafonnées, plus seulement 5 ;
+  - le dépensé y exclut désormais les opérations en attente (RM-1).
+- **Non vérifié** :
+  - MySQL réel ;
+  - envoi push réel (clés VAPID de production) ;
+  - aucune relance si un envoi échoue : l'alerte reste visible dans l'app.
