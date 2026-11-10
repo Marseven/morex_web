@@ -17,12 +17,11 @@ use Symfony\Component\HttpFoundation\Response;
 final class SecurityHeaders
 {
     private const HEADERS = [
-        'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains',
         'X-Frame-Options' => 'DENY',
         'X-Content-Type-Options' => 'nosniff',
         'Referrer-Policy' => 'strict-origin-when-cross-origin',
         'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
-        'Content-Security-Policy' => "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests",
+        'Content-Security-Policy' => "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -31,6 +30,12 @@ final class SecurityHeaders
 
         foreach (self::HEADERS as $name => $value) {
             $response->headers->set($name, $value);
+        }
+
+        // Directives HTTPS seulement : en http (MAMP, Vite) elles forceraient https et casseraient les assets.
+        if ($request->isSecure()) {
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+            $response->headers->set('Content-Security-Policy', self::HEADERS['Content-Security-Policy'].'; upgrade-insecure-requests');
         }
 
         // Ne pas annoncer la version de PHP (en-tête ajouté par l'interpréteur, hors de l'objet Response).

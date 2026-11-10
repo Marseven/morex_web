@@ -18,8 +18,8 @@ class SecurityHeadersTest extends TestCase
     public static function urls(): array
     {
         return [
-            'page web' => ['/login'],
-            'api' => ['/api/user'],
+            'page web' => ['https://localhost/login'],
+            'api' => ['https://localhost/api/user'],
         ];
     }
 
@@ -34,5 +34,15 @@ class SecurityHeadersTest extends TestCase
         $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
         $this->assertStringContainsString('camera=()', (string) $response->headers->get('Permissions-Policy'));
         $this->assertStringContainsString("frame-ancestors 'none'", (string) $response->headers->get('Content-Security-Policy'));
+    }
+
+    public function test_https_only_directives_are_skipped_over_plain_http(): void
+    {
+        // En développement (MAMP, Vite en http), HSTS et upgrade-insecure-requests casseraient les assets.
+        $response = $this->get('http://localhost/login');
+
+        $response->assertHeaderMissing('Strict-Transport-Security');
+        $response->assertHeader('X-Frame-Options', 'DENY');
+        $this->assertStringNotContainsString('upgrade-insecure-requests', (string) $response->headers->get('Content-Security-Policy'));
     }
 }
