@@ -20,7 +20,7 @@ class SendDailyRemindersTest extends TestCase
     {
         config(['webpush.public_key' => 'pub', 'webpush.private_key' => 'priv']);
         $user = User::factory()->create();
-        $sub = new PushSubscription(['endpoint' => 'https://push.example/abc', 'public_key' => 'k', 'auth_token' => 'a']);
+        $sub = new PushSubscription(['endpoint' => 'https://fcm.googleapis.com/fcm/send/abc', 'public_key' => 'k', 'auth_token' => 'a']);
         $sub->user_id = $user->id;
         $sub->save();
 

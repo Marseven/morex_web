@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Contracts\PushNotifier;
 use App\Models\PushSubscription;
 use App\Models\User;
+use App\Rules\KnownPushEndpoint;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 
@@ -22,7 +23,9 @@ final class WebPushNotifier implements PushNotifier
 
     public function sendToUser(User $user, array $payload): int
     {
-        $subscriptions = PushSubscription::where('user_id', $user->id)->get();
+        // Revérifié à l'envoi : un abonnement enregistré avant la règle ne doit jamais être appelé
+        $subscriptions = PushSubscription::where('user_id', $user->id)->get()
+            ->filter(fn (PushSubscription $sub) => KnownPushEndpoint::allows($sub->endpoint));
         if (! $this->isConfigured() || $subscriptions->isEmpty()) {
             return 0;
         }
@@ -32,7 +35,7 @@ final class WebPushNotifier implements PushNotifier
             $webPush->queueNotification($this->subscription($sub), json_encode($payload + ['title' => 'MR Money']) ?: '{}');
         }
 
-        return $this->flush($webPush);
+        return $this->flush($webPush, $user->id);
     }
 
     /** Client résolu par le conteneur (liaison dans AppServiceProvider), remplaçable en test. */
@@ -61,7 +64,7 @@ final class WebPushNotifier implements PushNotifier
     }
 
     /** Envoie la file et supprime les abonnements expirés ; renvoie le nombre de succès. */
-    public function flush(WebPush $webPush): int
+    public function flush(WebPush $webPush, ?int $userId = null): int
     {
         $sent = 0;
         foreach ($webPush->flush() as $report) {
@@ -71,7 +74,9 @@ final class WebPushNotifier implements PushNotifier
                 continue;
             }
             if (in_array($report->getResponse()?->getStatusCode(), [404, 410], true)) {
-                PushSubscription::where('endpoint', (string) $report->getRequest()->getUri())->delete();
+                PushSubscription::where('endpoint', (string) $report->getRequest()->getUri())
+                    ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
+                    ->delete();
             }
         }
 

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\PushSubscription;
 use App\Models\Transaction;
+use App\Rules\KnownPushEndpoint;
 use App\Services\WebPushNotifier;
 use Illuminate\Console\Command;
 
@@ -36,8 +37,8 @@ class SendDailyReminders extends Command
         // Un enregistrement par navigateur ; on ne notifie que les utilisateurs sans saisie aujourd'hui.
         PushSubscription::with('user')->chunk(100, function ($subscriptions) use ($notifier, $webPush, $payload, &$sent) {
             foreach ($subscriptions as $sub) {
-                if (! $sub->user) {
-                    continue;
+                if (! $sub->user || ! KnownPushEndpoint::allows($sub->endpoint)) {
+                    continue; // anti-SSRF : seuls les services push connus sont appelés
                 }
 
                 $hasLoggedToday = Transaction::where('user_id', $sub->user_id)
