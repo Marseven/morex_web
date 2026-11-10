@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BudgetCycle;
 use App\Models\Category;
+use App\Services\GoalProgressService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -65,38 +66,38 @@ class DashboardController extends Controller
 
         $budgetCategories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })
-        ->whereNotNull('budget_limit')
-        ->where('budget_limit', '>', 0)
-        ->get()
-        ->map(function ($category) use ($user, $budgetStartStr, $budgetEndStr) {
-            $query = $user->transactions()
-                ->where('category_id', $category->id)
-                ->where('type', 'expense')
-                ->where('date', '>=', $budgetStartStr);
+            ->whereNotNull('budget_limit')
+            ->where('budget_limit', '>', 0)
+            ->get()
+            ->map(function ($category) use ($user, $budgetStartStr, $budgetEndStr) {
+                $query = $user->transactions()
+                    ->where('category_id', $category->id)
+                    ->where('type', 'expense')
+                    ->where('date', '>=', $budgetStartStr);
 
-            if ($budgetEndStr) {
-                $query->where('date', '<=', $budgetEndStr);
-            }
+                if ($budgetEndStr) {
+                    $query->where('date', '<=', $budgetEndStr);
+                }
 
-            $spent = (int) $query->sum('amount');
+                $spent = (int) $query->sum('amount');
 
-            return [
-                'id' => $category->id,
-                'name' => $category->name,
-                'color' => $category->color,
-                'icon' => $category->icon,
-                'budget_limit' => $category->budget_limit,
-                'spent' => $spent,
-                'progress' => $category->budget_limit > 0
-                    ? min(100, ($spent / $category->budget_limit) * 100)
-                    : 0,
-            ];
-        })
-        ->sortByDesc('spent')
-        ->take(5)
-        ->values();
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'color' => $category->color,
+                    'icon' => $category->icon,
+                    'budget_limit' => $category->budget_limit,
+                    'spent' => $spent,
+                    'progress' => $category->budget_limit > 0
+                        ? min(100, ($spent / $category->budget_limit) * 100)
+                        : 0,
+                ];
+            })
+            ->sortByDesc('spent')
+            ->take(5)
+            ->values();
 
         // Dettes actives
         $activeDebts = $user->debts()
@@ -113,6 +114,7 @@ class DashboardController extends Controller
             'accounts' => $accounts,
             'recentTransactions' => $recentTransactions,
             'activeGoals' => $activeGoals,
+            'savingsGoal' => $this->savingsGoal($user),
             'activeDebts' => $activeDebts,
             'budgetCategories' => $budgetCategories,
             'currentPeriod' => $period,
@@ -155,5 +157,13 @@ class DashboardController extends Controller
             'year' => 'Cette année',
             default => 'Ce mois',
         };
+    }
+
+    /** Carte « Objectif » : le premier objectif actif suivi sur un compte (module suivi-objectifs). */
+    private function savingsGoal($user): ?array
+    {
+        $goal = $user->goals()->where('status', 'active')->whereNotNull('tracked_since')->orderBy('target_date')->first();
+
+        return $goal ? app(GoalProgressService::class)->status($goal) : null;
     }
 }
