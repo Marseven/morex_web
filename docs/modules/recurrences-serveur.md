@@ -7,7 +7,7 @@
 **Scénarios**
 1. 06:00, `recurrences:generate` : pour chaque récurrence active échue, l'opération du jour est créée avec la date d'échéance, puis la date suivante est calculée. Le solde bouge par le chemin habituel (`Transaction::booted`), et les plafonds et alertes suivent.
 2. Serveur arrêté trois jours : au passage suivant, les trois échéances quotidiennes manquées sont créées, au plus 60 par récurrence et par passage.
-3. iPhone, « Générer maintenant » : appel à `POST /api/recurring-transactions/process-due`, puis synchronisation. Les opérations arrivent par le pull.
+3. iPhone, « Générer maintenant » : appel à `POST /api/recurring-transactions-process-due`, puis synchronisation. Les opérations arrivent par le pull.
 4. Une même échéance traitée deux fois (cron et bouton en même temps, rejeu) : une seule opération existe.
 - Erreurs :
   - compte ou catégorie supprimé → la récurrence est désactivée et signalée (`ACCOUNT_GONE`), sans erreur pour les autres ;
@@ -17,7 +17,7 @@
 
 **API / tâches**
 - Commande `recurrences:generate`, planifiée `dailyAt('06:00')` (fuseau de l'app), `withoutOverlapping`.
-- `POST /api/recurring-transactions/process-due` et `/{id}/generate` passent par le même service (auth Sanctum, throttle existant).
+- `POST /api/recurring-transactions-process-due` et `/{id}/generate` passent par le même service (auth Sanctum, throttle existant).
 - Mobile : le bouton appelle l'API, puis synchronise (une seule page touchée).
 
 **Règles métier**

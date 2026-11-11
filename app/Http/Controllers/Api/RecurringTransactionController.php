@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\RecurringTransactionResource;
 use App\Http\Resources\TransactionResource;
 use App\Models\RecurringTransaction;
+use App\Services\RecurrenceGenerator;
+use App\Models\Transaction;
 use App\Rules\OwnedOrSystemCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -242,15 +244,15 @@ class RecurringTransactionController extends Controller
             ], 400);
         }
 
-        // Generate the transaction
-        $transaction = $recurringTransaction->generateTransaction();
-
-        // Update next due date
-        $recurringTransaction->updateNextDueDate();
+        // Même chemin que le scheduler (module recurrences-serveur) : verrou et idempotence
+        $occurrence = $recurringTransaction->next_due_date->toDateString();
+        app(RecurrenceGenerator::class)->generateNext($recurringTransaction);
+        $transaction = Transaction::where('recurring_transaction_id', $recurringTransaction->id)
+            ->whereDate('occurrence_date', $occurrence)->first();
 
         return response()->json([
             'message' => 'Transaction générée avec succès',
-            'transaction' => new TransactionResource($transaction->load(['account', 'category'])),
+            'transaction' => $transaction ? new TransactionResource($transaction->load(['account', 'category'])) : null,
             'recurring_transaction' => new RecurringTransactionResource($recurringTransaction->fresh()->load(['account', 'category'])),
         ]);
     }
@@ -267,22 +269,12 @@ class RecurringTransactionController extends Controller
     )]
     public function processDue(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $dueRecurrings = $user->recurringTransactions()->due()->get();
-
-        $generated = [];
-        foreach ($dueRecurrings as $recurring) {
-            $transaction = $recurring->generateTransaction();
-            $recurring->updateNextDueDate();
-            $generated[] = [
-                'recurring_id' => $recurring->id,
-                'transaction_id' => $transaction->id,
-            ];
-        }
+        // Même chemin que le scheduler (module recurrences-serveur) : rattrapage, verrou, idempotence
+        $count = app(RecurrenceGenerator::class)->runForUser($request->user());
 
         return response()->json([
-            'message' => count($generated) . ' transaction(s) générée(s)',
-            'generated' => $generated,
+            'message' => $count . ' transaction(s) générée(s)',
+            'count' => $count,
         ]);
     }
 }

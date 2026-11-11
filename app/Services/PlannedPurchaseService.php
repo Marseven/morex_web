@@ -93,7 +93,8 @@ final class PlannedPurchaseService
     /** RM-1 : la règle ne vise que les dépenses au-dessus du seuil, de nature courante (ni transit ni pro). */
     public function isSubjectToRule(Transaction $transaction): bool
     {
-        if ($transaction->type !== 'expense' || $transaction->amount < self::THRESHOLD) {
+        // Charges fixes issues d'une récurrence : hors règle (module recurrences-serveur, RM-5)
+        if ($transaction->type !== 'expense' || $transaction->amount < self::THRESHOLD || $transaction->recurring_transaction_id !== null) {
             return false;
         }
 
@@ -186,6 +187,7 @@ final class PlannedPurchaseService
             ->counted()
             ->where('type', 'expense')
             ->where('amount', '>=', self::THRESHOLD)
+            ->whereNull('recurring_transaction_id')
             ->where(fn ($q) => $q->whereNull('category_id')->orWhereNotIn('category_id', Category::withTrashed()->select('id')->where('nature', '!=', Category::NATURE_REGULAR)))
             ->whereNotIn('id', PlannedPurchase::withTrashed()->whereNotNull('transaction_id')->select('transaction_id'))
             ->where('date', '>=', $from->toDateString())
