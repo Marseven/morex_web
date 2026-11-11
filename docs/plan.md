@@ -20,7 +20,7 @@ Taux de référence : 80 000 FCFA par jour (à titre indicatif) → reste ~13 j 
 | 5c | revenus-transit | Tontines, remboursements et transferts internes exclus des revenus/dépenses ; séparation pro/perso (abonnements MRTECH) | 5a | oui | non | 1 j | livré (PR ouverte) |
 | 5d | achats-prevus | Liste d'achats prévus avec statut ; règle « > 30k hors liste attend le cycle suivant » | 5a | oui | non | 1 j | livré (PR ouverte) |
 | 6 | recurrences-serveur | Génération des récurrences par le scheduler (idempotente), plus seulement sur le mobile | 1 | non | non | 1 j | à faire |
-| 8 | bilan-mensuel | Bilan du cycle (réalisé vs budget, discrétionnaire, épargne) et proposition du cycle suivant créée directement dans l'app (plus de CSV à générer) | 5 | oui | non | 2 j | en cours |
+| 8 | bilan-mensuel | Bilan du cycle (réalisé vs budget, discrétionnaire, épargne) et proposition du cycle suivant créée directement dans l'app (plus de CSV à générer) | 5 | oui | non | 2 j | livré (PR ouverte) |
 | 7 | dette-qualite | 4 tests mobiles périmés, 9 avertissements `flutter analyze`, CI GitHub Actions, points moyens des revues de sécurité, opérations rapprochées modifiables, catégories d'écart à refuser aussi en saisie unitaire et en synchro | 0 | non | oui | 1,5 j | à faire |
 
 Statuts : à faire · analysé · en cours · livré · vérifié. Un module = une session, ≤ 15 fichiers.
