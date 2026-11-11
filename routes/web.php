@@ -73,6 +73,7 @@ Route::middleware('auth')->group(function () {
 
     // Cycles budgétaires
     Route::get('/budget-cycles', [BudgetCycleController::class, 'index'])->name('budget-cycles.index');
+    Route::get('/budget-cycles/{cycle}/bilan', [BudgetCycleController::class, 'review'])->name('budget-cycles.review');
     Route::post('/budget-cycles/start', [BudgetCycleController::class, 'start'])->name('budget-cycles.start');
     Route::put('/budget-cycles/active', [BudgetCycleController::class, 'updateActive'])->name('budget-cycles.update-active');
     Route::post('/budget-cycles/close', [BudgetCycleController::class, 'close'])->name('budget-cycles.close');

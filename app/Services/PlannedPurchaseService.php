@@ -164,9 +164,23 @@ final class PlannedPurchaseService
         return $this->outOfListQuery($user)->orderByDesc('date')->limit($limit)->get();
     }
 
-    private function outOfListQuery(User $user): Builder
+    /**
+     * Hors liste sur une période donnée (bilan d'un cycle clôturé, module bilan-mensuel).
+     *
+     * @return array{count: int, total: int}
+     */
+    public function outOfListTotals(User $user, CarbonImmutable $from, ?CarbonImmutable $to): array
     {
-        [$from, $to] = $this->period($user);
+        $query = $this->outOfListQuery($user, $from, $to);
+
+        return ['count' => (clone $query)->count(), 'total' => (int) (clone $query)->sum('amount')];
+    }
+
+    private function outOfListQuery(User $user, ?CarbonImmutable $from = null, ?CarbonImmutable $to = null): Builder
+    {
+        if ($from === null) {
+            [$from, $to] = $this->period($user);
+        }
 
         return Transaction::where('user_id', $user->id)
             ->counted()

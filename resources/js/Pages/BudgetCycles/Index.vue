@@ -1,8 +1,8 @@
 <script setup>
-import { Head, router } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { CalendarIcon, ArrowPathIcon, XMarkIcon, ExclamationTriangleIcon, CheckCircleIcon, InformationCircleIcon, ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
-import { ref, computed } from 'vue'
+import { ChartBarIcon, CalendarIcon, ArrowPathIcon, XMarkIcon, ExclamationTriangleIcon, CheckCircleIcon, InformationCircleIcon, ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, onMounted } from 'vue'
 
 const props = defineProps({
     activeCycle: { type: Object, default: null },
@@ -10,6 +10,8 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     suggestedIncome: { type: Number, default: 0 },
     savingsTargetRate: { type: Number, default: 25 },
+    recentCycles: { type: Array, default: () => [] },
+    proposal: { type: Object, default: null },
 })
 
 const formatAmount = (amount) => {
@@ -51,15 +53,22 @@ const budgetForm = ref([])
 const expectedIncome = ref(0)
 
 const openStartModal = () => {
+    // Proposition du bilan (module bilan-mensuel) : plafond proposé et raison, sinon le plafond actuel
+    const proposed = Object.fromEntries((props.proposal?.categories ?? []).map(p => [p.id, p]))
     budgetForm.value = props.categories.map(c => ({
         id: c.id,
         name: c.name,
         color: c.color,
-        budget_limit: c.budget_limit ?? 0,
+        budget_limit: proposed[c.id]?.proposed ?? c.budget_limit ?? 0,
+        reason: proposed[c.id] && proposed[c.id].rule !== 'unchanged' ? proposed[c.id].reason : '',
     }))
-    expectedIncome.value = props.suggestedIncome || 0
+    expectedIncome.value = (props.proposal?.has_history && props.proposal.expected_income) || props.suggestedIncome || 0
     showStartModal.value = true
 }
+
+onMounted(() => {
+    if (props.proposal) openStartModal()
+})
 
 const totalBudgetPreview = computed(() =>
     budgetForm.value.reduce((sum, c) => sum + (Number(c.budget_limit) || 0), 0)
@@ -161,6 +170,9 @@ const closeCycle = () => {
                         <h2 class="text-lg font-semibold text-theme-text-primary">{{ activeCycle.period_name }}</h2>
                     </div>
                     <div class="flex items-center gap-2">
+                        <Link :href="`/budget-cycles/${activeCycle.id}/bilan`" class="inline-flex items-center gap-1 min-h-[44px] px-3 text-sm border border-theme-border rounded-md text-theme-text-secondary hover:text-theme-text-primary">
+                            <ChartBarIcon class="w-4 h-4" aria-hidden="true" /> Bilan
+                        </Link>
                         <button
                             @click="closeCycle"
                             :disabled="closingCycle"
@@ -227,6 +239,18 @@ const closeCycle = () => {
                 </button>
             </div>
 
+            <!-- Bilans des cycles clôturés (module bilan-mensuel) -->
+            <div v-if="recentCycles.length > 0">
+                <h2 class="text-sm font-semibold text-theme-text-primary mb-3">Bilans</h2>
+                <div class="glass-card divide-y divide-theme-border">
+                    <Link v-for="c in recentCycles" :key="c.id" :href="`/budget-cycles/${c.id}/bilan`"
+                        class="flex items-center justify-between gap-3 min-h-[44px] px-4 py-2 hover:bg-theme-surface transition-colors">
+                        <span class="text-sm text-theme-text-primary">{{ c.period_name }}</span>
+                        <span class="inline-flex items-center gap-1 text-xs text-theme-text-secondary"><ChartBarIcon class="w-4 h-4" aria-hidden="true" /> Bilan</span>
+                    </Link>
+                </div>
+            </div>
+
             <!-- Historique des clôtures -->
             <div v-if="closures.length > 0">
                 <h2 class="text-sm font-semibold text-theme-text-primary mb-3">Historique des clôtures</h2>
@@ -282,8 +306,8 @@ const closeCycle = () => {
                             Le cycle actuel sera clôturé automatiquement.
                         </p>
                     </div>
-                    <button @click="showStartModal = false" class="text-theme-text-secondary hover:text-theme-text-primary">
-                        <XMarkIcon class="w-5 h-5" />
+                    <button @click="showStartModal = false" class="inline-flex items-center justify-center w-11 h-11 -m-2 text-theme-text-secondary hover:text-theme-text-primary" aria-label="Fermer">
+                        <XMarkIcon class="w-5 h-5" aria-hidden="true" />
                     </button>
                 </div>
 
@@ -353,13 +377,17 @@ const closeCycle = () => {
                         class="flex items-center gap-3"
                     >
                         <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" :style="{ backgroundColor: cat.color || '#71717A' }"></div>
-                        <label class="flex-1 min-w-0 text-sm text-theme-text-primary truncate">{{ cat.name }}</label>
+                        <label :for="`budget-${cat.id}`" class="flex-1 min-w-0 text-sm text-theme-text-primary">
+                            <span class="block truncate">{{ cat.name }}</span>
+                            <span v-if="cat.reason" class="block text-xs text-theme-text-muted">{{ cat.reason }}</span>
+                        </label>
                         <div class="relative flex-shrink-0 w-36">
                             <input
+                                :id="`budget-${cat.id}`"
                                 v-model.number="cat.budget_limit"
                                 type="number"
                                 min="0"
-                                class="w-full bg-theme-surface border border-theme-border rounded-md pl-3 pr-12 py-2 text-sm text-right text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
+                                class="w-full min-h-[44px] bg-theme-surface border border-theme-border rounded-md pl-3 pr-12 py-2 text-sm text-right text-theme-text-primary focus:border-theme-text-primary focus:ring-0 outline-none"
                             />
                             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-theme-text-muted pointer-events-none">FCFA</span>
                         </div>
