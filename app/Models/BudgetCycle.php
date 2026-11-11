@@ -95,6 +95,13 @@ class BudgetCycle extends Model
             ->sum('amount');
     }
 
+    /** Cycle clôturé : seul le dépensé suit une opération modifiée (module dette-qualite, P12). */
+    public function refreshSpent(): void
+    {
+        $this->total_spent = $this->calculateTotalSpent();
+        $this->save();
+    }
+
     /**
      * Met à jour les totaux du cycle
      */

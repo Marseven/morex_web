@@ -57,6 +57,20 @@ class Transaction extends Model
 
     public const STATUS_PENDING = 'pending_validation';
 
+    /** Champs qui changent le solde rapproché : les modifier dépointe l'opération (module dette-qualite). */
+    public const MATERIAL_FIELDS = ['amount', 'type', 'account_id', 'transfer_to_account_id', 'date'];
+
+    /** Dépointe une opération rapprochée dont un champ matériel change ; vrai si elle vient d'être dépointée. */
+    public function unpointIfMaterialChange(): bool
+    {
+        if ($this->reconciled_at === null || ! $this->isDirty(self::MATERIAL_FIELDS)) {
+            return false;
+        }
+        $this->reconciled_at = null;
+
+        return true;
+    }
+
     /**
      * Opérations comptées dans les revenus et dépenses (module revenus-transit, RM-1) :
      * hors attente, hors écarts de rapprochement, hors catégories en transit. Le pro reste compté.
@@ -118,19 +132,29 @@ class Transaction extends Model
 
     protected static function booted(): void
     {
-        $updateBudgetCycle = function (Transaction $transaction) {
-            if (in_array($transaction->type, ['expense', 'income'])) {
-                $activeCycle = BudgetCycle::where('user_id', $transaction->user_id)
-                    ->where('status', 'active')
-                    ->whereDate('start_date', '<=', $transaction->date)
-                    ->where(function ($q) use ($transaction) {
-                        $q->whereNull('end_date')
-                            ->orWhereDate('end_date', '>=', $transaction->date);
-                    })
-                    ->first();
-                $activeCycle?->updateTotals();
+        // Recalcule le cycle qui contient une date : totaux complets pour le cycle actif,
+        // dépensé seul pour un cycle clôturé (son budget reste celui de la clôture). P12 : ancienne et nouvelle date.
+        $refreshCycleAt = function (Transaction $transaction, $date) {
+            if ($date === null || ! in_array($transaction->type, ['expense', 'income']) && ! in_array($transaction->getOriginal('type'), ['expense', 'income'])) {
+                return;
+            }
+            BudgetCycle::where('user_id', $transaction->user_id)
+                ->whereDate('start_date', '<=', $date)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $date))
+                ->get()
+                ->each(fn (BudgetCycle $cycle) => $cycle->status === 'active' ? $cycle->updateTotals() : $cycle->refreshSpent());
+        };
+        $updateBudgetCycle = function (Transaction $transaction) use ($refreshCycleAt) {
+            $refreshCycleAt($transaction, $transaction->date);
+            if ($transaction->wasChanged('date')) {
+                $refreshCycleAt($transaction, $transaction->getOriginal('date'));
             }
         };
+
+        // Ne rien renvoyer : un false renvoyé par « updating » annulerait la mise à jour
+        static::updating(function (Transaction $transaction): void {
+            $transaction->unpointIfMaterialChange();
+        });
 
         /**
          * Applique les ajustements de solde pour une transaction (source + destination pour les transferts).
