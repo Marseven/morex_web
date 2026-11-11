@@ -39,6 +39,10 @@ on:
   schedule:
     - cron: '0 6 * * 1'
 
+# Moindre privilège (ajouté pour morex_web, revue de sécurité du module dette-qualite)
+permissions:
+  contents: read
+
 jobs:
   version-de-php:
     name: Version de PHP
@@ -51,7 +55,7 @@ jobs:
       AVIS: "CERT-EU 2026-018 (CVE-2026-109618, CVE-2026-109619, CVSS 9.2)"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Une fonction partagée par les deux contrôles : « cette version est-elle
       # corrigée ? ». Écrite une fois, appelée deux fois.

@@ -1,0 +1,7 @@
+# Mise à jour des actions épinglées par SHA (module dette-qualite)
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
