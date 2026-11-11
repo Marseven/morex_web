@@ -32,7 +32,7 @@ final class PlannedPurchaseController extends Controller
                 ->where('planned_for', '>=', $from->toDateString())
                 ->orderBy('planned_for')->orderBy('created_at')
                 ->limit(100)->get()->map(fn (PlannedPurchase $p) => $this->row($p)),
-            'outOfList' => $this->purchases->outOfList($user)->take(50)->map(fn (Transaction $t) => [
+            'outOfList' => $this->purchases->outOfList($user)->map(fn (Transaction $t) => [
                 'id' => $t->id, 'amount' => $t->amount, 'label' => $t->beneficiary ?: ($t->description ?: 'Dépense'),
                 'date' => $t->date->toDateString(),
             ])->values(),

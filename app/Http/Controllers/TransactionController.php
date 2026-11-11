@@ -10,6 +10,7 @@ use App\Services\PlannedPurchaseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -140,19 +141,24 @@ class TransactionController extends Controller
         $acceptOutOfList = ($validated['out_of_list'] ?? null) === 'accept';
         unset($validated['planned_purchase_id'], $validated['out_of_list']);
 
-        DB::transaction(function () use ($request, $validated, $purchaseId, $acceptOutOfList) {
-            $transaction = $request->user()->transactions()->create($validated);
-            if ($transaction->type !== 'expense') {
-                return;
-            }
+        try {
+            DB::transaction(function () use ($request, $validated, $purchaseId, $acceptOutOfList) {
+                $transaction = $request->user()->transactions()->create($validated);
+                $purchases = app(PlannedPurchaseService::class);
+                if (! $purchases->isSubjectToRule($transaction) && $purchaseId === null) {
+                    return;
+                }
 
-            $purchases = app(PlannedPurchaseService::class);
-            if ($purchaseId !== null) {
-                $purchases->link(PlannedPurchase::findOrFail($purchaseId), $transaction);
-            } elseif ($acceptOutOfList && $transaction->amount >= PlannedPurchaseService::THRESHOLD) {
-                $purchases->acceptUnplanned($transaction);
-            }
-        });
+                if ($purchaseId !== null && $transaction->type === 'expense') {
+                    $purchases->link(PlannedPurchase::findOrFail($purchaseId), $transaction);
+                } elseif ($acceptOutOfList) {
+                    $purchases->acceptUnplanned($transaction);
+                }
+            });
+        } catch (\DomainException) {
+            // Achat devenu indisponible entre l'affichage et l'envoi : rien n'est enregistré
+            throw ValidationException::withMessages(['planned_purchase_id' => "Cet achat prévu n'est plus disponible."]);
+        }
 
         return redirect()->route('transactions.index')
             ->with('success', 'Transaction créée avec succès.');

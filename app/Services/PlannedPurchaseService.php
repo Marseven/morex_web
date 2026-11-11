@@ -9,6 +9,7 @@ use App\Models\PlannedPurchase;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 
@@ -60,27 +61,65 @@ final class PlannedPurchaseService
         return $this->plan($user, ['planned_for' => $this->nextPeriodStart($user)->toDateString()] + $data);
     }
 
-    /** RM-4 : lie l'achat à l'opération réalisée. */
+    /**
+     * RM-4 : lie l'achat à l'opération réalisée.
+     * Mise à jour gardée (status planned, sans lien) : deux envois simultanés ne peuvent pas lier le même achat.
+     */
     public function link(PlannedPurchase $purchase, Transaction $transaction): void
     {
         if ($purchase->user_id !== $transaction->user_id) {
             throw new \DomainException('FOREIGN_TRANSACTION');
         }
-        if ($purchase->transaction_id !== null || PlannedPurchase::where('transaction_id', $transaction->id)->exists()) {
-            throw new \DomainException('ALREADY_LINKED');
-        }
 
-        $purchase->forceFill([
-            'status' => PlannedPurchase::STATUS_BOUGHT,
-            'transaction_id' => $transaction->id,
-            'bought_at' => now(),
-        ]);
+        $values = ['status' => PlannedPurchase::STATUS_BOUGHT, 'transaction_id' => $transaction->id, 'bought_at' => now()];
 
         try {
-            $purchase->save();
+            $updated = PlannedPurchase::whereKey($purchase->id)
+                ->where('user_id', $transaction->user_id)
+                ->where('status', PlannedPurchase::STATUS_PLANNED)
+                ->whereNull('transaction_id')
+                ->update($values + ['updated_at' => now()]);
         } catch (UniqueConstraintViolationException) {
+            throw new \DomainException('ALREADY_LINKED'); // l'opération est déjà liée à un autre achat
+        }
+
+        if ($updated !== 1) {
             throw new \DomainException('ALREADY_LINKED');
         }
+
+        $purchase->forceFill($values)->syncOriginal();
+    }
+
+    /** RM-1 : la règle ne vise que les dépenses au-dessus du seuil, de nature courante (ni transit ni pro). */
+    public function isSubjectToRule(Transaction $transaction): bool
+    {
+        if ($transaction->type !== 'expense' || $transaction->amount < self::THRESHOLD) {
+            return false;
+        }
+
+        return $transaction->category_id === null
+            || Category::whereKey($transaction->category_id)->where('nature', Category::NATURE_REGULAR)->exists();
+    }
+
+    /** Une opération supprimée ou qui n'est plus une dépense libère son achat : prévu rouvert, hors liste annulé. */
+    public function releaseFor(Transaction $transaction): void
+    {
+        PlannedPurchase::where('transaction_id', $transaction->id)->get()->each(fn (PlannedPurchase $p) => $p->forceFill([
+            'status' => $p->unplanned ? PlannedPurchase::STATUS_CANCELLED : PlannedPurchase::STATUS_PLANNED,
+            'transaction_id' => null,
+            'bought_at' => null,
+        ])->save());
+    }
+
+    /** Rattrapage des chemins sans événements (synchro) : liens vers une opération supprimée ou devenue autre chose. */
+    public function releaseOrphans(User $user): void
+    {
+        Transaction::withTrashed()
+            ->where('user_id', $user->id)
+            ->whereIn('id', PlannedPurchase::where('user_id', $user->id)->whereNotNull('transaction_id')->select('transaction_id'))
+            ->where(fn ($q) => $q->whereNotNull('deleted_at')->orWhere('type', '!=', 'expense'))
+            ->get()
+            ->each(fn (Transaction $t) => $this->releaseFor($t));
     }
 
     /** RM-3 « Acheter quand même » : trace d'un achat hors liste assumé. */
@@ -92,18 +131,18 @@ final class PlannedPurchaseService
             'category_id' => $transaction->category_id,
             'planned_for' => $transaction->date->toDateString(),
         ]);
-        $purchase->forceFill(['user_id' => $transaction->user_id, 'unplanned' => true, 'status' => PlannedPurchase::STATUS_PLANNED]);
-        $this->link($purchase, $transaction);
+        $purchase->forceFill([
+            'user_id' => $transaction->user_id, 'unplanned' => true, 'status' => PlannedPurchase::STATUS_BOUGHT,
+            'transaction_id' => $transaction->id, 'bought_at' => now(),
+        ]);
+
+        try {
+            $purchase->save();
+        } catch (UniqueConstraintViolationException) {
+            throw new \DomainException('ALREADY_LINKED');
+        }
 
         return $purchase;
-    }
-
-    /** Achats prévus encore ouverts et déjà permis (période en cours ou antérieure), même catégorie ou sans catégorie. */
-    public function candidates(User $user, ?string $categoryId): Collection
-    {
-        return $this->openPurchases($user)
-            ->filter(fn (PlannedPurchase $p) => $p->category_id === null || $p->category_id === $categoryId)
-            ->values();
     }
 
     /** Achats encore ouverts et déjà permis, toutes catégories (la saisie filtre selon la catégorie choisie). */
@@ -120,7 +159,12 @@ final class PlannedPurchaseService
     }
 
     /** RM-1 / RM-3 : dépenses de la période au-dessus du seuil, de nature courante, liées à aucun achat. */
-    public function outOfList(User $user): Collection
+    public function outOfList(User $user, int $limit = 50): Collection
+    {
+        return $this->outOfListQuery($user)->orderByDesc('date')->limit($limit)->get();
+    }
+
+    private function outOfListQuery(User $user): Builder
     {
         [$from, $to] = $this->period($user);
 
@@ -131,9 +175,7 @@ final class PlannedPurchaseService
             ->where(fn ($q) => $q->whereNull('category_id')->orWhereNotIn('category_id', Category::withTrashed()->select('id')->where('nature', '!=', Category::NATURE_REGULAR)))
             ->whereNotIn('id', PlannedPurchase::withTrashed()->whereNotNull('transaction_id')->select('transaction_id'))
             ->where('date', '>=', $from->toDateString())
-            ->when($to, fn ($q) => $q->where('date', '<=', $to->toDateString().' 23:59:59'))
-            ->orderByDesc('date')
-            ->get();
+            ->when($to, fn ($q) => $q->where('date', '<=', $to->toDateString().' 23:59:59'));
     }
 
     /** Résumé du cycle pour la carte et la page. */
@@ -148,21 +190,23 @@ final class PlannedPurchaseService
             ->when($to, fn ($q) => $q->where('planned_for', '<=', $to->toDateString()))
             ->get();
         $bought = $inPeriod->where('status', PlannedPurchase::STATUS_BOUGHT);
-        $outOfList = $this->outOfList($user);
+        $outOfList = $this->outOfListQuery($user);
 
         return [
             'planned_count' => $inPeriod->count(),
             'bought_count' => $bought->count(),
             'planned_total' => (int) $inPeriod->sum('estimated_amount'),
             'spent_total' => (int) $bought->sum(fn (PlannedPurchase $p) => $p->transaction?->amount ?? 0),
-            'out_of_list_count' => $outOfList->count(),
-            'out_of_list_total' => (int) $outOfList->sum('amount'),
+            'out_of_list_count' => (clone $outOfList)->count(),
+            'out_of_list_total' => (int) (clone $outOfList)->sum('amount'),
             'unplanned_count' => PlannedPurchase::where('user_id', $user->id)->where('unplanned', true)
-                ->where('planned_for', '>=', $from->toDateString())->count(),
+                ->where('status', '!=', PlannedPurchase::STATUS_CANCELLED)
+                ->where('planned_for', '>=', $from->toDateString())
+                ->when($to, fn ($q) => $q->where('planned_for', '<=', $to->toDateString()))->count(),
             'late' => PlannedPurchase::where('user_id', $user->id)
                 ->where('status', PlannedPurchase::STATUS_PLANNED)
                 ->where('planned_for', '<', $from->toDateString())
-                ->orderBy('planned_for')->get(),
+                ->orderBy('planned_for')->limit(20)->get(),
         ];
     }
 }

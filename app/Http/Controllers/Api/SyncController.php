@@ -14,6 +14,7 @@ use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Services\BudgetAlertService;
+use App\Services\PlannedPurchaseService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -197,6 +198,7 @@ class SyncController extends Controller
         // Les données sont validées : une erreur ici ne doit pas faire rejouer la synchro.
         try {
             app(BudgetAlertService::class)->checkUser($user);
+            app(PlannedPurchaseService::class)->releaseOrphans($user);
         } catch (\Throwable $e) {
             report($e);
         }

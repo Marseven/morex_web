@@ -6,6 +6,7 @@ use App\Contracts\PushNotifier;
 use App\Models\BudgetCycle;
 use App\Models\Transaction;
 use App\Services\BudgetAlertService;
+use App\Services\PlannedPurchaseService;
 use App\Services\WebPushNotifier;
 use Illuminate\Support\ServiceProvider;
 use Minishlink\WebPush\WebPush;
@@ -37,6 +38,14 @@ class AppServiceProvider extends ServiceProvider
         // Un cycle créé, clôturé ou supprimé change la période des plafonds
         BudgetCycle::saved(fn () => app(BudgetAlertService::class)->forgetPeriods());
         BudgetCycle::deleted(fn () => app(BudgetAlertService::class)->forgetPeriods());
+
+        // Achats prévus : une opération supprimée ou qui n'est plus une dépense libère son achat
+        Transaction::deleted(fn (Transaction $t) => app(PlannedPurchaseService::class)->releaseFor($t));
+        Transaction::updated(function (Transaction $t) {
+            if ($t->wasChanged('type') && $t->type !== 'expense') {
+                app(PlannedPurchaseService::class)->releaseFor($t);
+            }
+        });
 
         Transaction::saved(function (Transaction $transaction) {
             $relevant = $transaction->wasRecentlyCreated

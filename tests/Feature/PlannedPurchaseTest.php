@@ -140,8 +140,8 @@ class PlannedPurchaseTest extends TestCase
         $this->plan('Veste', 70000, '2026-12-01'); // cycle suivant : pas encore permis
         $other = Category::factory()->create(['user_id' => $this->user->id, 'type' => 'expense']);
 
-        $this->assertSame(['Chaussures'], $this->service->candidates($this->user, $this->clothes->id)->pluck('name')->all());
-        $this->assertCount(0, $this->service->candidates($this->user, $other->id));
+        $this->assertSame(['Chaussures'], $this->service->openPurchases($this->user)->pluck('name')->all());
+        unset($other);
     }
 
     public function test_summary_counts_the_period(): void
@@ -284,5 +284,107 @@ class PlannedPurchaseTest extends TestCase
                 ->where('purchases.0.bought_on', '2026-11-11')
                 ->where('purchases.1.planned_for', '2026-12-01')
             );
+    }
+
+    // --- Revue de code ---
+
+    public function test_a_purchase_bought_meanwhile_cannot_be_linked_again(): void
+    {
+        $purchase = $this->plan();
+        $stale = PlannedPurchase::find($purchase->id); // lu avant que l'autre envoi ne l'achète
+        $this->service->link($purchase, $this->spend(45000));
+
+        $this->expectException(\DomainException::class);
+        $this->service->link($stale, $this->spend(46000));
+    }
+
+    public function test_a_purchase_bought_between_display_and_save_returns_a_validation_error(): void
+    {
+        $purchase = $this->plan();
+        // Un autre envoi achète l'achat entre la validation et le lien
+        Transaction::created(function (Transaction $t) use ($purchase) {
+            if ($t->amount === 47000) {
+                PlannedPurchase::whereKey($purchase->id)->update(['status' => PlannedPurchase::STATUS_BOUGHT]);
+            }
+        });
+
+        $this->actingAs($this->user)->post('/transactions', $this->entry(['planned_purchase_id' => $purchase->id]))
+            ->assertSessionHasErrors('planned_purchase_id');
+        $this->assertSame(0, Transaction::where('amount', 47000)->count());
+    }
+
+    public function test_deleting_the_operation_reopens_the_purchase(): void
+    {
+        $purchase = $this->plan();
+        $tx = $this->spend(45000);
+        $this->service->link($purchase, $tx);
+        $assumed = $this->service->acceptUnplanned($other = $this->spend(60000));
+
+        $tx->delete();
+        $other->delete();
+
+        $purchase->refresh();
+        $this->assertSame([PlannedPurchase::STATUS_PLANNED, null], [$purchase->status, $purchase->transaction_id]);
+        $this->assertSame(PlannedPurchase::STATUS_CANCELLED, $assumed->fresh()->status);
+    }
+
+    public function test_an_operation_turned_into_income_releases_its_purchase(): void
+    {
+        $purchase = $this->plan();
+        $tx = $this->spend(45000);
+        $this->service->link($purchase, $tx);
+
+        $tx->update(['type' => 'income']);
+
+        $this->assertSame(PlannedPurchase::STATUS_PLANNED, $purchase->fresh()->status);
+    }
+
+    public function test_orphans_left_by_the_sync_are_released(): void
+    {
+        $purchase = $this->plan();
+        $tx = $this->spend(45000);
+        $this->service->link($purchase, $tx);
+        Transaction::withoutEvents(fn () => $tx->delete());
+
+        $this->service->releaseOrphans($this->user);
+
+        $this->assertSame(PlannedPurchase::STATUS_PLANNED, $purchase->fresh()->status);
+    }
+
+    public function test_a_bought_purchase_cannot_be_cancelled(): void
+    {
+        $purchase = $this->plan();
+        $this->service->link($purchase, $this->spend(45000));
+
+        $this->actingAs($this->user)->delete('/purchases/'.$purchase->id)->assertStatus(422);
+        $this->delete('/purchases/'.$purchase->id);
+        $this->assertSame(PlannedPurchase::STATUS_BOUGHT, $purchase->fresh()->status);
+    }
+
+    public function test_guests_and_strangers_cannot_cancel(): void
+    {
+        $purchase = $this->plan();
+
+        $this->delete('/purchases/'.$purchase->id)->assertRedirect('/login');
+        $this->actingAs(User::factory()->create())->delete('/purchases/'.$purchase->id)->assertForbidden();
+        $this->assertSame(PlannedPurchase::STATUS_PLANNED, $purchase->fresh()->status);
+    }
+
+    public function test_buying_anyway_leaves_no_trace_under_the_threshold_or_outside_regular(): void
+    {
+        $pro = Category::factory()->create(['user_id' => $this->user->id, 'type' => 'expense']);
+        $pro->forceFill(['nature' => 'pro'])->save();
+
+        $this->actingAs($this->user)->post('/transactions', $this->entry(['amount' => 20000, 'out_of_list' => 'accept']));
+        $this->actingAs($this->user)->post('/transactions', $this->entry(['amount' => 90000, 'category_id' => $pro->id, 'out_of_list' => 'accept']));
+
+        $this->assertSame(0, PlannedPurchase::count());
+    }
+
+    public function test_unplanned_purchases_of_another_period_are_not_counted(): void
+    {
+        $this->service->acceptUnplanned($this->spend(60000, extra: ['date' => '2026-12-05']));
+
+        $this->assertSame(0, $this->service->summary($this->user)['unplanned_count']);
     }
 }
