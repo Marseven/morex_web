@@ -38,7 +38,7 @@ class SmsPendingTransactionTest extends TestCase
     public function test_pending_sms_transaction_leaves_the_balance_untouched(): void
     {
         [$user, $account] = $this->userWithAccount();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['*']); // jeton complet, comme celui de l'app
 
         $this->postSms()->assertCreated();
 
@@ -48,7 +48,7 @@ class SmsPendingTransactionTest extends TestCase
     public function test_validating_a_pending_transaction_applies_it_once(): void
     {
         [$user, $account] = $this->userWithAccount();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['*']); // jeton complet, comme celui de l'app
         $transactionId = $this->postSms()->json('transaction_id');
 
         $this->actingAs($user)->post("/transactions/{$transactionId}/validate");
@@ -59,7 +59,7 @@ class SmsPendingTransactionTest extends TestCase
     public function test_deleting_a_pending_transaction_leaves_the_balance_untouched(): void
     {
         [$user, $account] = $this->userWithAccount();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['*']); // jeton complet, comme celui de l'app
         $transactionId = $this->postSms()->json('transaction_id');
 
         Transaction::find($transactionId)->delete();
@@ -91,7 +91,7 @@ class SmsPendingTransactionTest extends TestCase
     public function test_the_same_sms_received_twice_creates_a_single_transaction(): void
     {
         [$user] = $this->userWithAccount();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['*']); // jeton complet, comme celui de l'app
 
         $first = $this->postSms()->assertCreated();
         $second = $this->postSms()->assertOk()->assertJsonPath('duplicate', true);

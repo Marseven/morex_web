@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\TransferController;
 use App\Http\Controllers\Api\WebhookController;
+use App\Http\Middleware\EnsureFullAccessToken;
+use App\Services\SmsShortcutService;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -36,7 +38,12 @@ Route::middleware('throttle:5,1')->group(function () {
 });
 
 // Routes protégées (nécessitent authentification)
-Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+// Raccourci iOS (module sms-iphone) : jeton complet ou jeton restreint « sms:webhook »
+Route::post('/webhook/sms', [WebhookController::class, 'sms'])
+    ->middleware(['auth:sanctum', 'abilities:'.SmsShortcutService::ABILITY, 'throttle:30,1'])
+    ->name('api.webhook.sms');
+
+Route::middleware(['auth:sanctum', 'throttle:60,1', EnsureFullAccessToken::class])->group(function () {
     // Utilisateur
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -92,7 +99,6 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/sync/push', [SyncController::class, 'push']);
 
     // Webhook SMS
-    Route::post('/webhook/sms', [WebhookController::class, 'sms'])->name('api.webhook.sms');
 
     // Cycles budgétaires
     Route::get('/budget-settings', [BudgetCycleController::class, 'getSettings']);

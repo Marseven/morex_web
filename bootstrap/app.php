@@ -15,6 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
 
+        // Capacités des jetons Sanctum (module sms-iphone : jeton du Raccourci)
+        $middleware->alias([
+            'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+        ]);
+
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
