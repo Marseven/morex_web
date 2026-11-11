@@ -5,7 +5,8 @@
 ## 1. Créer le jeton (une fois)
 1. Morex web → **Profil** → carte « Raccourci SMS » → **Créer le jeton**.
 2. Copiez le **jeton** et l'**URL du webhook** : le jeton n'est affiché qu'une seule fois.
-3. Ce jeton ne sert qu'à envoyer des SMS : il ne donne accès à aucune autre donnée, et le Profil permet de le révoquer.
+3. Ce jeton ne sert qu'à envoyer des SMS. Il ne permet ni de lire ni de modifier vos comptes : un SMS peut seulement créer une opération en attente, ou pointer une opération de **même montant**. Le Profil permet de le révoquer, et changer de mot de passe le révoque aussi.
+4. La création demande votre mot de passe.
 
 ## 2. Créer l'automatisation (app Raccourcis)
 1. Onglet **Automatisation** → **+** → **Message**.
@@ -20,8 +21,8 @@
 
 ## 3. Vérifier
 - Envoyez-vous un SMS de test ou attendez le prochain SMS bancaire, puis ouvrez Morex :
-  - opération déjà saisie : elle apparaît **pointée** ;
-  - sinon : elle apparaît dans **Transactions → En attente**.
+  - opération déjà saisie, au **même montant** : elle apparaît **pointée** ;
+  - sinon (montant différent, par exemple avec des frais) : elle apparaît dans **Transactions → En attente**, et les frais se valident dans l'app.
 - La carte du Profil affiche la date du **dernier SMS reçu**.
 
 ## En cas de problème

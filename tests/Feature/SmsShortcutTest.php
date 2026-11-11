@@ -118,7 +118,8 @@ class SmsShortcutTest extends TestCase
 
     public function test_the_profile_issues_shows_once_then_revokes(): void
     {
-        $this->actingAs($this->user)->post('/profile/sms-token')->assertRedirect()
+        $this->actingAs($this->user)->post('/profile/sms-token')->assertSessionHasErrors('password');
+        $this->actingAs($this->user)->post('/profile/sms-token', ['password' => 'password'])->assertRedirect()
             ->assertSessionHas('sms_token');
         $this->actingAs($this->user)->get('/profile')
             ->assertInertia(fn ($page) => $page->where('smsShortcut.active', true)->missing('smsShortcut.token'));
@@ -136,5 +137,81 @@ class SmsShortcutTest extends TestCase
         }
 
         $this->postSms($token, self::sms(99))->assertStatus(429);
+    }
+
+    // --- Revue de sécurité ---
+
+    private function noted(int $amount): Transaction
+    {
+        $tx = new Transaction(['amount' => $amount, 'type' => 'expense', 'account_id' => $this->airtel->id, 'date' => now()->toDateString(), 'beneficiary' => 'note']);
+        $tx->user_id = $this->user->id;
+        $tx->save();
+
+        return $tx;
+    }
+
+    public function test_an_sms_with_a_gap_never_creates_confirmed_fees(): void
+    {
+        $noted = $this->noted(15000); // SMS de 15 500 : écart de 500, des frais possibles
+
+        $this->postSms($this->shortcutToken())->assertCreated();
+
+        $this->assertNull($noted->fresh()->reconciled_at);
+        $this->assertSame(0, Transaction::where('category_id', Category::BANK_FEES_ID)->count());
+        $this->assertSame(1, Transaction::where('status', Transaction::STATUS_PENDING)->count());
+    }
+
+    public function test_an_sms_reference_never_blocks_the_real_statement_line(): void
+    {
+        $this->noted(15500);
+        $this->postSms($this->shortcutToken())->assertOk();
+
+        $this->assertSame('sms:PP261112.1400.A00001', StatementLine::sole()->external_ref);
+        $entry = new \App\DTOs\StatementEntry(0, now()->toDateString(), -15500, 0, 'DIGITECH', 'PP261112.1400.A00001', 'ok', '');
+        $row = app(\App\Services\StatementMatcher::class)->match($this->airtel, [$entry])['lines'][0];
+        $this->assertSame('already_imported', $row['status']); // reconnue, pas dupliquée
+    }
+
+    public function test_an_sms_without_reference_sent_twice_is_pointed_once(): void
+    {
+        $this->noted(15500);
+        $token = $this->shortcutToken();
+        $sms = 'Paiement de 15500F DIGITECH pour achat. Nouveau solde 84500F.';
+
+        $this->postSms($token, $sms)->assertOk();
+        $this->travel(1)->days();
+        $this->postSms($token, $sms)->assertOk(); // doublon reconnu
+
+        $this->assertSame(0, Transaction::where('status', Transaction::STATUS_PENDING)->count());
+    }
+
+    public function test_the_restricted_token_gets_a_minimal_answer(): void
+    {
+        $this->noted(15500);
+
+        $this->postSms($this->shortcutToken())->assertOk()->assertJsonMissingPath('transaction_id')->assertJsonMissingPath('result');
+    }
+
+    public function test_the_shortcut_token_does_not_expire_after_thirty_days(): void
+    {
+        $shortcut = $this->shortcutToken();
+        $api = $this->user->createToken('api-token')->plainTextToken;
+        $this->travel(40)->days();
+
+        $this->postSms($shortcut)->assertCreated();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($api)->getJson('/api/user')->assertUnauthorized();
+    }
+
+    public function test_changing_the_password_revokes_every_token(): void
+    {
+        $this->shortcutToken();
+        $this->user->createToken('api-token');
+
+        $this->actingAs($this->user)->put('/profile/password', [
+            'current_password' => 'password', 'password' => 'N0uveau-mot-de-passe!', 'password_confirmation' => 'N0uveau-mot-de-passe!',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(0, $this->user->tokens()->count());
     }
 }

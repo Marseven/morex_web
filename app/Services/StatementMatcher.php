@@ -155,7 +155,7 @@ final class StatementMatcher
         $query = StatementLine::where('account_id', $account->id);
 
         return $entry->reference !== null
-            ? $query->where('external_ref', $entry->reference)->exists()
+            ? $query->whereIn('external_ref', [$entry->reference, SmsReconciler::REFERENCE_PREFIX.$entry->reference])->exists()
             : $query->whereBetween('date', [$entry->date, $entry->date.' 23:59:59'])
                 ->where('amount', $entry->amount)
                 ->get(['label'])

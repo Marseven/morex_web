@@ -23,6 +23,11 @@ class ProfileController extends Controller
         $user = $request->user();
         $twoFactorData = $this->getTwoFactorData($user);
 
+        // Jeton du Raccourci affiché une fois : l'historique du navigateur est chiffré (pas de réaffichage par « Retour »)
+        if ($request->session()->has('sms_token')) {
+            Inertia::encryptHistory();
+        }
+
         return Inertia::render('Profile/Edit', [
             'user' => $user->only('id', 'name', 'email', 'phone', 'avatar', 'theme'),
             'twoFactor' => $twoFactorData,
@@ -35,6 +40,9 @@ class ProfileController extends Controller
     /** Raccourci SMS : nouveau jeton, montré une seule fois par message flash. */
     public function issueSmsToken(Request $request, SmsShortcutService $shortcut): RedirectResponse
     {
+        // Une session volée ne suffit pas : le mot de passe est redemandé (revue de sécurité)
+        $request->validate(['password' => ['required', 'current_password']]);
+
         return back()->with('sms_token', $shortcut->issue($request->user()))
             ->with('success', 'Jeton du Raccourci créé. Copiez-le maintenant.');
     }
@@ -107,6 +115,8 @@ class ProfileController extends Controller
         $request->user()->update([
             'password' => Hash::make($validated['password']),
         ]);
+        // Nouveau mot de passe : tous les jetons (app iPhone, Raccourci SMS) sont révoqués
+        $request->user()->tokens()->delete();
 
         return back()->with('success', 'Mot de passe mis à jour avec succès.');
     }

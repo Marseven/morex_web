@@ -73,14 +73,10 @@ class WebhookController extends Controller
         }
 
         // Module sms-iphone : une opération déjà saisie (notes du jour) est pointée au lieu d'être dupliquée
-        $reconciled = app(SmsReconciler::class)->reconcile(Account::findOrFail($accountId), $result, now()->toDateString());
+        $reconciled = app(SmsReconciler::class)->reconcile(Account::findOrFail($accountId), $result, now()->toDateString(), $fingerprint);
         if ($reconciled['status'] === SmsReconciler::MATCHED) {
-            return response()->json([
-                'message' => 'Opération déjà saisie : pointée.',
-                'parsed' => true,
-                'matched' => true,
-                'transaction_id' => $reconciled['transaction_id'],
-            ]);
+            return response()->json(['message' => 'Opération déjà saisie : pointée.', 'parsed' => true, 'matched' => true]
+                + ($this->isFullToken($request) ? ['transaction_id' => $reconciled['transaction_id']] : []));
         }
         if ($reconciled['status'] === SmsReconciler::ALREADY_IMPORTED) {
             return response()->json(['message' => 'Déjà importé depuis un relevé.', 'parsed' => true, 'duplicate' => true]);
@@ -105,12 +101,9 @@ class WebhookController extends Controller
             return $this->duplicateResponse($this->findBySmsFingerprint($user->id, $fingerprint));
         }
 
-        return response()->json([
-            'message' => 'Transaction creee en attente de validation.',
-            'parsed' => true,
-            'transaction_id' => $transaction->id,
-            'result' => $result,
-        ], 201);
+        // Jeton du Raccourci (restreint) : réponse minimale, sans identifiant ni contenu analysé
+        return response()->json(['message' => 'Transaction creee en attente de validation.', 'parsed' => true]
+            + ($this->isFullToken($request) ? ['transaction_id' => $transaction->id, 'result' => $result] : []), 201);
     }
 
     private function findBySmsFingerprint(int $userId, string $fingerprint): ?Transaction
@@ -145,5 +138,12 @@ class WebhookController extends Controller
 
         return $user->accounts()->whereRaw("LOWER(name) LIKE ? ESCAPE '!'", ["%{$escaped}%"])
             ->orderBy('created_at')->value('id'); // plusieurs correspondances : toujours la même
+    }
+
+    private function isFullToken(Request $request): bool
+    {
+        $token = $request->user()?->currentAccessToken();
+
+        return ! $token instanceof \Laravel\Sanctum\PersonalAccessToken || $token->can('*');
     }
 }

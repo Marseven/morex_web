@@ -8,12 +8,14 @@ use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Services\BudgetAlertService;
 use App\Services\PlannedPurchaseService;
+use App\Services\SmsShortcutService;
 use App\Services\TransferService;
 use App\Services\WebPushNotifier;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 use Minishlink\WebPush\WebPush;
 
 class AppServiceProvider extends ServiceProvider
@@ -53,6 +55,16 @@ class AppServiceProvider extends ServiceProvider
             if ($t->wasChanged('type') && $t->type !== 'expense') {
                 app(PlannedPurchaseService::class)->releaseFor($t);
             }
+        });
+
+        // Jeton du Raccourci SMS (module sms-iphone) : pas d'expiration globale (le Raccourci ne sait pas se renouveler),
+        // mais révocable et réservé au webhook. Les autres jetons gardent l'expiration de config/sanctum.php.
+        Sanctum::authenticateAccessTokensUsing(function ($token, bool $isValid): bool {
+            if ($token->name === SmsShortcutService::TOKEN_NAME && ! $token->can('*')) {
+                return $token->tokenable !== null && ! ($token->expires_at?->isPast() ?? false);
+            }
+
+            return $isValid;
         });
 
         // Frais de transfert (module transferts-frais) : transfert et dépense liée restent alignés

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
+import { router, useForm, usePage } from '@inertiajs/vue3'
 import { CheckIcon, ClipboardDocumentIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 // Raccourci SMS (module sms-iphone) : jeton réservé au webhook, affiché une seule fois
@@ -22,9 +22,14 @@ const copy = async (value, what) => {
         copied.value = ''
     }
 }
+// Créer ou remplacer le jeton demande le mot de passe (revue de sécurité du module)
+const asking = ref(false)
+const form = useForm({ password: '' })
 const issue = () => {
-    if (props.status.active && !confirm("Créer un nouveau jeton ? L'ancien cessera de fonctionner : il faudra mettre à jour le Raccourci.")) return
-    router.post('/profile/sms-token', {}, { preserveScroll: true })
+    form.post('/profile/sms-token', {
+        preserveScroll: true,
+        onSuccess: () => { asking.value = false; form.reset() },
+    })
 }
 const revoke = () => {
     if (confirm('Révoquer le jeton ? Le Raccourci ne pourra plus envoyer de SMS.')) router.delete('/profile/sms-token', { preserveScroll: true })
@@ -36,7 +41,7 @@ const revoke = () => {
         <div>
             <h2 id="sms-shortcut-title" class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Raccourci SMS (iPhone)</h2>
             <p class="text-sm text-theme-text-muted mt-1">
-                Un Raccourci iOS envoie vos SMS bancaires à Morex. Ce jeton ne sert qu'à cela : il ne donne accès à aucune autre donnée.
+                Un Raccourci iOS envoie vos SMS bancaires à Morex. Ce jeton ne sert qu'à envoyer des SMS : il ne permet ni de lire ni de modifier vos comptes. Un SMS peut seulement créer une opération en attente, ou pointer une opération de même montant.
             </p>
         </div>
 
@@ -62,8 +67,23 @@ const revoke = () => {
             </div>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-            <button type="button" @click="issue" class="min-h-11 px-4 rounded-md bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium">
+        <form v-if="asking" @submit.prevent="issue" class="space-y-2">
+            <label for="sms-token-password" class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider">Mot de passe</label>
+            <input id="sms-token-password" v-model="form.password" type="password" autocomplete="current-password" required
+                :aria-invalid="form.errors.password ? 'true' : 'false'" aria-describedby="sms-token-password-help"
+                class="w-full min-h-11 bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-base text-theme-text-primary focus:border-white focus:ring-0 outline-none" />
+            <p id="sms-token-password-help" class="text-sm text-theme-text-muted">
+                {{ status.active ? "L'ancien jeton cessera de fonctionner : il faudra mettre à jour le Raccourci." : 'Confirmez votre mot de passe pour créer le jeton.' }}
+            </p>
+            <p v-if="form.errors.password" role="alert" class="text-sm text-danger">{{ form.errors.password }}</p>
+            <div class="flex gap-2">
+                <button type="submit" :disabled="form.processing" class="min-h-11 px-4 rounded-md bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium disabled:opacity-50">Confirmer</button>
+                <button type="button" @click="asking = false" class="min-h-11 px-4 rounded-md border border-theme-border text-sm text-theme-text-secondary">Annuler</button>
+            </div>
+        </form>
+
+        <div v-else class="flex flex-wrap gap-2">
+            <button type="button" @click="asking = true" class="min-h-11 px-4 rounded-md bg-theme-btn-primary-bg text-theme-btn-primary-text text-sm font-medium">
                 {{ status.active ? 'Remplacer le jeton' : 'Créer le jeton' }}
             </button>
             <button v-if="status.active" type="button" @click="revoke" class="min-h-11 px-4 rounded-md border border-theme-border text-sm text-theme-text-secondary">Révoquer</button>

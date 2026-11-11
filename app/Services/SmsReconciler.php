@@ -21,25 +21,33 @@ final class SmsReconciler
 
     public const NO_MATCH = 'no_match';
 
+    public const REFERENCE_PREFIX = 'sms:';
+
     public function __construct(
         private readonly StatementMatcher $matcher,
         private readonly StatementService $statements,
     ) {}
 
     /**
+     * Seule une correspondance au **montant exact** pointe sans validation : un écart (frais possibles) ne crée jamais
+     * de frais confirmés depuis un SMS ; l'opération en attente se valide dans l'app (revue de sécurité du module).
+     * La référence enregistrée est préfixée « sms: » (TID, sinon empreinte du SMS) : elle ne bloque jamais l'import
+     * du vrai relevé et reconnaît un SMS renvoyé.
+     *
      * @param  array{amount: int, is_income: bool, beneficiary: ?string, reference: ?string}  $sms  résultat de SmsParser
      * @return array{status: string, transaction_id: ?string}
      */
-    public function reconcile(Account $account, array $sms, string $date): array
+    public function reconcile(Account $account, array $sms, string $date, string $fingerprint): array
     {
         $amount = $sms['is_income'] ? (int) $sms['amount'] : -(int) $sms['amount'];
-        $entry = new StatementEntry(0, $date, $amount, 0, $sms['beneficiary'] ?? null, $sms['reference'] ?? null, 'ok', '');
+        $reference = self::REFERENCE_PREFIX.($sms['reference'] ?? $fingerprint);
+        $entry = new StatementEntry(0, $date, $amount, 0, $sms['beneficiary'] ?? null, $reference, 'ok', '');
         $row = $this->matcher->match($account, [$entry])['lines'][0];
 
         if ($row['status'] === 'already_imported') {
             return ['status' => self::ALREADY_IMPORTED, 'transaction_id' => null];
         }
-        if ($row['status'] !== 'matched') {
+        if ($row['status'] !== 'matched' || (int) ($row['fee'] ?? 0) !== 0) {
             return ['status' => self::NO_MATCH, 'transaction_id' => null];
         }
 
@@ -49,9 +57,9 @@ final class SmsReconciler
                 'transaction_id' => $row['transaction_id'],
                 'date' => $date,
                 'amount' => $amount,
-                'fee' => (int) ($row['fee'] ?? 0),
+                'fee' => 0,
                 'label' => $sms['beneficiary'] ?? null,
-                'reference' => $sms['reference'] ?? null,
+                'reference' => $reference,
             ]], StatementLine::SOURCE_SMS);
         } catch (\Illuminate\Validation\ValidationException) {
             // Opération rapprochée entre-temps : l'appelant retombe sur l'opération en attente

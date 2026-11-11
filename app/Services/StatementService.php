@@ -24,23 +24,19 @@ use Illuminate\Validation\ValidationException;
  */
 final class StatementService
 {
-    /** Origine des lignes enregistrées : paste, csv ou sms (module sms-iphone). */
-    private string $source = 'paste';
-
     /**
      * @param  list<array<string, mixed>>  $lines
      * @return array{matched: int, created: int, ignored: int, fees_count: int, fees_total: int}
      */
     public function apply(Account $account, array $lines, string $source = 'paste'): array
     {
-        $this->source = $source;
 
         $summary = ['matched' => 0, 'created' => 0, 'ignored' => 0, 'fees_count' => 0, 'fees_total' => 0];
 
         try {
-            DB::transaction(function () use ($account, $lines, &$summary) {
+            DB::transaction(function () use ($account, $lines, &$summary, $source) {
                 foreach ($lines as $i => $line) {
-                    $this->applyLine($account, $line, $i, $summary);
+                    $this->applyLine($account, $line, $i, $summary, $source);
                 }
             });
         } catch (UniqueConstraintViolationException) {
@@ -52,7 +48,7 @@ final class StatementService
     }
 
     /** @param  array<string, mixed>  $line */
-    private function applyLine(Account $account, array $line, int $index, array &$summary): void
+    private function applyLine(Account $account, array $line, int $index, array &$summary, string $source): void
     {
         $statement = new StatementLine([
             'account_id' => $account->id,
@@ -61,7 +57,7 @@ final class StatementService
             'fee' => $line['fee'],
             'label' => $line['label'] ?? null,
             'external_ref' => $line['reference'] ?? null,
-            'source' => $this->source,
+            'source' => $source, // paste, csv ou sms (module sms-iphone)
         ]);
         $statement->user_id = $account->user_id;
 
