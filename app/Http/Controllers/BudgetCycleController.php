@@ -78,7 +78,7 @@ class BudgetCycleController extends Controller
 
         $cycle = BudgetCycle::where('user_id', $request->user()->id)->find($cycleId);
 
-        return $cycle ? app(MonthlyReviewService::class)->review($request->user(), $cycle)['proposal'] : null;
+        return $cycle ? app(MonthlyReviewService::class)->proposal($request->user(), $cycle) : null;
     }
 
     /** Bilan d'un cycle et proposition du suivant (module bilan-mensuel, design A). */

@@ -32,10 +32,13 @@ class Category extends Model
 
     public const NATURES = [self::NATURE_REGULAR, self::NATURE_TRANSIT, self::NATURE_PRO];
 
-    /** Somme des plafonds perso d'un utilisateur : dépenses courantes, ni transit ni pro (module revenus-transit). */
+    /**
+     * Somme des plafonds perso d'un utilisateur : ses dépenses courantes, ni transit ni pro (module revenus-transit).
+     * Les catégories système, partagées et non réglables, n'entrent pas dans le budget (module bilan-mensuel).
+     */
     public static function personalBudgetFor(int|string $userId): int
     {
-        return (int) static::where(fn ($q) => $q->where('user_id', $userId)->orWhereNull('user_id'))
+        return (int) static::where('user_id', $userId)
             ->where('type', 'expense')
             ->where('nature', self::NATURE_REGULAR)
             ->whereNotNull('budget_limit')

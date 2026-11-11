@@ -67,7 +67,11 @@ const openStartModal = () => {
 }
 
 onMounted(() => {
-    if (props.proposal) openStartModal()
+    if (props.proposal) {
+        openStartModal()
+        // La proposition ne se rouvre pas à chaque rechargement
+        window.history.replaceState(window.history.state, '', '/budget-cycles')
+    }
 })
 
 const totalBudgetPreview = computed(() =>

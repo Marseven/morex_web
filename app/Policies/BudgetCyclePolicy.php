@@ -11,6 +11,6 @@ final class BudgetCyclePolicy
 {
     public function view(User $user, BudgetCycle $cycle): bool
     {
-        return $user->id === $cycle->user_id;
+        return (int) $user->id === (int) $cycle->user_id;
     }
 }

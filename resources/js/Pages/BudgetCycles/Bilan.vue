@@ -60,7 +60,8 @@ const launchHref = computed(() => `/budget-cycles?proposal=${r.value.cycle.id}`)
                     :aria-label="`Taux d'épargne ${formatRate(r.savings_rate)} %, cible ${r.savings_target_rate} %`">
                     <div class="h-full rounded-full" :class="savingsOk ? 'bg-success' : 'bg-warning'" :style="{ width: `${savingsBar}%` }"></div>
                 </div>
-                <p class="text-sm text-theme-text-secondary tabular-nums">{{ formatRate(r.savings_rate) }} % des revenus · cible {{ r.savings_target_rate }} %</p>
+                <p v-if="r.income > 0" class="text-sm text-theme-text-secondary tabular-nums">{{ formatRate(r.savings_rate) }} % des revenus · cible {{ r.savings_target_rate }} %</p>
+                <p v-else class="text-sm text-theme-text-secondary">Aucun revenu compté sur ce cycle.</p>
                 <dl class="space-y-1 text-sm tabular-nums">
                     <div class="flex justify-between gap-2"><dt class="text-theme-text-secondary">Revenus</dt><dd class="text-theme-text-primary">{{ formatAmount(r.income) }}</dd></div>
                     <div class="flex justify-between gap-2"><dt class="text-theme-text-secondary">Dépenses perso</dt><dd class="text-theme-text-primary">{{ formatAmount(r.personal_spent) }} / {{ formatAmount(r.personal_budget) }}</dd></div>

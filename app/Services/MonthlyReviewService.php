@@ -55,6 +55,12 @@ final class MonthlyReviewService
         $categories = $this->categories($user);
         $spent = $this->spentByCategory($user, $from, $to);
         $rows = $this->rows($categories, $spent);
+        // Catégories système, supprimées ou sans catégorie : regroupées pour que les lignes somment au total perso
+        $other = $personal - (int) $rows->sum('spent');
+        if ($other > 0) {
+            $rows->push(['id' => null, 'name' => 'Autres (sans catégorie, système)', 'discretionary' => false,
+                'spent' => $other, 'limit' => null, 'diff' => null, 'status' => 'none', 'status_rank' => 2]);
+        }
         $savings = $income - $expense;
 
         return [
@@ -77,7 +83,7 @@ final class MonthlyReviewService
                 'budget' => (int) $rows->where('discretionary', true)->sum('limit'),
             ],
             'categories' => $rows->sortBy([['status_rank', 'asc'], ['diff', 'desc']])->values()->map(fn ($r) => collect($r)->except('status_rank')->all())->all(),
-            'proposal' => $this->proposal($user, $cycle, $categories),
+            'proposal' => $this->proposal($user, $cycle),
         ];
     }
 
@@ -126,21 +132,25 @@ final class MonthlyReviewService
         })->filter(fn ($r) => $r['spent'] > 0 || $r['limit'] !== null)->values();
     }
 
-    /** RM-3 / RM-4 : cycle revu et jusqu'à 2 cycles précédents. */
-    private function proposal(User $user, BudgetCycle $cycle, Collection $categories): array
+    /**
+     * RM-3 / RM-4 : proposition du cycle suivant, sur les cycles clôturés (au plus 3, jusqu'au cycle revu).
+     * Un cycle en cours n'est pas complet : il ne compte que pour constater un dépassement déjà acquis.
+     */
+    public function proposal(User $user, BudgetCycle $cycle): array
     {
-        $history = BudgetCycle::where('user_id', $user->id)
+        $closed = BudgetCycle::where('user_id', $user->id)
+            ->where('status', 'closed')
             ->where('start_date', '<=', $cycle->start_date)
             ->orderByDesc('start_date')
             ->limit(self::HISTORY)
             ->get();
-        $periods = $history->map(fn (BudgetCycle $c) => $this->range($c));
-        $spentPerCycle = $periods->map(fn (array $p) => $this->spentByCategory($user, $p[0], $p[1]));
-        $incomes = $periods->map(fn (array $p) => (int) Transaction::where('user_id', $user->id)->counted()->where('type', 'income')
-            ->whereBetween('date', [$p[0]->toDateString(), $p[1]->toDateString().' 23:59:59'])->sum('amount'));
-        $hasHistory = $history->count() > 1 || $incomes->sum() > 0;
+        $closedSpent = $closed->map(fn (BudgetCycle $c) => $this->spentByCategory($user, ...$this->range($c)));
+        $incomes = $closed->map(fn (BudgetCycle $c) => $this->incomeBetween($user, ...$this->range($c)));
+        $running = $cycle->status === 'active' ? $this->spentByCategory($user, ...$this->range($cycle)) : collect();
+        $hasHistory = $closed->isNotEmpty();
 
-        $lines = $categories->map(fn (Category $c) => $this->proposeFor($c, $spentPerCycle->map(fn ($s) => $s[$c->id] ?? 0), $hasHistory))
+        $lines = $this->categories($user)
+            ->map(fn (Category $c) => $this->proposeFor($c, $closedSpent->map(fn ($s) => $s[$c->id] ?? 0), $running[$c->id] ?? 0, $hasHistory))
             ->filter()->values();
         $expectedIncome = $hasHistory ? (int) (round($incomes->avg() / 1000) * 1000) : 0;
         $savingsTarget = (int) Goal::where('user_id', $user->id)->where('status', 'active')->sum('monthly_target');
@@ -148,7 +158,7 @@ final class MonthlyReviewService
 
         return [
             'has_history' => $hasHistory,
-            'cycles' => $history->count(),
+            'cycles' => $closed->count(),
             'expected_income' => $expectedIncome,
             'savings_target' => $savingsTarget,
             'total' => $total,
@@ -157,12 +167,19 @@ final class MonthlyReviewService
         ];
     }
 
-    /** @param Collection<int, int> $spent dépenses par cycle, du plus récent au plus ancien */
-    private function proposeFor(Category $category, Collection $spent, bool $hasHistory): ?array
+    private function incomeBetween(User $user, CarbonImmutable $from, CarbonImmutable $to): int
+    {
+        return (int) Transaction::where('user_id', $user->id)->counted()->where('type', 'income')
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString().' 23:59:59'])->sum('amount');
+    }
+
+    /** @param Collection<int, int> $spent dépenses par cycle clôturé, du plus récent au plus ancien */
+    private function proposeFor(Category $category, Collection $spent, int $running, bool $hasHistory): ?array
     {
         $limit = (int) $category->budget_limit;
         $count = $spent->count();
-        $average = $count > 0 ? $spent->avg() : 0;
+        $average = $count > 0 ? (float) $spent->avg() : 0.0;
+        $roundUp = fn (float $n) => (int) (ceil($n / 1000) * 1000);
         $line = fn (int $proposed, string $rule, string $reason) => [
             'id' => $category->id, 'name' => $category->name, 'current' => $limit ?: null,
             'proposed' => $proposed, 'rule' => $rule, 'reason' => $reason,
@@ -170,17 +187,19 @@ final class MonthlyReviewService
 
         if ($limit <= 0) {
             return $hasHistory && $average > 0
-                ? $line((int) (ceil($average / 1000) * 1000), 'new', "Jamais plafonnée : moyenne des {$count} derniers cycles")
+                ? $line($roundUp($average), 'new', "Jamais plafonnée : moyenne des {$count} derniers cycles")
                 : null;
         }
 
-        $overruns = $spent->filter(fn (int $s) => $s > $limit)->count();
+        $overruns = $spent->filter(fn (int $s) => $s > $limit)->count() + ($running > $limit ? 1 : 0);
+        $observed = $count + ($running > 0 ? 1 : 0);
         if ($overruns >= self::KEEP_AFTER_OVERRUNS) {
-            return $line($limit, 'kept', "Dépassé {$overruns} cycles sur {$count} : plafond maintenu");
+            return $line($limit, 'kept', "Dépassé {$overruns} cycles sur {$observed} : plafond maintenu");
         }
 
-        if ($hasHistory && $spent->every(fn (int $s) => $s * 100 < $limit * self::LOWER_BELOW_PERCENT)) {
-            return $line((int) (ceil($average / 1000) * 1000), 'lowered', 'Sous '.self::LOWER_BELOW_PERCENT." % depuis {$count} cycles : baisse proposée");
+        // Baisse : au moins 2 cycles clôturés, tous sous 70 %, et une moyenne non nulle (un plafond à 0 serait supprimé)
+        if ($count >= self::KEEP_AFTER_OVERRUNS && $average > 0 && $spent->every(fn (int $s) => $s * 100 < $limit * self::LOWER_BELOW_PERCENT)) {
+            return $line(min($limit, max(1000, $roundUp($average))), 'lowered', 'Sous '.self::LOWER_BELOW_PERCENT." % depuis {$count} cycles : baisse proposée");
         }
 
         return $line($limit, 'unchanged', 'Plafond inchangé');

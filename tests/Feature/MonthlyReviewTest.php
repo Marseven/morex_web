@@ -112,21 +112,22 @@ class MonthlyReviewTest extends TestCase
     public function test_the_proposal_follows_the_three_last_cycles(): void
     {
         $free = $this->category('Cadeaux', 'expense');
-        $this->add('expense', 20500, $free, '2026-11-01');
+        $this->add('expense', 20500, $free, '2026-09-01');
 
         $proposal = collect(app(MonthlyReviewService::class)->review($this->user, $this->history())['proposal']['categories'])->keyBy('name');
 
         $this->assertSame([170000, 'kept'], [$proposal['Sorties/Loisirs']['proposed'], $proposal['Sorties/Loisirs']['rule']]);
         $this->assertSame([41000, 'lowered'], [$proposal['Abonnements']['proposed'], $proposal['Abonnements']['rule']]);
         $this->assertSame([120000, 'unchanged'], [$proposal['Alimentation']['proposed'], $proposal['Alimentation']['rule']]);
-        $this->assertSame([7000, 'new'], [$proposal['Cadeaux']['proposed'], $proposal['Cadeaux']['rule']]);
+        $this->assertSame([11000, 'new'], [$proposal['Cadeaux']['proposed'], $proposal['Cadeaux']['rule']]);
     }
 
     public function test_the_expected_income_is_the_recent_average(): void
     {
-        $this->add('income', 300000, $this->salary, '2026-11-15'); // freelance du cycle courant
+        $this->add('income', 300000, $this->salary, '2026-10-01'); // freelance d'un cycle clôturé
+        $this->add('income', 900000, $this->salary, '2026-11-15'); // cycle en cours : hors moyenne
 
-        $this->assertSame(1100000, app(MonthlyReviewService::class)->review($this->user, $this->history())['proposal']['expected_income']);
+        $this->assertSame(1150000, app(MonthlyReviewService::class)->review($this->user, $this->history())['proposal']['expected_income']);
     }
 
     public function test_reading_the_review_changes_nothing(): void
@@ -190,5 +191,62 @@ class MonthlyReviewTest extends TestCase
             );
         $this->actingAs($stranger)->get('/budget-cycles?proposal='.$cycle->id)
             ->assertInertia(fn ($page) => $page->where('proposal', null));
+    }
+
+    // --- Revue de code ---
+
+    public function test_an_unused_cap_is_never_lowered_to_zero(): void
+    {
+        $unused = $this->category('Coiffeur', 'expense', 15000);
+
+        $proposal = collect(app(MonthlyReviewService::class)->review($this->user, $this->history())['proposal']['categories'])->keyBy('name');
+
+        $this->assertSame([15000, 'unchanged'], [$proposal['Coiffeur']['proposed'], $proposal['Coiffeur']['rule']]);
+        unset($unused);
+    }
+
+    public function test_a_lowered_cap_never_rises(): void
+    {
+        $tiny = $this->category('Presse', 'expense', 1500);
+        foreach (['2026-08-26', '2026-09-26'] as $date) {
+            $this->add('expense', 200, $tiny, $date);
+        }
+
+        $line = collect(app(MonthlyReviewService::class)->review($this->user, $this->history())['proposal']['categories'])->firstWhere('name', 'Presse');
+
+        $this->assertLessThanOrEqual(1500, $line['proposed']);
+    }
+
+    public function test_the_running_cycle_never_triggers_a_lowering(): void
+    {
+        $cycle = $this->cycle('2026-10-25', null, 'active');
+        $this->cycle('2026-09-25', '2026-10-24');
+        $this->add('expense', 10000, $this->subscriptions, '2026-10-01');
+
+        $line = collect(app(MonthlyReviewService::class)->review($this->user, $cycle)['proposal']['categories'])->firstWhere('name', 'Abonnements');
+
+        $this->assertSame('unchanged', $line['rule']); // un seul cycle clôturé : pas assez pour baisser
+    }
+
+    public function test_spending_outside_own_categories_shows_as_other(): void
+    {
+        $fees = Category::factory()->create(['user_id' => null, 'is_system' => true, 'type' => 'expense', 'name' => 'Frais bancaires']);
+        $cycle = $this->history();
+        $this->add('expense', 2500, $fees, '2026-11-02');
+
+        $review = app(MonthlyReviewService::class)->review($this->user, $cycle);
+
+        $this->assertSame($review['personal_spent'], collect($review['categories'])->sum('spent'));
+        $this->assertSame(2500, collect($review['categories'])->firstWhere('id', null)['spent']);
+    }
+
+    public function test_a_cycle_without_income_has_a_zero_rate(): void
+    {
+        $cycle = $this->cycle('2026-11-01', null, 'active');
+        $this->add('expense', 5000, $this->food, '2026-11-02');
+
+        $review = app(MonthlyReviewService::class)->review($this->user, $cycle);
+
+        $this->assertSame([0, -5000, 0.0], [$review['income'], $review['savings'], $review['savings_rate']]);
     }
 }
