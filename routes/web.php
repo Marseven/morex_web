@@ -6,11 +6,11 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BatchEntryController;
 use App\Http\Controllers\BudgetCycleController;
 use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\PlannedPurchaseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DebtController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PlannedPurchaseController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReconciliationController;
 use App\Http\Controllers\StatementController;
@@ -106,6 +106,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
     Route::delete('/profile/avatar', [ProfileController::class, 'deleteAvatar'])->name('profile.avatar.delete');
+    Route::post('/profile/sms-token', [ProfileController::class, 'issueSmsToken'])->middleware('throttle:6,1')->name('profile.sms-token.store');
+    Route::delete('/profile/sms-token', [ProfileController::class, 'revokeSmsToken'])->name('profile.sms-token.destroy');
     Route::put('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
 
     // Web Push (notifications PWA)
