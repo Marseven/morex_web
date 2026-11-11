@@ -24,12 +24,17 @@ use Illuminate\Validation\ValidationException;
  */
 final class StatementService
 {
+    /** Origine des lignes enregistrées : paste, csv ou sms (module sms-iphone). */
+    private string $source = 'paste';
+
     /**
      * @param  list<array<string, mixed>>  $lines
      * @return array{matched: int, created: int, ignored: int, fees_count: int, fees_total: int}
      */
-    public function apply(Account $account, array $lines): array
+    public function apply(Account $account, array $lines, string $source = 'paste'): array
     {
+        $this->source = $source;
+
         $summary = ['matched' => 0, 'created' => 0, 'ignored' => 0, 'fees_count' => 0, 'fees_total' => 0];
 
         try {
@@ -56,7 +61,7 @@ final class StatementService
             'fee' => $line['fee'],
             'label' => $line['label'] ?? null,
             'external_ref' => $line['reference'] ?? null,
-            'source' => 'paste',
+            'source' => $this->source,
         ]);
         $statement->user_id = $account->user_id;
 

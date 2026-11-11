@@ -22,6 +22,9 @@ class StatementLine extends Model
 
     public const STATUS_IGNORED = 'ignored';
 
+    /** Ligne venue d'un SMS du Raccourci iOS (module sms-iphone). */
+    public const SOURCE_SMS = 'sms';
+
     protected $fillable = [
         'account_id',
         'date',

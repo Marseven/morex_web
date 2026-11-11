@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\SmsParser;
+use App\Services\SmsReconciler;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -69,6 +70,20 @@ class WebhookController extends Controller
                 'parsed' => true,
                 'result' => $result,
             ], 422);
+        }
+
+        // Module sms-iphone : une opération déjà saisie (notes du jour) est pointée au lieu d'être dupliquée
+        $reconciled = app(SmsReconciler::class)->reconcile(Account::findOrFail($accountId), $result, now()->toDateString());
+        if ($reconciled['status'] === SmsReconciler::MATCHED) {
+            return response()->json([
+                'message' => 'Opération déjà saisie : pointée.',
+                'parsed' => true,
+                'matched' => true,
+                'transaction_id' => $reconciled['transaction_id'],
+            ]);
+        }
+        if ($reconciled['status'] === SmsReconciler::ALREADY_IMPORTED) {
+            return response()->json(['message' => 'Déjà importé depuis un relevé.', 'parsed' => true, 'duplicate' => true]);
         }
 
         $transaction = new Transaction([
