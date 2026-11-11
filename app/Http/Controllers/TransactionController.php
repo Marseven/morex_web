@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\PlannedPurchase;
 use App\Models\Transaction;
 use App\Rules\OwnedOrSystemCategory;
+use App\Services\PlannedPurchaseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -92,9 +94,21 @@ class TransactionController extends Controller
                 ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
 
+        // Achats prévus (module achats-prevus) : candidats à l'association et préremplissage depuis « Acheté »
+        $purchases = app(PlannedPurchaseService::class);
+        $planned = $purchases->openPurchases($request->user())->map->only(['id', 'name', 'estimated_amount', 'category_id'])->values();
+        $prefill = $planned->firstWhere('id', $request->query('planned_purchase_id'));
+
         return Inertia::render('Transactions/Create', [
             'accounts' => $accounts,
             'categories' => $categories,
+            'plannedPurchases' => $planned,
+            'purchaseThreshold' => PlannedPurchaseService::THRESHOLD,
+            'nextPeriodStart' => $purchases->nextPeriodStart($request->user())->toDateString(),
+            'prefill' => $prefill ? [
+                'planned_purchase_id' => $prefill['id'], 'amount' => $prefill['estimated_amount'],
+                'category_id' => $prefill['category_id'], 'beneficiary' => $prefill['name'],
+            ] : null,
         ]);
     }
 
@@ -110,6 +124,10 @@ class TransactionController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['required', 'date'],
             'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:account_id'],
+            // Achats prévus : achat encore ouvert de l'utilisateur, ou « acheter quand même »
+            'planned_purchase_id' => ['nullable', 'uuid', Rule::exists('planned_purchases', 'id')
+                ->where('user_id', $userId)->where('status', PlannedPurchase::STATUS_PLANNED)->whereNull('deleted_at')],
+            'out_of_list' => ['nullable', 'in:accept'],
         ]);
 
         if ($validated['type'] === 'transfer' && ! isset($validated['transfer_to_account_id'])) {
@@ -118,7 +136,23 @@ class TransactionController extends Controller
             ]);
         }
 
-        $request->user()->transactions()->create($validated);
+        $purchaseId = $validated['planned_purchase_id'] ?? null;
+        $acceptOutOfList = ($validated['out_of_list'] ?? null) === 'accept';
+        unset($validated['planned_purchase_id'], $validated['out_of_list']);
+
+        DB::transaction(function () use ($request, $validated, $purchaseId, $acceptOutOfList) {
+            $transaction = $request->user()->transactions()->create($validated);
+            if ($transaction->type !== 'expense') {
+                return;
+            }
+
+            $purchases = app(PlannedPurchaseService::class);
+            if ($purchaseId !== null) {
+                $purchases->link(PlannedPurchase::findOrFail($purchaseId), $transaction);
+            } elseif ($acceptOutOfList && $transaction->amount >= PlannedPurchaseService::THRESHOLD) {
+                $purchases->acceptUnplanned($transaction);
+            }
+        });
 
         return redirect()->route('transactions.index')
             ->with('success', 'Transaction créée avec succès.');
