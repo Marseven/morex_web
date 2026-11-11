@@ -8,6 +8,9 @@ use App\Models\Transaction;
 use App\Services\BudgetAlertService;
 use App\Services\PlannedPurchaseService;
 use App\Services\WebPushNotifier;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Minishlink\WebPush\WebPush;
 
@@ -35,6 +38,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Plafonds (module plafonds-alertes) : toute dépense confirmée recalcule le plafond de sa catégorie.
         // La synchro désactive ces événements et vérifie tout l'utilisateur après validation.
+        // Rotation du jeton (module dette-qualite-mobile) : compteur propre, distinct du throttle du groupe API
+        RateLimiter::for('token-rotate', fn (Request $request) => Limit::perMinute(6)->by('token-rotate:'.($request->user()?->id ?: $request->ip())));
+
         // Un cycle créé, clôturé ou supprimé change la période des plafonds
         BudgetCycle::saved(fn () => app(BudgetAlertService::class)->forgetPeriods());
         BudgetCycle::deleted(fn () => app(BudgetAlertService::class)->forgetPeriods());

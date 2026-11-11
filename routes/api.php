@@ -40,6 +40,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Utilisateur
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    // P15 (module dette-qualite-mobile) : nouveau jeton, l'ancien est révoqué
+    Route::post('/token/rotate', [AuthController::class, 'rotateToken'])->middleware('throttle:token-rotate')->name('api.token.rotate');
 
     // Comptes
     Route::apiResource('accounts', AccountController::class)->names('api.accounts');

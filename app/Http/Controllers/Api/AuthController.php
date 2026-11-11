@@ -275,4 +275,26 @@ class AuthController extends Controller
 
         return null;
     }
+
+    /**
+     * Rotation du jeton d'API (module dette-qualite-mobile, P15) : un nouveau jeton de mêmes capacités,
+     * puis révocation de l'ancien. Un jeton volé ne survit pas à la rotation suivante de l'app.
+     */
+    public function rotateToken(Request $request): JsonResponse
+    {
+        $current = $request->user()->currentAccessToken();
+        $abilities = $current instanceof \Laravel\Sanctum\PersonalAccessToken ? $current->abilities : ['*'];
+
+        $new = $request->user()->createToken('api-token', $abilities);
+        if ($current instanceof \Laravel\Sanctum\PersonalAccessToken) {
+            $current->delete();
+        }
+
+        $minutes = config('sanctum.expiration');
+
+        return response()->json([
+            'token' => $new->plainTextToken,
+            'expires_at' => $minutes ? now()->addMinutes((int) $minutes)->toIso8601String() : null,
+        ]);
+    }
 }
