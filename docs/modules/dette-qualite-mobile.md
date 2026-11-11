@@ -1,4 +1,4 @@
-# Module dette-qualite-mobile (7b)                  statut : en cours · 2026-11-12
+# Module dette-qualite-mobile (7b)                  statut : livré · 2026-11-12
 
 **Conclusion** : on solde la dette de l'app iPhone, sans fonctionnalité nouvelle, et la suite de tests mobile repasse au vert. Au programme :
 - 4 tests périmés ;
@@ -44,3 +44,25 @@ La base locale chiffrée (SQLCipher) demande une nouvelle dépendance native : e
 3. CI mobile sur `ubuntu-latest` (analyse et tests, sans build iOS) ? → *Hypothèse : oui.*
 
 **Hors module** : SQLCipher, build et signature iOS en CI, écrans mobiles 2 ter et 4 bis.
+
+## Livré (7b)
+- **Tests mobiles** : de 89 réussis et 4 en échec à **101 au vert**.
+  - Réalignés : catégories (création refusée sur mobile, sans écriture), dette soldée (`recordPayment`), écran de démarrage (le logo porte le libellé « Morex » lu par VoiceOver).
+  - Ajoutés : `TokenRotationService` (5) et `ApiClient` (4).
+- **`flutter analyze`** : 9 avertissements → 0. Les 4 usages de `BuildContext` après un `await` sont maintenant gardés par `mounted`. Restent 12 informations de style, préexistantes et tolérées en CI.
+- **`analysis_options.yaml`** : les exclusions des dossiers natifs sont commitées et le fichier ne bouge plus.
+- **Rotation du jeton (P15)** :
+  - Web : `POST /api/token/rotate` via `ApiTokenRotator`, avec limiteur `token-rotate` (6/min), refus d'un jeton de session (403) et 3 garde-fous.
+    - **échéance absolue** : un jeton volé ne vit jamais plus de 30 jours après la connexion, même tourné ;
+    - **délai de grâce de 2 minutes** pour l'ancien jeton, si la réponse se perd ;
+    - **compare-and-set** : un rejeu est refusé (401) et ne crée pas de second jeton.
+  - iPhone : rotation au démarrage et au retour au premier plan au-delà de 7 jours. La date d'émission est gardée au trousseau, et un échec garde l'ancien jeton. Un 401 portant un ancien jeton ne vide plus la session, et les journaux de débogage masquent les jetons.
+- **CI mobile** : `flutter analyze --no-fatal-infos` et `flutter test` sur chaque PR, avec Flutter 3.47.6, actions épinglées par SHA, lecture seule et Dependabot.
+- **Tests web** : `TokenRotationTest` (6). Suite web : 559 au vert.
+- **Revue de sécurité**, point haut corrigé : sans échéance absolue, la rotation prolongeait indéfiniment un jeton volé.
+- **Revue de sécurité**, points moyens corrigés : déconnexion sur réponse perdue ou requête en vol ; double jeton en cas de rejeu.
+- **Revue de sécurité**, points bas corrigés : jeton de session, journaux, nettoyage de la date, `persist-credentials`.
+- **Décision maintenue (question 1)** : pas de SQLCipher (protection des données iOS et trousseau). Un ADR suivra si vous voulez chiffrer la base.
+- **Non vérifié** :
+  - premier passage des CI web et mobile sur GitHub ;
+  - rotation sur l'iPhone réel.
