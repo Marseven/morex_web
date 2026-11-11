@@ -4,6 +4,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import SavingsGoalCard from '@/Components/Goals/SavingsGoalCard.vue'
 import BudgetCapCard from '@/Components/Budgets/BudgetCapCard.vue'
 import TransitCard from '@/Components/Budgets/TransitCard.vue'
+import PlannedPurchasesCard from '@/Components/Purchases/PlannedPurchasesCard.vue'
 import {
     BanknotesIcon,
     ArrowTrendingUpIcon,
@@ -21,6 +22,7 @@ const props = defineProps({
     expenseForPeriod: { type: Number, default: 0 },
     proExpense: { type: Number, default: null },
     transit: { type: Object, default: null },
+    purchases: { type: Object, default: null },
     accounts: { type: Array, default: () => [] },
     recentTransactions: { type: Array, default: () => [] },
     activeGoals: { type: Array, default: () => [] },
@@ -263,6 +265,9 @@ const changePeriod = (period) => {
                             </div>
                         </div>
                     </div>
+
+                    <!-- Achats prévus et hors liste (module achats-prevus) -->
+                    <PlannedPurchasesCard v-if="purchases" :summary="purchases" :period="budgetPeriod" />
 
                     <!-- Tontines et avances (module revenus-transit) -->
                     <TransitCard v-if="transit" :transit="transit" :period="budgetPeriod" />

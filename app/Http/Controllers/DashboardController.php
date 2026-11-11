@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\BudgetAlertService;
 use App\Services\GoalProgressService;
+use App\Services\PlannedPurchaseService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -116,6 +117,7 @@ class DashboardController extends Controller
             'expenseForPeriod' => $expenseForPeriod,
             'proExpense' => $this->proExpense($user, $startDate, $endDate),
             'transit' => $this->transitSummary($user, $capFrom, $capTo),
+            'purchases' => $this->purchasesSummary($user),
             'accounts' => $accounts,
             'recentTransactions' => $recentTransactions,
             'activeGoals' => $activeGoals,
@@ -137,6 +139,16 @@ class DashboardController extends Controller
             'currentPeriod' => $period,
             'periodLabel' => $this->getPeriodLabel($period),
         ]);
+    }
+
+    /** Carte « Achats prévus » (module achats-prevus). */
+    private function purchasesSummary(User $user): array
+    {
+        $summary = app(PlannedPurchaseService::class)->summary($user);
+        $summary['late_count'] = $summary['late']->count();
+        unset($summary['late']);
+
+        return $summary;
     }
 
     /** Dépenses pro de la période, comptées dans le total (null sans catégorie pro). */
