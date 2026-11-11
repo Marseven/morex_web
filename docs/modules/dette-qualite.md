@@ -1,4 +1,4 @@
-# Module dette-qualite (7a : web)                   statut : en cours · 2026-11-11
+# Module dette-qualite (7a : web)                   statut : livré · 2026-11-11
 
 **Conclusion** : on solde la dette du web relevée par l'analyse initiale et par les revues des modules 4 à 6, sans fonctionnalité nouvelle. Le module est **scindé** pour rester sous 15 fichiers :
 - **7a, web** : ce module ;
@@ -43,3 +43,40 @@
 3. 7b (mobile) juste après ? → *Hypothèse : oui, dans une session dédiée.*
 
 **Hors module** : 7b mobile, déploiement automatisé (Deployer), `BalanceService` unique (refonte des événements de modèle).
+
+## Livré (7a)
+- **Opérations pointées** :
+  - changer le montant, la date, le compte, le type ou le statut d'une opération pointée la dépointe (web, API, synchro) ;
+  - le web affiche « Opération dépointée : refaites le rapprochement du compte » ; la suppression d'une opération pointée affiche aussi un avertissement ;
+  - le message `flash.warning` est partagé et affiché dans le layout.
+- **Catégories d'écart** : la règle `NotReconciliationCategory` s'applique en saisie web et API, et la synchro les refuse aussi. Elle est insensible à la casse ; une opération d'écart existante garde sa catégorie.
+- **P12** : les cycles de l'ancienne et de la nouvelle date sont recalculés une seule fois chacun, et seulement sur une modification matérielle. Un cycle clôturé ne met à jour que son dépensé : son budget reste celui de la clôture.
+- **P13** : `WebhookController::accountIdForSource` ne cherche qu'avec une source non vide, jokers échappés et ordre stable.
+- **P16** : les cellules de l'export CSV qui commencent par `= + - @`, une tabulation ou un retour chariot sont préfixées d'une apostrophe.
+- **Dépensé par catégorie** :
+  - les opérations en attente sont exclues (Budgets, Cycles, `spent_this_month`) ;
+  - la borne haute de la période est exclusive au lendemain, indexable, et compte le dernier jour même sous SQLite.
+- **Saisie web** : `StoreTransactionRequest` et `TransactionEntryService` ; message du transfert conservé.
+- **P17** : `Pdo\Mysql::ATTR_SSL_CA` dans `config/database.php`. **Écart** : les avertissements restent dans les tests, car ils viennent du fichier par défaut du framework (`vendor/laravel/framework/config/database.php`, Laravel 11.48). Ils disparaîtront avec une mise à jour de Laravel (hors module).
+- **CI** :
+  - tests sur PHP 8.2 et 8.5 ;
+  - Pint sur les fichiers de chaque PR (comparés au merge-base) ;
+  - Gitleaks ;
+  - garde-fou `php-securite.yml` (copie du modèle htdocs, avec `permissions` ajouté) ;
+  - jeton en lecture seule, actions épinglées par SHA, Dependabot `github-actions` ;
+  - déclenchement sur toutes les PR.
+- **Tests** : `QualityDebtTest`, 22 tests. Suite complète : 550 au vert.
+- **Revue de sécurité** (0 critique, 0 haute), points moyens corrigés :
+  - casse des UUID ;
+  - statut « en attente » qui contournait le dépointage ;
+  - droits et épinglage de la CI.
+- **Revue de sécurité**, points bas corrigés : injection d'expression dans la CI, correspondance SMS stable.
+- **Revue de code**, point haut corrigé : l'avertissement n'atteignait pas l'écran.
+- **Revue de code**, points moyens corrigés : double recalcul, filtre de date non indexable, merge-base de Pint.
+- **Reste ouvert** (préexistant, signalé par les revues) :
+  - `update` web et API sans Form Request ;
+  - une opération d'écart peut voir son montant modifié ;
+  - espace en tête de cellule CSV.
+- **Non vérifié** :
+  - premier passage de la CI sur GitHub ;
+  - collation MySQL de production (la casse est désormais neutralisée par le code).

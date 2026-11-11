@@ -21,7 +21,7 @@ Taux de référence : 80 000 FCFA par jour (à titre indicatif) → reste ~13 j 
 | 5d | achats-prevus | Liste d'achats prévus avec statut ; règle « > 30k hors liste attend le cycle suivant » | 5a | oui | non | 1 j | livré (PR ouverte) |
 | 6 | recurrences-serveur | Génération des récurrences par le scheduler (idempotente), plus seulement sur le mobile | 1 | non | non | 1 j | livré (PR ouvertes) |
 | 8 | bilan-mensuel | Bilan du cycle (réalisé vs budget, discrétionnaire, épargne) et proposition du cycle suivant créée directement dans l'app (plus de CSV à générer) | 5 | oui | non | 2 j | livré (PR ouverte) |
-| 7a | dette-qualite | Web : opérations rapprochées dépointées à la modification, catégories d'écart refusées partout, P12/P13/P16/P17, dépensé par catégorie, Form Request de saisie, CI (PHP 8.5, Pint, Gitleaks, garde-fou PHP) | 0 | non | oui | 1 j | en cours |
+| 7a | dette-qualite | Web : opérations rapprochées dépointées à la modification, catégories d'écart refusées partout, P12/P13/P16/P17, dépensé par catégorie, Form Request de saisie, CI (PHP 8.5, Pint, Gitleaks, garde-fou PHP) | 0 | non | oui | 1 j | livré (PR ouverte) |
 | 7b | dette-qualite-mobile | Mobile : 4 tests périmés, avertissements `flutter analyze`, jeton 30 j et base Drift en clair (P15), hook `analysis_options.yaml` | 7a | non | oui | 1 j | à faire |
 
 Statuts : à faire · analysé · en cours · livré · vérifié. Un module = une session, ≤ 15 fichiers.
