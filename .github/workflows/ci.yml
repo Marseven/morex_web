@@ -42,10 +42,10 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Pas de .env : la suite tourne sur les valeurs par défaut de config/ (comme en local) avec une clé éphémère.
+      # Copier .env.example imposerait ses valeurs (ex. SESSION_LIFETIME) et masquerait les défauts testés.
       - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate
+        run: echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
 
       - name: Run tests
         # La suite tourne sur SQLite :memory: (voir phpunit.xml)
