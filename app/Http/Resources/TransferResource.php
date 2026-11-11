@@ -16,7 +16,7 @@ class TransferResource extends JsonResource
             'from_account_id' => $this->from_account_id,
             'to_account_id' => $this->to_account_id,
             'amount' => $this->amount,
-            'formatted_amount' => number_format($this->amount, 0, ',', ' ') . ' FCFA',
+            'formatted_amount' => number_format($this->amount, 0, ',', ' ').' FCFA',
             'description' => $this->description,
             'date' => $this->date->format('Y-m-d'),
             'created_at' => $this->created_at,

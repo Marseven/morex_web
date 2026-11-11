@@ -19,7 +19,7 @@ class TransferController extends Controller
             $accountId = $request->account_id;
             $query->where(function ($q) use ($accountId) {
                 $q->where('from_account_id', $accountId)
-                  ->orWhere('to_account_id', $accountId);
+                    ->orWhere('to_account_id', $accountId);
             });
         }
 
@@ -122,7 +122,7 @@ class TransferController extends Controller
         });
 
         return redirect()->route('transfers.index')
-            ->with('success', count($validated['rows']) . ' transfert(s) importé(s).');
+            ->with('success', count($validated['rows']).' transfert(s) importé(s).');
     }
 
     public function edit(Request $request, Transfer $transfer): Response

@@ -21,7 +21,7 @@ class TransferController extends Controller
             $accountId = $request->account_id;
             $query->where(function ($q) use ($accountId) {
                 $q->where('from_account_id', $accountId)
-                  ->orWhere('to_account_id', $accountId);
+                    ->orWhere('to_account_id', $accountId);
             });
         }
 
@@ -78,8 +78,8 @@ class TransferController extends Controller
         for ($i = 0; $i < count($hops) - 1; $i++) {
             if ($hops[$i]['to_account_id'] !== $hops[$i + 1]['from_account_id']) {
                 return response()->json([
-                    'message' => "Les sauts doivent se connecter: le compte d'arrivee du saut " . ($i + 1) . " doit etre le compte de depart du saut " . ($i + 2) . ".",
-                    'errors' => ['hops' => ["Connexion invalide entre les sauts " . ($i + 1) . " et " . ($i + 2)]],
+                    'message' => "Les sauts doivent se connecter: le compte d'arrivee du saut ".($i + 1).' doit etre le compte de depart du saut '.($i + 2).'.',
+                    'errors' => ['hops' => ['Connexion invalide entre les sauts '.($i + 1).' et '.($i + 2)]],
                 ], 422);
             }
         }
@@ -93,7 +93,7 @@ class TransferController extends Controller
         });
 
         return response()->json([
-            'message' => count($transfers) . ' transferts crees.',
+            'message' => count($transfers).' transferts crees.',
             'transfers' => TransferResource::collection(
                 collect($transfers)->map(fn ($t) => $t->load(['fromAccount', 'toAccount']))
             ),
