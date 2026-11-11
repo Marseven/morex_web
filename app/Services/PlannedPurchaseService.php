@@ -101,13 +101,21 @@ final class PlannedPurchaseService
     /** Achats prévus encore ouverts et déjà permis (période en cours ou antérieure), même catégorie ou sans catégorie. */
     public function candidates(User $user, ?string $categoryId): Collection
     {
+        return $this->openPurchases($user)
+            ->filter(fn (PlannedPurchase $p) => $p->category_id === null || $p->category_id === $categoryId)
+            ->values();
+    }
+
+    /** Achats encore ouverts et déjà permis, toutes catégories (la saisie filtre selon la catégorie choisie). */
+    public function openPurchases(User $user): Collection
+    {
         [, $to] = $this->period($user);
 
         return PlannedPurchase::where('user_id', $user->id)
             ->where('status', PlannedPurchase::STATUS_PLANNED)
             ->where('planned_for', '<=', ($to ?? CarbonImmutable::now())->toDateString())
-            ->where(fn ($q) => $q->whereNull('category_id')->when($categoryId, fn ($q) => $q->orWhere('category_id', $categoryId)))
             ->orderBy('planned_for')
+            ->limit(50)
             ->get();
     }
 

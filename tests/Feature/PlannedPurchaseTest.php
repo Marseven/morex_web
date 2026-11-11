@@ -164,4 +164,112 @@ class PlannedPurchaseTest extends TestCase
 
         $this->assertSame(['Lunettes'], $this->service->summary($this->user)['late']->pluck('name')->all());
     }
+
+    // --- Page et saisie ---
+
+    private function entry(array $extra = []): array
+    {
+        return $extra + ['amount' => 47000, 'type' => 'expense', 'category_id' => $this->clothes->id,
+            'account_id' => $this->account->id, 'date' => now()->toDateString(), 'beneficiary' => 'Chaussures'];
+    }
+
+    public function test_the_page_lists_the_period_for_its_owner(): void
+    {
+        $this->plan();
+        $this->get('/purchases')->assertRedirect('/login');
+
+        $this->actingAs($this->user)->get('/purchases')
+            ->assertInertia(fn ($page) => $page
+                ->component('Purchases/Index')
+                ->where('purchases.0.name', 'Chaussures')
+                ->where('summary.planned_count', 1)
+                ->where('threshold', 30000)
+            );
+    }
+
+    public function test_purchases_are_planned_now_or_postponed_from_the_page(): void
+    {
+        $this->actingAs($this->user)->post('/purchases', ['name' => 'Sac', 'estimated_amount' => 35000, 'category_id' => $this->clothes->id, 'when' => 'current'])
+            ->assertRedirect('/purchases');
+        $this->actingAs($this->user)->post('/purchases', ['name' => 'Montre', 'estimated_amount' => 60000, 'when' => 'next'])
+            ->assertRedirect('/purchases');
+
+        $this->assertSame(['Sac' => '2026-11-01', 'Montre' => '2026-12-01'],
+            PlannedPurchase::orderBy('name', 'desc')->get()->mapWithKeys(fn ($p) => [$p->name => $p->planned_for->toDateString()])->all());
+    }
+
+    public function test_invalid_purchases_are_refused(): void
+    {
+        $foreign = Category::factory()->create();
+
+        $this->actingAs($this->user)->post('/purchases', ['name' => 'X', 'estimated_amount' => 0, 'when' => 'current'])
+            ->assertSessionHasErrors('estimated_amount');
+        $this->actingAs($this->user)->post('/purchases', ['name' => 'X', 'estimated_amount' => 100, 'category_id' => $foreign->id, 'when' => 'later'])
+            ->assertSessionHasErrors(['category_id', 'when']);
+    }
+
+    public function test_only_the_owner_cancels_a_purchase(): void
+    {
+        $purchase = $this->plan();
+
+        $this->actingAs(User::factory()->create())->delete('/purchases/'.$purchase->id)->assertForbidden();
+        $this->actingAs($this->user)->delete('/purchases/'.$purchase->id)->assertRedirect('/purchases');
+
+        $this->assertSame(PlannedPurchase::STATUS_CANCELLED, $purchase->fresh()->status);
+    }
+
+    public function test_the_entry_form_receives_candidates_and_the_threshold(): void
+    {
+        $purchase = $this->plan();
+
+        $this->actingAs($this->user)->get('/transactions/create?planned_purchase_id='.$purchase->id)
+            ->assertInertia(fn ($page) => $page
+                ->where('plannedPurchases.0.id', $purchase->id)
+                ->where('purchaseThreshold', 30000)
+                ->where('prefill.planned_purchase_id', $purchase->id)
+            );
+    }
+
+    public function test_saving_with_a_planned_purchase_links_it(): void
+    {
+        $purchase = $this->plan();
+
+        $this->actingAs($this->user)->post('/transactions', $this->entry(['planned_purchase_id' => $purchase->id]))->assertRedirect();
+
+        $this->assertSame(PlannedPurchase::STATUS_BOUGHT, $purchase->fresh()->status);
+        $this->assertNotNull($purchase->fresh()->transaction_id);
+    }
+
+    public function test_buying_anyway_records_an_assumed_out_of_list_purchase(): void
+    {
+        $this->actingAs($this->user)->post('/transactions', $this->entry(['amount' => 60000, 'out_of_list' => 'accept']))->assertRedirect();
+
+        $this->assertSame(1, PlannedPurchase::where('unplanned', true)->count());
+        $this->assertCount(0, $this->service->outOfList($this->user));
+    }
+
+    public function test_a_foreign_or_bought_purchase_cannot_be_linked(): void
+    {
+        $other = User::factory()->create();
+        $foreign = $this->service->plan($other, ['name' => 'X', 'estimated_amount' => 50000]);
+        $bought = $this->plan('Sac');
+        $this->service->link($bought, $this->spend(40000));
+
+        foreach ([$foreign, $bought] as $purchase) {
+            $this->actingAs($this->user)->post('/transactions', $this->entry(['planned_purchase_id' => $purchase->id]))
+                ->assertSessionHasErrors('planned_purchase_id');
+        }
+    }
+
+    public function test_the_dashboard_shows_the_purchases_card(): void
+    {
+        $this->plan();
+        $this->spend(60000);
+
+        $this->actingAs($this->user)->get('/')
+            ->assertInertia(fn ($page) => $page
+                ->where('purchases.planned_count', 1)
+                ->where('purchases.out_of_list_total', 60000)
+            );
+    }
 }

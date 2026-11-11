@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BatchEntryController;
 use App\Http\Controllers\BudgetCycleController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\PlannedPurchaseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DebtController;
 use App\Http\Controllers\GoalController;
@@ -78,6 +79,7 @@ Route::middleware('auth')->group(function () {
 
     // Objectifs
     Route::resource('goals', GoalController::class)->except(['show']);
+    Route::resource('purchases', PlannedPurchaseController::class)->only(['index', 'store', 'destroy']);
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'contribute'])->name('goals.contribute');
     Route::post('/goals/{goal}/track', [GoalController::class, 'track'])->name('goals.track');
     Route::delete('/goals/{goal}/track', [GoalController::class, 'untrack'])->name('goals.untrack');

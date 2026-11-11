@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, computed, h } from 'vue'
 import { Link, usePage, router } from '@inertiajs/vue3'
 import {
+    ShoppingBagIcon,
     HomeIcon,
     ArrowsRightLeftIcon,
     WalletIcon,
@@ -33,6 +34,7 @@ const navigation = [
     { name: 'Cycles', href: '/budget-cycles', icon: CalendarIcon },
     { name: 'Transferts', href: '/transfers', icon: BanknotesIcon },
     { name: 'Objectifs', href: '/goals', icon: FlagIcon },
+    { name: 'Achats prévus', href: '/purchases', icon: ShoppingBagIcon },
     { name: 'Dettes', href: '/debts', icon: CreditCardIcon },
     { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
 ]
