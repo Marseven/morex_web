@@ -14,7 +14,7 @@ Taux de référence : 80 000 FCFA par jour (à titre indicatif) → reste ~13 j 
 | 3b | sms-iphone | Raccourci iOS → webhook → lignes de relevé (même moteur que 3a) ; jeton Sanctum limité au webhook | 3a | non | oui | 1 j | livré (PR ouverte) |
 | 3c | transferts-frais | Transferts entre comptes avec frais (retraits Airtel, GIMAC), import compris | 3a | oui | non | 1 j | livré (PR ouverte) |
 | 4 | rapprochement | Serveur + API + écran web : solde du relevé → écart, pointage, opération d'écart tracée ; `adjust-balance` passe par le service | 0 | oui | non | 2 j | livré (PR ouverte) |
-| 4 bis | rapprochement-mobile | Écran de rapprochement sur l'iPhone, branché sur l'API du module 4 | 4 | oui | non | 1 j | à faire |
+| 4 bis | rapprochement-mobile | Écran de rapprochement sur l'iPhone, branché sur l'API du module 4 | 4 | oui | non | 1 j | en cours |
 | 5a | suivi-objectifs | Objectif suivi sur un compte (progression = solde du Compte Epargne, transferts compris), versement du mois (300k), projection au 31/12, carte du tableau de bord | 4 | oui | non | 1,5 j | livré (PR ouverte) |
 | 5b | plafonds-alertes | Plafonds réels (sorties 170k, Emilie 150k, abonnements 90k…) avec alertes à 80 % / 100 % et discrétionnaire agrégé | 5a | oui | non | 1 j | livré (PR ouverte) |
 | 5c | revenus-transit | Tontines, remboursements et transferts internes exclus des revenus/dépenses ; séparation pro/perso (abonnements MRTECH) | 5a | oui | non | 1 j | livré (PR ouverte) |
