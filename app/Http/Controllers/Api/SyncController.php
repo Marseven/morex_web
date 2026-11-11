@@ -739,7 +739,7 @@ class SyncController extends Controller
         // (transactions/transferts). Évite le double-comptage lors d'un update.
         $this->captureOriginalSnapshot($serverId, $model);
 
-        $model->fill($this->withoutTrackedGoalFields($model, $data));
+        $model->fill($this->withoutServerScheduleFields($model, $this->withoutTrackedGoalFields($model, $data)));
         $model->save();
 
         // Si était supprimé et qu'on update, on restore
@@ -753,6 +753,29 @@ class SyncController extends Controller
             'status' => 'success',
             'action' => 'updated',
         ];
+    }
+
+    /**
+     * Récurrences (module recurrences-serveur) : le serveur génère les échéances et tient l'historique.
+     * Le client ne peut ni réécrire la dernière génération ni ramener l'échéance sur une occurrence déjà générée.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withoutServerScheduleFields($model, array $data): array
+    {
+        if (! $model instanceof RecurringTransaction) {
+            return $data;
+        }
+
+        unset($data['last_generated_date']);
+        $lastGenerated = $model->last_generated_date;
+        if ($lastGenerated !== null && isset($data['next_due_date'])
+            && Carbon::parse($data['next_due_date'])->toDateString() <= $lastGenerated->toDateString()) {
+            unset($data['next_due_date']);
+        }
+
+        return $data;
     }
 
     /**

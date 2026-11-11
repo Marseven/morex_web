@@ -180,4 +180,102 @@ class RecurrenceGenerationTest extends TestCase
         $this->getJson('/api/sync/pull')->assertOk()
             ->assertJsonPath('transactions.0.recurring_transaction_id', $r->id);
     }
+
+    // --- Revue de code ---
+
+    /** @return list<string> échéances générées, dans l'ordre */
+    private function occurrences(): array
+    {
+        return Transaction::orderBy('occurrence_date')->get()->map(fn ($t) => $t->occurrence_date->toDateString())->all();
+    }
+
+    public function test_month_ends_never_skip_february(): void
+    {
+        $this->travelTo(now()->setDate(2027, 4, 1));
+        $this->recurring(['day_of_month' => 31, 'start_date' => '2027-01-31', 'next_due_date' => '2027-01-31']);
+
+        $this->generator()->runForUser($this->user);
+
+        $this->assertSame(['2027-01-31', '2027-02-28', '2027-03-31'], $this->occurrences());
+    }
+
+    public function test_without_day_of_month_the_start_day_is_kept(): void
+    {
+        $this->travelTo(now()->setDate(2027, 4, 1));
+        $this->recurring(['day_of_month' => null, 'start_date' => '2027-01-31', 'next_due_date' => '2027-01-31']);
+
+        $this->generator()->runForUser($this->user);
+
+        $this->assertSame(['2027-01-31', '2027-02-28', '2027-03-31'], $this->occurrences());
+    }
+
+    public function test_quarterly_and_yearly_never_overflow(): void
+    {
+        $this->travelTo(now()->setDate(2029, 3, 1));
+        $this->recurring(['frequency' => 'quarterly', 'day_of_month' => null, 'start_date' => '2028-11-30', 'next_due_date' => '2028-11-30']);
+        $this->recurring(['frequency' => 'yearly', 'day_of_month' => null, 'start_date' => '2028-02-29', 'next_due_date' => '2028-02-29', 'amount' => 1000]);
+
+        $this->generator()->runForUser($this->user);
+
+        $this->assertSame(['2028-02-29', '2028-11-30', '2029-02-28', '2029-02-28'], $this->occurrences());
+    }
+
+    public function test_one_failing_recurrence_never_stops_the_others(): void
+    {
+        $this->recurring(['amount' => 666]);
+        $this->recurring();
+        Transaction::creating(function (Transaction $t) {
+            if ($t->amount === 666) {
+                throw new \RuntimeException('listener en échec');
+            }
+        });
+
+        $this->artisan('recurrences:generate')->assertSuccessful();
+
+        $this->assertSame([150000], Transaction::pluck('amount')->all());
+    }
+
+    public function test_a_deleted_category_deactivates_the_recurrence(): void
+    {
+        $r = $this->recurring();
+        $this->rent->delete();
+
+        $this->assertSame(0, $this->generator()->runForUser($this->user));
+        $this->assertFalse($r->fresh()->is_active);
+    }
+
+    public function test_generation_moves_the_balance_with_its_history(): void
+    {
+        $this->recurring();
+
+        $this->generator()->runForUser($this->user);
+
+        $this->assertDatabaseHas('balance_history', ['account_id' => $this->account->id, 'balance_after' => 850000]);
+    }
+
+    public function test_the_sync_cannot_rewind_a_recurrence_to_a_generated_occurrence(): void
+    {
+        $r = $this->recurring();
+        $this->generator()->runForUser($this->user);
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/sync/push', ['changes' => [[
+            'type' => 'recurring_transaction', 'action' => 'update', 'server_id' => $r->id, 'local_id' => 'r1',
+            'data' => ['next_due_date' => '2026-11-05', 'last_generated_date' => '2026-10-05', 'amount' => 160000],
+            'updated_at' => now()->addMinute()->toIso8601String(),
+        ]]])->assertOk();
+
+        $r->refresh();
+        $this->assertSame(['2026-12-05', '2026-11-05', 160000], [$r->next_due_date->toDateString(), $r->last_generated_date->toDateString(), $r->amount]);
+    }
+
+    public function test_generate_endpoint_returns_the_created_operation(): void
+    {
+        $r = $this->recurring();
+        Sanctum::actingAs($this->user);
+
+        $id = $this->postJson("/api/recurring-transactions/{$r->id}/generate")->assertOk()->json('transaction.id');
+
+        $this->assertSame(Transaction::sole()->id, $id);
+    }
 }

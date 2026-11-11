@@ -7,7 +7,6 @@ use App\Http\Resources\RecurringTransactionResource;
 use App\Http\Resources\TransactionResource;
 use App\Models\RecurringTransaction;
 use App\Services\RecurrenceGenerator;
-use App\Models\Transaction;
 use App\Rules\OwnedOrSystemCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -234,7 +233,7 @@ class RecurringTransactionController extends Controller
             new OA\Response(response: 401, description: "Non authentifié"),
         ]
     )]
-    public function generate(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
+    public function generate(Request $request, RecurringTransaction $recurringTransaction, RecurrenceGenerator $generator): JsonResponse
     {
         $this->authorize('update', $recurringTransaction);
 
@@ -245,10 +244,7 @@ class RecurringTransactionController extends Controller
         }
 
         // Même chemin que le scheduler (module recurrences-serveur) : verrou et idempotence
-        $occurrence = $recurringTransaction->next_due_date->toDateString();
-        app(RecurrenceGenerator::class)->generateNext($recurringTransaction);
-        $transaction = Transaction::where('recurring_transaction_id', $recurringTransaction->id)
-            ->whereDate('occurrence_date', $occurrence)->first();
+        $transaction = $generator->generateNext($recurringTransaction);
 
         return response()->json([
             'message' => 'Transaction générée avec succès',
@@ -267,10 +263,10 @@ class RecurringTransactionController extends Controller
             new OA\Response(response: 401, description: "Non authentifié"),
         ]
     )]
-    public function processDue(Request $request): JsonResponse
+    public function processDue(Request $request, RecurrenceGenerator $generator): JsonResponse
     {
         // Même chemin que le scheduler (module recurrences-serveur) : rattrapage, verrou, idempotence
-        $count = app(RecurrenceGenerator::class)->runForUser($request->user());
+        $count = $generator->runForUser($request->user());
 
         return response()->json([
             'message' => $count . ' transaction(s) générée(s)',

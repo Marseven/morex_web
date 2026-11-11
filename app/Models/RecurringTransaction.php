@@ -127,9 +127,9 @@ class RecurringTransaction extends Model
             'daily' => $this->next_due_date->copy()->addDay(),
             'weekly' => $this->next_due_date->copy()->addWeek(),
             'biweekly' => $this->next_due_date->copy()->addWeeks(2),
-            'monthly' => $this->calculateNextMonthlyDate(),
-            'quarterly' => $this->next_due_date->copy()->addMonths(3),
-            'yearly' => $this->next_due_date->copy()->addYear(),
+            'monthly' => $this->addMonthsAnchored(1),
+            'quarterly' => $this->addMonthsAnchored(3),
+            'yearly' => $this->addMonthsAnchored(12),
             default => $this->next_due_date->copy()->addMonth(),
         };
 
@@ -152,18 +152,15 @@ class RecurringTransaction extends Model
     }
 
     /**
-     * Calculate the next monthly due date, respecting day_of_month
+     * Ajoute des mois sans débordement, en gardant le jour d'ancrage (day_of_month, sinon le jour de départ).
+     * Exemple : ancrage 31 → 31/01, 28/02, 31/03 (jamais de mois sauté ni de dérive au 28).
      */
-    private function calculateNextMonthlyDate(): \Carbon\Carbon
+    private function addMonthsAnchored(int $months): \Carbon\Carbon
     {
-        $nextMonth = $this->next_due_date->copy()->addMonth();
+        $anchor = $this->day_of_month ?? $this->start_date?->day ?? $this->next_due_date->day;
+        $next = $this->next_due_date->copy()->startOfMonth()->addMonthsNoOverflow($months);
 
-        if ($this->day_of_month) {
-            $targetDay = min($this->day_of_month, $nextMonth->daysInMonth);
-            $nextMonth->setDay($targetDay);
-        }
-
-        return $nextMonth;
+        return $next->setDay(min($anchor, $next->daysInMonth));
     }
 
     /**

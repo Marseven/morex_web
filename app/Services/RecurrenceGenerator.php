@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Account;
+use App\Models\Category;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Génération des opérations récurrentes par le serveur (module recurrences-serveur 6).
@@ -25,8 +27,7 @@ final class RecurrenceGenerator
     /** Toutes les récurrences échues, tous utilisateurs (commande planifiée). */
     public function runAll(): int
     {
-        return RecurringTransaction::due()->distinct()->pluck('user_id')
-            ->sum(fn ($userId) => ($user = User::find($userId)) ? $this->runForUser($user) : 0);
+        return RecurringTransaction::due()->pluck('id')->sum(fn (string $id) => $this->catchUp($id));
     }
 
     /** Échéances dues d'un utilisateur (commande ou bouton « Générer »). */
@@ -36,33 +37,48 @@ final class RecurrenceGenerator
             ->sum(fn (string $id) => $this->catchUp($id));
     }
 
-    /** Une échéance, même pas encore due (bouton « Générer » d'une récurrence). */
-    public function generateNext(RecurringTransaction $recurring): int
+    /** Une échéance, même pas encore due (bouton « Générer » d'une récurrence) : l'opération créée, ou null. */
+    public function generateNext(RecurringTransaction $recurring): ?Transaction
     {
-        return $this->process($recurring->id, onlyDue: false, limit: 1);
+        return $this->process($recurring->id, onlyDue: false, limit: 1)[0] ?? null;
     }
 
+    /** Une récurrence en échec est signalée sans arrêter les autres (montants jamais journalisés). */
     private function catchUp(string $id): int
     {
-        return $this->process($id, onlyDue: true, limit: self::MAX_PER_RUN);
+        try {
+            return count($this->process($id, onlyDue: true, limit: self::MAX_PER_RUN));
+        } catch (\Throwable $e) {
+            report($e);
+            Log::warning('recurrence.failed', ['recurring_transaction_id' => $id]);
+
+            return 0;
+        }
     }
 
-    private function process(string $id, bool $onlyDue, int $limit): int
+    /** @return list<Transaction> opérations créées */
+    private function process(string $id, bool $onlyDue, int $limit): array
     {
         return DB::transaction(function () use ($id, $onlyDue, $limit) {
             $recurring = RecurringTransaction::whereKey($id)->lockForUpdate()->first();
             if ($recurring === null || ! $recurring->is_active) {
-                return 0;
+                return [];
             }
 
-            // Le compte doit exister et appartenir au même utilisateur, sinon la récurrence est arrêtée
-            if (! Account::whereKey($recurring->account_id)->where('user_id', $recurring->user_id)->exists()) {
+            // Compte et catégorie doivent exister (et le compte appartenir au même utilisateur), sinon arrêt signalé
+            $gone = match (true) {
+                ! Account::whereKey($recurring->account_id)->where('user_id', $recurring->user_id)->exists() => 'account_gone',
+                $recurring->category_id !== null && ! Category::whereKey($recurring->category_id)->exists() => 'category_gone',
+                default => null,
+            };
+            if ($gone !== null) {
                 $recurring->forceFill(['is_active' => false])->save();
+                Log::warning("recurrence.{$gone}", ['recurring_transaction_id' => $recurring->id]);
 
-                return 0;
+                return [];
             }
 
-            $created = 0;
+            $created = [];
             for ($done = 0; $done < $limit && $recurring->is_active; $done++) {
                 if ($onlyDue && $recurring->next_due_date->toDateString() > now()->toDateString()) {
                     break;
@@ -72,9 +88,11 @@ final class RecurrenceGenerator
                     break;
                 }
 
-                $isNew = $this->createOccurrence($recurring);
-                $created += $isNew ? 1 : 0;
-                $recurring->updateNextDueDate(consume: $isNew);
+                $transaction = $this->createOccurrence($recurring);
+                if ($transaction !== null) {
+                    $created[] = $transaction;
+                }
+                $recurring->updateNextDueDate(consume: $transaction !== null);
             }
 
             return $created;
@@ -87,23 +105,21 @@ final class RecurrenceGenerator
             || ($recurring->end_date !== null && $recurring->next_due_date->gt($recurring->end_date));
     }
 
-    /** RM-1 : faux si l'échéance existe déjà (rejeu, synchro qui remet une ancienne date). */
-    private function createOccurrence(RecurringTransaction $recurring): bool
+    /** RM-1 : null si l'échéance existe déjà (rejeu, synchro qui remet une ancienne date). */
+    private function createOccurrence(RecurringTransaction $recurring): ?Transaction
     {
         $exists = Transaction::withTrashed()
             ->where('recurring_transaction_id', $recurring->id)
             ->whereDate('occurrence_date', $recurring->next_due_date->toDateString())
             ->exists();
         if ($exists) {
-            return false;
+            return null;
         }
 
         try {
-            DB::transaction(fn () => $recurring->generateTransaction());
+            return DB::transaction(fn () => $recurring->generateTransaction());
         } catch (UniqueConstraintViolationException) {
-            return false;
+            return null;
         }
-
-        return true;
     }
 }
