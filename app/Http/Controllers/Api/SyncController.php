@@ -531,6 +531,7 @@ class SyncController extends Controller
 
         // Sécurité : vérifier que les FK référencées appartiennent bien à l'utilisateur (anti-IDOR)
         $this->assertForeignKeysBelongToUser($user, $data);
+        $this->assertNoReconciliationCategory($modelClass, $data, null);
 
         // Pour les comptes, s'assurer que balance = initial_balance si non fourni
         if ($modelClass === Account::class) {
@@ -734,12 +735,17 @@ class SyncController extends Controller
 
         // Sécurité : vérifier que les FK référencées appartiennent bien à l'utilisateur (anti-IDOR)
         $this->assertForeignKeysBelongToUser($user, $data);
+        $this->assertNoReconciliationCategory($modelClass, $data, $model->category_id ?? null);
 
         // Capturer l'état AVANT modification pour pouvoir reverser l'ancien mouvement de solde
         // (transactions/transferts). Évite le double-comptage lors d'un update.
         $this->captureOriginalSnapshot($serverId, $model);
 
         $model->fill($this->withoutServerScheduleFields($model, $this->withoutTrackedGoalFields($model, $data)));
+        // Le push désactive les événements : le dépointage (module dette-qualite) est appliqué ici
+        if ($model instanceof Transaction) {
+            $model->unpointIfMaterialChange();
+        }
         $model->save();
 
         // Si était supprimé et qu'on update, on restore
@@ -753,6 +759,16 @@ class SyncController extends Controller
             'status' => 'success',
             'action' => 'updated',
         ];
+    }
+
+    /** Catégories d'écart réservées au rapprochement (module dette-qualite) ; une opération d'écart garde la sienne. */
+    private function assertNoReconciliationCategory(string $modelClass, array $data, ?string $currentCategoryId): void
+    {
+        $categoryId = $data['category_id'] ?? null;
+        if ($modelClass === Transaction::class && is_string($categoryId)
+            && in_array($categoryId, Category::RECONCILIATION_IDS, true) && $categoryId !== $currentCategoryId) {
+            throw new \RuntimeException('Catégorie réservée aux écarts de rapprochement');
+        }
     }
 
     /**

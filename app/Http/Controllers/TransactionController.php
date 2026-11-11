@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTransactionRequest;
 use App\Models\Category;
-use App\Models\PlannedPurchase;
 use App\Models\Transaction;
+use App\Rules\NotReconciliationCategory;
 use App\Rules\OwnedOrSystemCategory;
 use App\Services\PlannedPurchaseService;
+use App\Services\TransactionEntryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -113,48 +115,12 @@ class TransactionController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreTransactionRequest $request, TransactionEntryService $entries)
     {
-        $userId = $request->user()->id;
-        $validated = $request->validate([
-            'amount' => ['required', 'integer', 'min:1'],
-            'type' => ['required', 'in:expense,income,transfer'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
-            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'beneficiary' => ['nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'date' => ['required', 'date'],
-            'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:account_id'],
-            // Achats prévus : achat encore ouvert de l'utilisateur, ou « acheter quand même »
-            'planned_purchase_id' => ['nullable', 'uuid', Rule::exists('planned_purchases', 'id')
-                ->where('user_id', $userId)->where('status', PlannedPurchase::STATUS_PLANNED)->whereNull('deleted_at')],
-            'out_of_list' => ['nullable', 'in:accept'],
-        ]);
-
-        if ($validated['type'] === 'transfer' && ! isset($validated['transfer_to_account_id'])) {
-            return back()->withErrors([
-                'transfer_to_account_id' => 'Le compte de destination est requis pour un transfert.',
-            ]);
-        }
-
-        $purchaseId = $validated['planned_purchase_id'] ?? null;
-        $acceptOutOfList = ($validated['out_of_list'] ?? null) === 'accept';
-        unset($validated['planned_purchase_id'], $validated['out_of_list']);
+        $data = $request->safe()->except(['planned_purchase_id', 'out_of_list']);
 
         try {
-            DB::transaction(function () use ($request, $validated, $purchaseId, $acceptOutOfList) {
-                $transaction = $request->user()->transactions()->create($validated);
-                $purchases = app(PlannedPurchaseService::class);
-                if (! $purchases->isSubjectToRule($transaction) && $purchaseId === null) {
-                    return;
-                }
-
-                if ($purchaseId !== null && $transaction->type === 'expense') {
-                    $purchases->link(PlannedPurchase::findOrFail($purchaseId), $transaction);
-                } elseif ($acceptOutOfList) {
-                    $purchases->acceptUnplanned($transaction);
-                }
-            });
+            $entries->record($request->user(), $data, $request->validated('planned_purchase_id'), $request->validated('out_of_list') === 'accept');
         } catch (\DomainException) {
             // Achat devenu indisponible entre l'affichage et l'envoi : rien n'est enregistré
             throw ValidationException::withMessages(['planned_purchase_id' => "Cet achat prévu n'est plus disponible."]);
@@ -195,7 +161,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
             'type' => ['required', 'in:expense,income,transfer'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId), new NotReconciliationCategory($transaction->category_id)],
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -203,10 +169,15 @@ class TransactionController extends Controller
             'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}"],
         ]);
 
+        $wasPointed = $transaction->reconciled_at !== null;
         $transaction->update($validated);
 
-        return redirect()->route('transactions.index')
-            ->with('success', 'Transaction mise à jour avec succès.');
+        $redirect = redirect()->route('transactions.index')->with('success', 'Transaction mise à jour avec succès.');
+
+        // Module dette-qualite : un changement de montant, date, compte ou type dépointe l'opération
+        return $wasPointed && $transaction->reconciled_at === null
+            ? $redirect->with('warning', 'Opération dépointée : refaites le rapprochement du compte.')
+            : $redirect;
     }
 
     public function destroy(Transaction $transaction)
@@ -238,7 +209,7 @@ class TransactionController extends Controller
 
             $query->orderBy('date')->chunk(500, function ($transactions) use ($out) {
                 foreach ($transactions as $t) {
-                    fputcsv($out, [
+                    fputcsv($out, array_map([self::class, 'csvCell'], [
                         $t->date?->format('Y-m-d'),
                         $t->amount,
                         $t->type,
@@ -246,12 +217,20 @@ class TransactionController extends Controller
                         $t->description,
                         $t->category?->name,
                         $t->account?->name,
-                    ], ';');
+                    ]), ';');
                 }
             });
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** P16 : un texte commençant par =, +, -, @, tabulation ou retour chariot est préfixé d'une apostrophe. */
+    private static function csvCell(mixed $value): mixed
+    {
+        return is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)
+            ? "'".$value
+            : $value;
     }
 
     /**

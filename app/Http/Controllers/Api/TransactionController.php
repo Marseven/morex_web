@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
+use App\Rules\NotReconciliationCategory;
 use App\Rules\OwnedOrSystemCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -106,7 +107,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
             'type' => ['required', 'in:expense,income'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId), new NotReconciliationCategory],
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -181,7 +182,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'amount' => ['sometimes', 'integer', 'min:1'],
             'type' => ['sometimes', 'in:expense,income'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId), new NotReconciliationCategory($transaction->category_id)],
             'account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
