@@ -11,6 +11,7 @@ const props = defineProps({
 
 const r = computed(() => props.review)
 const formatAmount = (n) => new Intl.NumberFormat('fr-FR').format(Math.abs(n ?? 0))
+const formatRate = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(n ?? 0)
 const shortDate = (iso) => iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : ''
 
 const isActive = computed(() => r.value.cycle.status === 'active')
@@ -56,10 +57,10 @@ const launchHref = computed(() => `/budget-cycles?proposal=${r.value.cycle.id}`)
                 </div>
                 <p class="text-2xl font-semibold tabular-nums text-theme-text-primary">{{ r.savings < 0 ? '−' : '' }}{{ formatAmount(r.savings) }} <span class="text-sm font-normal text-theme-text-muted">FCFA</span></p>
                 <div class="h-2 rounded-full bg-theme-surface overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="savingsBar"
-                    :aria-label="`Taux d'épargne ${r.savings_rate} %, cible ${r.savings_target_rate} %`">
+                    :aria-label="`Taux d'épargne ${formatRate(r.savings_rate)} %, cible ${r.savings_target_rate} %`">
                     <div class="h-full rounded-full" :class="savingsOk ? 'bg-success' : 'bg-warning'" :style="{ width: `${savingsBar}%` }"></div>
                 </div>
-                <p class="text-sm text-theme-text-secondary tabular-nums">{{ r.savings_rate }} % des revenus · cible {{ r.savings_target_rate }} %</p>
+                <p class="text-sm text-theme-text-secondary tabular-nums">{{ formatRate(r.savings_rate) }} % des revenus · cible {{ r.savings_target_rate }} %</p>
                 <dl class="space-y-1 text-sm tabular-nums">
                     <div class="flex justify-between gap-2"><dt class="text-theme-text-secondary">Revenus</dt><dd class="text-theme-text-primary">{{ formatAmount(r.income) }}</dd></div>
                     <div class="flex justify-between gap-2"><dt class="text-theme-text-secondary">Dépenses perso</dt><dd class="text-theme-text-primary">{{ formatAmount(r.personal_spent) }} / {{ formatAmount(r.personal_budget) }}</dd></div>
