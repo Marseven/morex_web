@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main, develop]
+  # Toutes les PR, y compris celles empilées sur des branches feat/* (module dette-qualite)
   pull_request:
-    branches: [main, develop]
+
+# Moindre privilège : lecture seule (revue de sécurité du module dette-qualite)
+permissions:
+  contents: read
 
 jobs:
   tests:
@@ -12,35 +16,70 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        php: ['8.2']
+        # 8.2 : plancher de composer.json ; 8.5 : version de production (Hostinger)
+        php: ['8.2', '8.5']
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: ${{ matrix.php }}
           extensions: mbstring, dom, fileinfo, sqlite3, pdo_sqlite, bcmath
           coverage: none
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
+          key: composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ matrix.php }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Pas de .env : la suite tourne sur les valeurs par défaut de config/ (comme en local) avec une clé éphémère.
+      # Copier .env.example imposerait ses valeurs (ex. SESSION_LIFETIME) et masquerait les défauts testés.
       - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate
+        run: echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
 
       - name: Run tests
         # La suite tourne sur SQLite :memory: (voir phpunit.xml)
         run: php artisan test
+
+  style:
+    name: Formatage (Pint, fichiers modifiés)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      # Seulement les fichiers de la PR : le code ancien n'est pas encore au format (pas de reformatage massif)
+      - run: vendor/bin/pint --test --diff="$(git merge-base HEAD "origin/$BASE_REF")"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+
+  secrets:
+    name: Secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TransferResource;
 use App\Models\Transfer;
+use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -21,7 +22,7 @@ class TransferController extends Controller
             $accountId = $request->account_id;
             $query->where(function ($q) use ($accountId) {
                 $q->where('from_account_id', $accountId)
-                  ->orWhere('to_account_id', $accountId);
+                    ->orWhere('to_account_id', $accountId);
             });
         }
 
@@ -40,19 +41,20 @@ class TransferController extends Controller
         return TransferResource::collection($transfers);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, TransferService $transfers): JsonResponse
     {
         $userId = $request->user()->id;
 
         $validated = $request->validate([
             'from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:from_account_id'],
-            'amount' => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
+            'fee' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['required', 'date'],
         ]);
 
-        $transfer = $request->user()->transfers()->create($validated);
+        $transfer = $transfers->create($request->user(), $validated);
 
         return response()->json(
             new TransferResource($transfer->load(['fromAccount', 'toAccount'])),
@@ -68,7 +70,7 @@ class TransferController extends Controller
             'hops' => ['required', 'array', 'min:1'],
             'hops.*.from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'hops.*.to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'hops.*.amount' => ['required', 'integer', 'min:1'],
+            'hops.*.amount' => ['required', 'integer', 'min:1', 'max:999999999999'], // multi-sauts : sans frais
             'hops.*.description' => ['nullable', 'string', 'max:1000'],
             'hops.*.date' => ['required', 'date'],
         ]);
@@ -78,8 +80,8 @@ class TransferController extends Controller
         for ($i = 0; $i < count($hops) - 1; $i++) {
             if ($hops[$i]['to_account_id'] !== $hops[$i + 1]['from_account_id']) {
                 return response()->json([
-                    'message' => "Les sauts doivent se connecter: le compte d'arrivee du saut " . ($i + 1) . " doit etre le compte de depart du saut " . ($i + 2) . ".",
-                    'errors' => ['hops' => ["Connexion invalide entre les sauts " . ($i + 1) . " et " . ($i + 2)]],
+                    'message' => "Les sauts doivent se connecter: le compte d'arrivee du saut ".($i + 1).' doit etre le compte de depart du saut '.($i + 2).'.',
+                    'errors' => ['hops' => ['Connexion invalide entre les sauts '.($i + 1).' et '.($i + 2)]],
                 ], 422);
             }
         }
@@ -93,7 +95,7 @@ class TransferController extends Controller
         });
 
         return response()->json([
-            'message' => count($transfers) . ' transferts crees.',
+            'message' => count($transfers).' transferts crees.',
             'transfers' => TransferResource::collection(
                 collect($transfers)->map(fn ($t) => $t->load(['fromAccount', 'toAccount']))
             ),
@@ -107,7 +109,7 @@ class TransferController extends Controller
         return new TransferResource($transfer->load(['fromAccount', 'toAccount']));
     }
 
-    public function update(Request $request, Transfer $transfer): TransferResource
+    public function update(Request $request, Transfer $transfer, TransferService $transfers): TransferResource
     {
         $this->authorize('update', $transfer);
 
@@ -116,21 +118,24 @@ class TransferController extends Controller
         $validated = $request->validate([
             'from_account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'to_account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'amount' => ['sometimes', 'integer', 'min:1'],
+            // Sans « fee », le montant ne peut pas descendre sous les frais actuels (RM-3)
+            'amount' => ['sometimes', 'integer', 'min:'.max(1, $request->has('fee') ? 1 : (int) $transfer->fee), 'max:999999999999'],
+            // Frais bornés par le montant envoyé, sinon par le montant actuel (module transferts-frais)
+            'fee' => ['sometimes', 'integer', 'min:0', 'max:'.(int) $request->input('amount', $transfer->amount)],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['sometimes', 'date'],
         ]);
 
-        $transfer->update($validated);
+        $transfer = $transfers->update($transfer, $validated);
 
         return new TransferResource($transfer->fresh()->load(['fromAccount', 'toAccount']));
     }
 
-    public function destroy(Request $request, Transfer $transfer): JsonResponse
+    public function destroy(Request $request, Transfer $transfer, TransferService $transfers): JsonResponse
     {
         $this->authorize('delete', $transfer);
 
-        $transfer->delete();
+        $transfers->delete($transfer);
 
         return response()->json(null, 204);
     }

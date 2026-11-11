@@ -23,6 +23,7 @@ class Transfer extends Model
     {
         return [
             'amount' => 'integer',
+            'fee' => 'integer',
             'date' => 'date',
         ];
     }
@@ -40,6 +41,12 @@ class Transfer extends Model
     public function toAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'to_account_id');
+    }
+
+    /** Dépense « Frais bancaires » du transfert (module transferts-frais) ; fee et lien posés par TransferService. */
+    public function feeTransaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'fee_transaction_id');
     }
 
     protected static function booted(): void

@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TrackGoalRequest;
 use App\Http\Resources\GoalResource;
+use App\Models\Account;
 use App\Models\Goal;
+use App\Services\GoalProgressService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -13,24 +16,24 @@ use OpenApi\Attributes as OA;
 class GoalController extends Controller
 {
     #[OA\Get(
-        path: "/goals",
-        summary: "Liste des objectifs",
-        tags: ["Goals"],
-        security: [["bearerAuth" => []]],
+        path: '/goals',
+        summary: 'Liste des objectifs',
+        tags: ['Goals'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "status", in: "query", schema: new OA\Schema(type: "string", enum: ["active", "completed", "cancelled"])),
+            new OA\Parameter(name: 'status', in: 'query', schema: new OA\Schema(type: 'string', enum: ['active', 'completed', 'cancelled'])),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: "Liste des objectifs",
+                description: 'Liste des objectifs',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: "data", type: "array", items: new OA\Items(ref: "#/components/schemas/Goal")),
+                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/Goal')),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function index(Request $request): AnonymousResourceCollection
@@ -47,30 +50,30 @@ class GoalController extends Controller
     }
 
     #[OA\Post(
-        path: "/goals",
-        summary: "Créer un objectif",
-        tags: ["Goals"],
-        security: [["bearerAuth" => []]],
+        path: '/goals',
+        summary: 'Créer un objectif',
+        tags: ['Goals'],
+        security: [['bearerAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ["name", "type", "target_amount"],
+                required: ['name', 'type', 'target_amount'],
                 properties: [
-                    new OA\Property(property: "name", type: "string", example: "Fonds d'urgence"),
-                    new OA\Property(property: "type", type: "string", enum: ["savings", "debt", "investment", "custom"]),
-                    new OA\Property(property: "target_amount", type: "integer", example: 2610000, description: "Montant cible en FCFA"),
-                    new OA\Property(property: "current_amount", type: "integer", example: 0, description: "Montant déjà épargné"),
-                    new OA\Property(property: "target_date", type: "string", format: "date", nullable: true),
-                    new OA\Property(property: "account_id", type: "string", format: "uuid", nullable: true, description: "Compte associé pour suivi auto"),
-                    new OA\Property(property: "color", type: "string", example: "#8B5CF6"),
-                    new OA\Property(property: "icon", type: "string", example: "target"),
+                    new OA\Property(property: 'name', type: 'string', example: "Fonds d'urgence"),
+                    new OA\Property(property: 'type', type: 'string', enum: ['savings', 'debt', 'investment', 'custom']),
+                    new OA\Property(property: 'target_amount', type: 'integer', example: 2610000, description: 'Montant cible en FCFA'),
+                    new OA\Property(property: 'current_amount', type: 'integer', example: 0, description: 'Montant déjà épargné'),
+                    new OA\Property(property: 'target_date', type: 'string', format: 'date', nullable: true),
+                    new OA\Property(property: 'account_id', type: 'string', format: 'uuid', nullable: true, description: 'Compte associé pour suivi auto'),
+                    new OA\Property(property: 'color', type: 'string', example: '#8B5CF6'),
+                    new OA\Property(property: 'icon', type: 'string', example: 'target'),
                 ]
             )
         ),
         responses: [
-            new OA\Response(response: 201, description: "Objectif créé", content: new OA\JsonContent(ref: "#/components/schemas/Goal")),
-            new OA\Response(response: 422, description: "Erreur de validation"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 201, description: 'Objectif créé', content: new OA\JsonContent(ref: '#/components/schemas/Goal')),
+            new OA\Response(response: 422, description: 'Erreur de validation'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function store(Request $request): JsonResponse
@@ -98,17 +101,17 @@ class GoalController extends Controller
     }
 
     #[OA\Get(
-        path: "/goals/{id}",
+        path: '/goals/{id}',
         summary: "Détail d'un objectif",
-        tags: ["Goals"],
-        security: [["bearerAuth" => []]],
+        tags: ['Goals'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
         ],
         responses: [
-            new OA\Response(response: 200, description: "Détail de l'objectif", content: new OA\JsonContent(ref: "#/components/schemas/Goal")),
-            new OA\Response(response: 404, description: "Objectif non trouvé"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 200, description: "Détail de l'objectif", content: new OA\JsonContent(ref: '#/components/schemas/Goal')),
+            new OA\Response(response: 404, description: 'Objectif non trouvé'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function show(Request $request, Goal $goal): GoalResource
@@ -119,33 +122,33 @@ class GoalController extends Controller
     }
 
     #[OA\Put(
-        path: "/goals/{id}",
-        summary: "Modifier un objectif",
-        tags: ["Goals"],
-        security: [["bearerAuth" => []]],
+        path: '/goals/{id}',
+        summary: 'Modifier un objectif',
+        tags: ['Goals'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
         ],
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: "name", type: "string"),
-                    new OA\Property(property: "type", type: "string", enum: ["savings", "debt", "investment", "custom"]),
-                    new OA\Property(property: "target_amount", type: "integer"),
-                    new OA\Property(property: "current_amount", type: "integer"),
-                    new OA\Property(property: "target_date", type: "string", format: "date", nullable: true),
-                    new OA\Property(property: "account_id", type: "string", format: "uuid", nullable: true),
-                    new OA\Property(property: "status", type: "string", enum: ["active", "completed", "cancelled"]),
-                    new OA\Property(property: "color", type: "string"),
-                    new OA\Property(property: "icon", type: "string"),
+                    new OA\Property(property: 'name', type: 'string'),
+                    new OA\Property(property: 'type', type: 'string', enum: ['savings', 'debt', 'investment', 'custom']),
+                    new OA\Property(property: 'target_amount', type: 'integer'),
+                    new OA\Property(property: 'current_amount', type: 'integer'),
+                    new OA\Property(property: 'target_date', type: 'string', format: 'date', nullable: true),
+                    new OA\Property(property: 'account_id', type: 'string', format: 'uuid', nullable: true),
+                    new OA\Property(property: 'status', type: 'string', enum: ['active', 'completed', 'cancelled']),
+                    new OA\Property(property: 'color', type: 'string'),
+                    new OA\Property(property: 'icon', type: 'string'),
                 ]
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: "Objectif modifié", content: new OA\JsonContent(ref: "#/components/schemas/Goal")),
-            new OA\Response(response: 422, description: "Erreur de validation"),
-            new OA\Response(response: 404, description: "Objectif non trouvé"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 200, description: 'Objectif modifié', content: new OA\JsonContent(ref: '#/components/schemas/Goal')),
+            new OA\Response(response: 422, description: 'Erreur de validation'),
+            new OA\Response(response: 404, description: 'Objectif non trouvé'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function update(Request $request, Goal $goal): GoalResource
@@ -166,6 +169,11 @@ class GoalController extends Controller
             'icon' => ['nullable', 'string', 'max:50'],
         ]);
 
+        // Objectif suivi : compte et progression se gèrent par /track (module suivi-objectifs)
+        if ($goal->isTracked()) {
+            unset($validated['account_id'], $validated['current_amount']);
+        }
+
         $goal->update($validated);
 
         if (isset($validated['current_amount']) && $validated['current_amount'] >= $goal->target_amount) {
@@ -176,17 +184,17 @@ class GoalController extends Controller
     }
 
     #[OA\Delete(
-        path: "/goals/{id}",
-        summary: "Supprimer un objectif",
-        tags: ["Goals"],
-        security: [["bearerAuth" => []]],
+        path: '/goals/{id}',
+        summary: 'Supprimer un objectif',
+        tags: ['Goals'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
         ],
         responses: [
-            new OA\Response(response: 204, description: "Objectif supprimé"),
-            new OA\Response(response: 404, description: "Objectif non trouvé"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 204, description: 'Objectif supprimé'),
+            new OA\Response(response: 404, description: 'Objectif non trouvé'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function destroy(Request $request, Goal $goal): JsonResponse
@@ -199,32 +207,33 @@ class GoalController extends Controller
     }
 
     #[OA\Post(
-        path: "/goals/{id}/contribute",
-        summary: "Ajouter une contribution à un objectif",
-        tags: ["Goals"],
-        security: [["bearerAuth" => []]],
+        path: '/goals/{id}/contribute',
+        summary: 'Ajouter une contribution à un objectif',
+        tags: ['Goals'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
         ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ["amount"],
+                required: ['amount'],
                 properties: [
-                    new OA\Property(property: "amount", type: "integer", example: 50000, description: "Montant à ajouter en FCFA"),
+                    new OA\Property(property: 'amount', type: 'integer', example: 50000, description: 'Montant à ajouter en FCFA'),
                 ]
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: "Contribution ajoutée", content: new OA\JsonContent(ref: "#/components/schemas/Goal")),
-            new OA\Response(response: 422, description: "Erreur de validation"),
-            new OA\Response(response: 404, description: "Objectif non trouvé"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 200, description: 'Contribution ajoutée', content: new OA\JsonContent(ref: '#/components/schemas/Goal')),
+            new OA\Response(response: 422, description: 'Erreur de validation'),
+            new OA\Response(response: 404, description: 'Objectif non trouvé'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
-    public function addContribution(Request $request, Goal $goal): GoalResource
+    public function addContribution(Request $request, Goal $goal, GoalProgressService $progress): GoalResource
     {
         $this->authorize('update', $goal);
+        $progress->assertManual($goal);
 
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
@@ -233,5 +242,20 @@ class GoalController extends Controller
         $goal->addAmount($validated['amount']);
 
         return new GoalResource($goal->fresh()->load('account'));
+    }
+
+    public function track(TrackGoalRequest $request, Goal $goal, GoalProgressService $progress): GoalResource
+    {
+        $account = Account::findOrFail($request->validated('account_id'));
+        $progress->track($goal, $account, (int) $request->validated('start_amount'), $request->validated('monthly_target'));
+
+        return new GoalResource($goal->fresh()->load('account'));
+    }
+
+    public function untrack(Goal $goal, GoalProgressService $progress): GoalResource
+    {
+        $this->authorize('update', $goal);
+
+        return new GoalResource($progress->untrack($goal)->fresh()->load('account'));
     }
 }

@@ -1,6 +1,7 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import { computed } from 'vue'
 
 const props = defineProps({
     goal: { type: Object, required: true },
@@ -13,11 +14,27 @@ const form = useForm({
     target_amount: props.goal.target_amount,
     current_amount: props.goal.current_amount,
     target_date: props.goal.target_date ? props.goal.target_date.split('T')[0] : '',
-    account_id: props.goal.account_id || '',
+    account_id: props.goal.account_id || null,
     status: props.goal.status,
     color: props.goal.color || '#FFFFFF',
     icon: props.goal.icon || 'target',
 })
+
+// Suivi sur un compte (module suivi-objectifs) : la progression suit le solde du compte
+const isTracked = computed(() => !!props.goal.tracked_since)
+const trackForm = useForm({
+    account_id: props.goal.account_id || props.accounts.find((a) => /epargne/i.test(a.name.normalize('NFD').replace(/\p{Diacritic}/gu, '')))?.id || props.accounts[0]?.id || '',
+    start_amount: props.goal.current_amount,
+    monthly_target: props.goal.monthly_target ?? null,
+})
+const trackedAccount = computed(() => props.accounts.find((a) => a.id === props.goal.account_id))
+const formatAmount = (amount) => new Intl.NumberFormat('fr-FR').format(amount ?? 0)
+const startTracking = () => trackForm.post(`/goals/${props.goal.id}/track`, { preserveScroll: true })
+const stopTracking = () => {
+    if (confirm(`La progression redeviendra manuelle, figée à ${formatAmount(props.goal.current_amount)} FCFA. Arrêter le suivi ?`)) {
+        router.delete(`/goals/${props.goal.id}/track`, { preserveScroll: true })
+    }
+}
 
 const goalTypes = [
     { value: 'emergency_fund', label: 'Fonds d\'urgence' },
@@ -110,14 +127,18 @@ const submit = () => {
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Montant actuel (FCFA)</label>
+                        <label for="current_amount" class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Montant actuel (FCFA)</label>
                         <input
+                            id="current_amount"
                             v-model.number="form.current_amount"
                             type="number"
                             required
                             min="0"
+                            :readonly="isTracked"
+                            :aria-describedby="isTracked ? 'current-help' : undefined"
                             class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary focus:border-white focus:ring-0 outline-none"
                         />
+                        <p v-if="isTracked" id="current-help" class="mt-1 text-xs text-theme-text-muted">Calculé à partir du solde de « {{ trackedAccount?.name }} ».</p>
                     </div>
 
                     <div>
@@ -127,19 +148,6 @@ const submit = () => {
                             type="date"
                             class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary focus:border-white focus:ring-0 outline-none"
                         />
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Compte associé</label>
-                        <select
-                            v-model="form.account_id"
-                            class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary focus:border-white focus:ring-0 outline-none"
-                        >
-                            <option value="">Aucun</option>
-                            <option v-for="account in accounts" :key="account.id" :value="account.id">
-                                {{ account.name }}
-                            </option>
-                        </select>
                     </div>
 
                     <div>
@@ -171,6 +179,59 @@ const submit = () => {
                     </button>
                 </div>
             </form>
+
+            <!-- Suivre sur un compte (module suivi-objectifs) -->
+            <section class="glass-card p-6 mt-6 space-y-4" aria-labelledby="tracking-title">
+                <h2 id="tracking-title" class="text-sm font-semibold text-theme-text-primary">
+                    {{ isTracked ? 'Suivi sur un compte' : 'Suivre sur un compte' }}
+                    <span v-if="isTracked" class="ml-2 text-xs font-normal text-green-400">Actif</span>
+                </h2>
+
+                <template v-if="isTracked">
+                    <dl class="grid grid-cols-2 gap-2 text-sm">
+                        <dt class="text-theme-text-muted">Compte</dt><dd class="text-theme-text-primary">{{ trackedAccount?.name }}</dd>
+                        <dt class="text-theme-text-muted">Suivi depuis</dt><dd class="text-theme-text-primary">{{ new Date(goal.tracked_since).toLocaleDateString('fr-FR') }}</dd>
+                        <dt class="text-theme-text-muted">Départ</dt><dd class="text-theme-text-primary">{{ formatAmount(goal.tracked_start_amount) }} FCFA</dd>
+                        <dt class="text-theme-text-muted">Versement visé</dt><dd class="text-theme-text-primary">{{ goal.monthly_target ? `${formatAmount(goal.monthly_target)} FCFA/mois` : '—' }}</dd>
+                    </dl>
+                    <div class="flex justify-end">
+                        <button type="button" class="px-4 py-2 min-h-[44px] text-sm text-theme-text-secondary border border-theme-border rounded-md hover:text-theme-text-primary" @click="stopTracking">
+                            Arrêter le suivi
+                        </button>
+                    </div>
+                </template>
+
+                <form v-else class="space-y-4" @submit.prevent="startTracking">
+                    <p class="text-xs text-theme-text-muted">La progression sera calculée à partir du solde du compte : les versements et transferts entrants comptent, les retraits se déduisent.</p>
+                    <p v-if="!accounts.length" class="text-sm text-theme-text-secondary">Aucun compte disponible. Créez d'abord un compte.</p>
+                    <div>
+                        <label for="track_account" class="block text-xs text-theme-text-secondary mb-1">Compte</label>
+                        <select id="track_account" v-model="trackForm.account_id" required
+                            class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-base text-theme-text-primary outline-none focus:border-white">
+                            <option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option>
+                        </select>
+                        <p v-if="trackForm.errors.account_id" class="mt-1 text-xs text-red-400">Ce compte n'est pas disponible.</p>
+                    </div>
+                    <div>
+                        <label for="start_amount" class="block text-xs text-theme-text-secondary mb-1">Montant de départ (FCFA)</label>
+                        <input id="start_amount" v-model.number="trackForm.start_amount" type="number" min="0" step="1" required aria-describedby="start-help"
+                            class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-base text-theme-text-primary outline-none focus:border-white" />
+                        <p id="start-help" class="mt-1 text-xs text-theme-text-muted">Le montant déjà épargné aujourd'hui pour cet objectif.</p>
+                        <p v-if="trackForm.errors.start_amount" class="mt-1 text-xs text-red-400">Entrez un montant entier, sans décimales.</p>
+                    </div>
+                    <div>
+                        <label for="monthly_target" class="block text-xs text-theme-text-secondary mb-1">Versement mensuel visé (FCFA, facultatif)</label>
+                        <input id="monthly_target" v-model.number="trackForm.monthly_target" type="number" min="0" step="1"
+                            class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-base text-theme-text-primary outline-none focus:border-white" />
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" :disabled="trackForm.processing || !accounts.length"
+                            class="px-4 py-2 min-h-[44px] text-sm font-medium rounded-md bg-theme-btn-primary-bg text-theme-btn-primary-text disabled:opacity-50">
+                            {{ trackForm.processing ? 'Enregistrement…' : 'Suivre ce compte' }}
+                        </button>
+                    </div>
+                </form>
+            </section>
         </div>
     </AppLayout>
 </template>

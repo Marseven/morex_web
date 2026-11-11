@@ -1,23 +1,49 @@
 <script setup>
-import { computed } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { computed, nextTick, ref } from 'vue'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import PurchaseCheck from '@/Components/Purchases/PurchaseCheck.vue'
 
 const props = defineProps({
     accounts: { type: Array, default: () => [] },
     categories: { type: Array, default: () => [] },
+    plannedPurchases: { type: Array, default: () => [] },
+    purchaseThreshold: { type: Number, default: 30000 },
+    nextPeriodStart: { type: String, default: '' },
+    prefill: { type: Object, default: null },
 })
 
 const form = useForm({
-    amount: '',
+    amount: props.prefill?.amount ?? '',
     type: 'expense',
-    category_id: '',
+    category_id: props.prefill?.category_id ?? '',
     account_id: props.accounts[0]?.id || '',
-    beneficiary: '',
+    beneficiary: props.prefill?.beneficiary ?? '',
     description: '',
     date: new Date().toISOString().split('T')[0],
     transfer_to_account_id: '',
+    planned_purchase_id: props.prefill?.planned_purchase_id ?? '',
+    out_of_list: '',
 })
+
+// Achats prévus (module achats-prevus) : bloc évalué à la sortie du champ montant, pas à chaque frappe
+const committedAmount = ref(Number(form.amount) || 0)
+const commitAmount = () => { committedAmount.value = Number(form.amount) || 0 }
+const purchaseCheck = ref(null)
+// Le transit et le pro ne sont pas concernés par la règle (module revenus-transit)
+const isRegularCategory = computed(() => {
+    const cat = props.categories.find((c) => c.id === form.category_id)
+    return !cat || !cat.nature || cat.nature === 'regular'
+})
+const showPurchaseCheck = computed(() => form.type === 'expense' && isRegularCategory.value && committedAmount.value >= props.purchaseThreshold)
+const postpone = () => {
+    router.post('/purchases', {
+        name: form.beneficiary || form.description || 'Achat reporté',
+        estimated_amount: Number(form.amount),
+        category_id: form.category_id || null,
+        when: 'next',
+    })
+}
 
 const filteredCategories = computed(() => {
     return props.categories.filter(cat =>
@@ -30,8 +56,20 @@ const otherAccounts = computed(() => {
     return props.accounts.filter(acc => acc.id !== form.account_id)
 })
 
-const submit = () => {
-    form.post('/transactions')
+const submit = async () => {
+    commitAmount()
+    await nextTick()
+    // Filet : une dépense au-dessus du seuil demande un choix explicite (jamais un blocage)
+    if (showPurchaseCheck.value && purchaseCheck.value && !purchaseCheck.value.decided) {
+        purchaseCheck.value.$el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        purchaseCheck.value.focus()
+        return
+    }
+    form.transform((data) => ({
+        ...data,
+        planned_purchase_id: showPurchaseCheck.value ? (data.planned_purchase_id || null) : null,
+        out_of_list: showPurchaseCheck.value ? (data.out_of_list || null) : null,
+    })).post('/transactions')
 }
 </script>
 
@@ -91,6 +129,7 @@ const submit = () => {
                         <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Montant (FCFA)</label>
                         <input
                             v-model.number="form.amount"
+                            @blur="commitAmount"
                             type="number"
                             required
                             min="1"
@@ -141,6 +180,18 @@ const submit = () => {
                             </option>
                         </select>
                     </div>
+
+                    <PurchaseCheck
+                        v-if="showPurchaseCheck"
+                        ref="purchaseCheck"
+                        v-model:purchase-id="form.planned_purchase_id"
+                        v-model:out-of-list="form.out_of_list"
+                        :amount="committedAmount"
+                        :category-id="form.category_id"
+                        :purchases="plannedPurchases"
+                        :next-start="nextPeriodStart"
+                        @postpone="postpone"
+                    />
 
                     <div>
                         <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Date</label>

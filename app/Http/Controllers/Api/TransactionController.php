@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
+use App\Rules\NotReconciliationCategory;
 use App\Rules\OwnedOrSystemCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,31 +15,31 @@ use OpenApi\Attributes as OA;
 class TransactionController extends Controller
 {
     #[OA\Get(
-        path: "/transactions",
-        summary: "Liste des transactions",
-        tags: ["Transactions"],
-        security: [["bearerAuth" => []]],
+        path: '/transactions',
+        summary: 'Liste des transactions',
+        tags: ['Transactions'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "type", in: "query", schema: new OA\Schema(type: "string", enum: ["expense", "income", "transfer"])),
-            new OA\Parameter(name: "account_id", in: "query", schema: new OA\Schema(type: "string", format: "uuid")),
-            new OA\Parameter(name: "category_id", in: "query", schema: new OA\Schema(type: "string", format: "uuid")),
-            new OA\Parameter(name: "start_date", in: "query", schema: new OA\Schema(type: "string", format: "date")),
-            new OA\Parameter(name: "end_date", in: "query", schema: new OA\Schema(type: "string", format: "date")),
-            new OA\Parameter(name: "per_page", in: "query", schema: new OA\Schema(type: "integer", default: 20)),
-            new OA\Parameter(name: "page", in: "query", schema: new OA\Schema(type: "integer", default: 1)),
+            new OA\Parameter(name: 'type', in: 'query', schema: new OA\Schema(type: 'string', enum: ['expense', 'income', 'transfer'])),
+            new OA\Parameter(name: 'account_id', in: 'query', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'category_id', in: 'query', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'start_date', in: 'query', schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'end_date', in: 'query', schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', default: 20)),
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: "Liste paginée des transactions",
+                description: 'Liste paginée des transactions',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: "data", type: "array", items: new OA\Items(ref: "#/components/schemas/Transaction")),
-                        new OA\Property(property: "meta", ref: "#/components/schemas/PaginationMeta"),
+                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/Transaction')),
+                        new OA\Property(property: 'meta', ref: '#/components/schemas/PaginationMeta'),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function index(Request $request): AnonymousResourceCollection
@@ -73,30 +74,30 @@ class TransactionController extends Controller
     }
 
     #[OA\Post(
-        path: "/transactions",
-        summary: "Créer une transaction",
-        tags: ["Transactions"],
-        security: [["bearerAuth" => []]],
+        path: '/transactions',
+        summary: 'Créer une transaction',
+        tags: ['Transactions'],
+        security: [['bearerAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ["amount", "type", "account_id", "date"],
+                required: ['amount', 'type', 'account_id', 'date'],
                 properties: [
-                    new OA\Property(property: "amount", type: "integer", example: 25000, description: "Montant en FCFA"),
-                    new OA\Property(property: "type", type: "string", enum: ["expense", "income", "transfer"]),
-                    new OA\Property(property: "category_id", type: "string", format: "uuid", nullable: true),
-                    new OA\Property(property: "account_id", type: "string", format: "uuid"),
-                    new OA\Property(property: "beneficiary", type: "string", nullable: true, example: "Supermarché"),
-                    new OA\Property(property: "description", type: "string", nullable: true),
-                    new OA\Property(property: "date", type: "string", format: "date", example: "2026-01-27"),
-                    new OA\Property(property: "transfer_to_account_id", type: "string", format: "uuid", nullable: true, description: "Requis pour les transferts"),
+                    new OA\Property(property: 'amount', type: 'integer', example: 25000, description: 'Montant en FCFA'),
+                    new OA\Property(property: 'type', type: 'string', enum: ['expense', 'income', 'transfer']),
+                    new OA\Property(property: 'category_id', type: 'string', format: 'uuid', nullable: true),
+                    new OA\Property(property: 'account_id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'beneficiary', type: 'string', nullable: true, example: 'Supermarché'),
+                    new OA\Property(property: 'description', type: 'string', nullable: true),
+                    new OA\Property(property: 'date', type: 'string', format: 'date', example: '2026-01-27'),
+                    new OA\Property(property: 'transfer_to_account_id', type: 'string', format: 'uuid', nullable: true, description: 'Requis pour les transferts'),
                 ]
             )
         ),
         responses: [
-            new OA\Response(response: 201, description: "Transaction créée", content: new OA\JsonContent(ref: "#/components/schemas/Transaction")),
-            new OA\Response(response: 422, description: "Erreur de validation"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 201, description: 'Transaction créée', content: new OA\JsonContent(ref: '#/components/schemas/Transaction')),
+            new OA\Response(response: 422, description: 'Erreur de validation'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function store(Request $request): JsonResponse
@@ -106,7 +107,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
             'type' => ['required', 'in:expense,income'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId), new NotReconciliationCategory],
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -123,17 +124,17 @@ class TransactionController extends Controller
     }
 
     #[OA\Get(
-        path: "/transactions/{id}",
+        path: '/transactions/{id}',
         summary: "Détail d'une transaction",
-        tags: ["Transactions"],
-        security: [["bearerAuth" => []]],
+        tags: ['Transactions'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
         ],
         responses: [
-            new OA\Response(response: 200, description: "Détail de la transaction", content: new OA\JsonContent(ref: "#/components/schemas/Transaction")),
-            new OA\Response(response: 404, description: "Transaction non trouvée"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 200, description: 'Détail de la transaction', content: new OA\JsonContent(ref: '#/components/schemas/Transaction')),
+            new OA\Response(response: 404, description: 'Transaction non trouvée'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function show(Request $request, Transaction $transaction): TransactionResource
@@ -144,32 +145,32 @@ class TransactionController extends Controller
     }
 
     #[OA\Put(
-        path: "/transactions/{id}",
-        summary: "Modifier une transaction",
-        tags: ["Transactions"],
-        security: [["bearerAuth" => []]],
+        path: '/transactions/{id}',
+        summary: 'Modifier une transaction',
+        tags: ['Transactions'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
         ],
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: "amount", type: "integer"),
-                    new OA\Property(property: "type", type: "string", enum: ["expense", "income", "transfer"]),
-                    new OA\Property(property: "category_id", type: "string", format: "uuid", nullable: true),
-                    new OA\Property(property: "account_id", type: "string", format: "uuid"),
-                    new OA\Property(property: "beneficiary", type: "string", nullable: true),
-                    new OA\Property(property: "description", type: "string", nullable: true),
-                    new OA\Property(property: "date", type: "string", format: "date"),
-                    new OA\Property(property: "transfer_to_account_id", type: "string", format: "uuid", nullable: true),
+                    new OA\Property(property: 'amount', type: 'integer'),
+                    new OA\Property(property: 'type', type: 'string', enum: ['expense', 'income', 'transfer']),
+                    new OA\Property(property: 'category_id', type: 'string', format: 'uuid', nullable: true),
+                    new OA\Property(property: 'account_id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'beneficiary', type: 'string', nullable: true),
+                    new OA\Property(property: 'description', type: 'string', nullable: true),
+                    new OA\Property(property: 'date', type: 'string', format: 'date'),
+                    new OA\Property(property: 'transfer_to_account_id', type: 'string', format: 'uuid', nullable: true),
                 ]
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: "Transaction modifiée", content: new OA\JsonContent(ref: "#/components/schemas/Transaction")),
-            new OA\Response(response: 422, description: "Erreur de validation"),
-            new OA\Response(response: 404, description: "Transaction non trouvée"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 200, description: 'Transaction modifiée', content: new OA\JsonContent(ref: '#/components/schemas/Transaction')),
+            new OA\Response(response: 422, description: 'Erreur de validation'),
+            new OA\Response(response: 404, description: 'Transaction non trouvée'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function update(Request $request, Transaction $transaction): TransactionResource
@@ -181,7 +182,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'amount' => ['sometimes', 'integer', 'min:1'],
             'type' => ['sometimes', 'in:expense,income'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId), new NotReconciliationCategory($transaction->category_id)],
             'account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -195,17 +196,17 @@ class TransactionController extends Controller
     }
 
     #[OA\Delete(
-        path: "/transactions/{id}",
-        summary: "Supprimer une transaction",
-        tags: ["Transactions"],
-        security: [["bearerAuth" => []]],
+        path: '/transactions/{id}',
+        summary: 'Supprimer une transaction',
+        tags: ['Transactions'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "string", format: "uuid")),
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
         ],
         responses: [
-            new OA\Response(response: 204, description: "Transaction supprimée"),
-            new OA\Response(response: 404, description: "Transaction non trouvée"),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 204, description: 'Transaction supprimée'),
+            new OA\Response(response: 404, description: 'Transaction non trouvée'),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function destroy(Request $request, Transaction $transaction): JsonResponse
@@ -218,38 +219,38 @@ class TransactionController extends Controller
     }
 
     #[OA\Get(
-        path: "/transactions-stats",
-        summary: "Statistiques des transactions",
-        tags: ["Transactions"],
-        security: [["bearerAuth" => []]],
+        path: '/transactions-stats',
+        summary: 'Statistiques des transactions',
+        tags: ['Transactions'],
+        security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: "start_date", in: "query", schema: new OA\Schema(type: "string", format: "date")),
-            new OA\Parameter(name: "end_date", in: "query", schema: new OA\Schema(type: "string", format: "date")),
+            new OA\Parameter(name: 'start_date', in: 'query', schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'end_date', in: 'query', schema: new OA\Schema(type: 'string', format: 'date')),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: "Statistiques des transactions",
+                description: 'Statistiques des transactions',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: "period", type: "object", properties: [
-                            new OA\Property(property: "start", type: "string", format: "date"),
-                            new OA\Property(property: "end", type: "string", format: "date"),
+                        new OA\Property(property: 'period', type: 'object', properties: [
+                            new OA\Property(property: 'start', type: 'string', format: 'date'),
+                            new OA\Property(property: 'end', type: 'string', format: 'date'),
                         ]),
-                        new OA\Property(property: "income", type: "integer"),
-                        new OA\Property(property: "expense", type: "integer"),
-                        new OA\Property(property: "balance", type: "integer"),
-                        new OA\Property(property: "by_category", type: "array", items: new OA\Items(
+                        new OA\Property(property: 'income', type: 'integer'),
+                        new OA\Property(property: 'expense', type: 'integer'),
+                        new OA\Property(property: 'balance', type: 'integer'),
+                        new OA\Property(property: 'by_category', type: 'array', items: new OA\Items(
                             properties: [
-                                new OA\Property(property: "category", type: "string"),
-                                new OA\Property(property: "color", type: "string"),
-                                new OA\Property(property: "total", type: "integer"),
+                                new OA\Property(property: 'category', type: 'string'),
+                                new OA\Property(property: 'color', type: 'string'),
+                                new OA\Property(property: 'total', type: 'integer'),
                             ]
                         )),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: "Non authentifié"),
+            new OA\Response(response: 401, description: 'Non authentifié'),
         ]
     )]
     public function stats(Request $request): JsonResponse
@@ -257,7 +258,9 @@ class TransactionController extends Controller
         $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
         $endDate = $request->end_date ?? now()->endOfMonth()->toDateString();
 
+        // Hors attente, écarts et transit (module revenus-transit)
         $transactions = $request->user()->transactions()
+            ->counted()
             ->whereBetween('date', [$startDate, $endDate]);
 
         $income = (clone $transactions)->where('type', 'income')->sum('amount');
@@ -265,6 +268,7 @@ class TransactionController extends Controller
 
         $byCategory = $request->user()->transactions()
             ->with('category')
+            ->counted()
             ->where('type', 'expense')
             ->whereBetween('date', [$startDate, $endDate])
             ->selectRaw('category_id, SUM(amount) as total')

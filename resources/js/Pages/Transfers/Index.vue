@@ -116,6 +116,7 @@ const deleteTransfer = (transfer) => {
                         </div>
                         <div class="flex flex-col items-end flex-shrink-0">
                             <span class="text-sm font-medium text-blue-400 whitespace-nowrap">{{ formatAmount(transfer.amount) }} FCFA</span>
+                            <span v-if="transfer.fee > 0" class="text-xs text-theme-text-secondary whitespace-nowrap">frais {{ formatAmount(transfer.fee) }} FCFA</span>
                             <div class="flex items-center gap-0.5 mt-1">
                                 <Link :href="`/transfers/${transfer.id}/edit`" class="p-1.5 -my-1 rounded-md text-theme-text-secondary hover:text-theme-text-primary" title="Modifier" aria-label="Modifier">
                                     <PencilSquareIcon class="w-4 h-4" />
@@ -157,6 +158,7 @@ const deleteTransfer = (transfer) => {
                             </td>
                             <td class="px-4 py-3 text-right">
                                 <span class="text-sm font-medium text-blue-400">{{ formatAmount(transfer.amount) }} FCFA</span>
+                                <span v-if="transfer.fee > 0" class="block text-xs text-theme-text-secondary">frais {{ formatAmount(transfer.fee) }} FCFA</span>
                             </td>
                             <td class="px-4 py-3 text-right">
                                 <div class="flex items-center justify-end gap-2">

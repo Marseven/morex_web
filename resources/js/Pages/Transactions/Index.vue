@@ -84,6 +84,12 @@ const deleteTransaction = (tx) => {
                 </div>
                 <div class="flex items-center gap-2">
                     <Link
+                        href="/transactions/batch"
+                        class="px-3 py-1.5 border border-theme-border text-theme-text-secondary hover:text-theme-text-primary text-sm font-medium rounded-md transition-colors"
+                    >
+                        Saisie en lot
+                    </Link>
+                    <Link
                         href="/transactions/import"
                         class="px-3 py-1.5 border border-theme-border text-theme-text-secondary hover:text-theme-text-primary text-sm font-medium rounded-md transition-colors"
                     >

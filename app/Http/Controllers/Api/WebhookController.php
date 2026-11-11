@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\SmsParser;
+use App\Services\SmsReconciler;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,8 +17,8 @@ class WebhookController extends Controller
     public function sms(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'message' => ['required', 'string'],
-            'sender' => ['nullable', 'string'],
+            'message' => ['required', 'string', 'max:2000'],
+            'sender' => ['nullable', 'string', 'max:100'],
             'account_id' => ['nullable', 'uuid'],
         ]);
 
@@ -53,16 +55,7 @@ class WebhookController extends Controller
                 ], 403);
             }
         }
-        if (! $accountId) {
-            // Try to find a matching account by name
-            $source = strtolower($result['source'] ?? '');
-            $account = $user->accounts()
-                ->where(function ($q) use ($source) {
-                    $q->whereRaw('LOWER(name) LIKE ?', ["%{$source}%"]);
-                })
-                ->first();
-            $accountId = $account?->id;
-        }
+        $accountId ??= self::accountIdForSource($user, $result['source'] ?? null);
 
         if (! $accountId) {
             // Fall back to default account
@@ -77,6 +70,16 @@ class WebhookController extends Controller
                 'parsed' => true,
                 'result' => $result,
             ], 422);
+        }
+
+        // Module sms-iphone : une opération déjà saisie (notes du jour) est pointée au lieu d'être dupliquée
+        $reconciled = app(SmsReconciler::class)->reconcile(Account::findOrFail($accountId), $result, now()->toDateString(), $fingerprint);
+        if ($reconciled['status'] === SmsReconciler::MATCHED) {
+            return response()->json(['message' => 'Opération déjà saisie : pointée.', 'parsed' => true, 'matched' => true]
+                + ($this->isFullToken($request) ? ['transaction_id' => $reconciled['transaction_id']] : []));
+        }
+        if ($reconciled['status'] === SmsReconciler::ALREADY_IMPORTED) {
+            return response()->json(['message' => 'Déjà importé depuis un relevé.', 'parsed' => true, 'duplicate' => true]);
         }
 
         $transaction = new Transaction([
@@ -98,12 +101,9 @@ class WebhookController extends Controller
             return $this->duplicateResponse($this->findBySmsFingerprint($user->id, $fingerprint));
         }
 
-        return response()->json([
-            'message' => 'Transaction creee en attente de validation.',
-            'parsed' => true,
-            'transaction_id' => $transaction->id,
-            'result' => $result,
-        ], 201);
+        // Jeton du Raccourci (restreint) : réponse minimale, sans identifiant ni contenu analysé
+        return response()->json(['message' => 'Transaction creee en attente de validation.', 'parsed' => true]
+            + ($this->isFullToken($request) ? ['transaction_id' => $transaction->id, 'result' => $result] : []), 201);
     }
 
     private function findBySmsFingerprint(int $userId, string $fingerprint): ?Transaction
@@ -122,5 +122,28 @@ class WebhookController extends Controller
             'duplicate' => true,
             'transaction_id' => $transaction->id,
         ]);
+    }
+
+    /**
+     * P13 (module dette-qualite) : un compte n'est retrouvé par son nom qu'avec une source non vide,
+     * jokers LIKE échappés. Sans source, l'appelant retombe sur le compte par défaut.
+     */
+    public static function accountIdForSource(User $user, ?string $source): ?string
+    {
+        $source = mb_strtolower(trim((string) $source));
+        if ($source === '') {
+            return null;
+        }
+        $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $source);
+
+        return $user->accounts()->whereRaw("LOWER(name) LIKE ? ESCAPE '!'", ["%{$escaped}%"])
+            ->orderBy('created_at')->value('id'); // plusieurs correspondances : toujours la même
+    }
+
+    private function isFullToken(Request $request): bool
+    {
+        $token = $request->user()?->currentAccessToken();
+
+        return ! $token instanceof \Laravel\Sanctum\PersonalAccessToken || $token->can('*');
     }
 }

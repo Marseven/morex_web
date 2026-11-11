@@ -1,18 +1,22 @@
 <?php
 
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountController;
-use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\GoalController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\DebtController;
 use App\Http\Controllers\AnalyticsController;
-use App\Http\Controllers\PasswordResetController;
-use App\Http\Controllers\TwoFactorAuthController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BatchEntryController;
 use App\Http\Controllers\BudgetCycleController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DebtController;
+use App\Http\Controllers\GoalController;
+use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PlannedPurchaseController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReconciliationController;
+use App\Http\Controllers\StatementController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TransferController;
+use App\Http\Controllers\TwoFactorAuthController;
 use Illuminate\Support\Facades\Route;
 
 // Routes d'authentification (publiques)
@@ -43,10 +47,17 @@ Route::middleware('auth')->group(function () {
     // Comptes
     Route::resource('accounts', AccountController::class)->except(['show']);
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('accounts.adjust-balance');
+    Route::get('/accounts/{account}/reconcile', [ReconciliationController::class, 'show'])->name('accounts.reconcile');
+    Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('accounts.reconciliations.store');
+    Route::get('/accounts/{account}/statement', [StatementController::class, 'show'])->name('accounts.statement');
+    Route::post('/accounts/{account}/statement/preview', [StatementController::class, 'preview'])->middleware('throttle:30,1')->name('accounts.statement.preview');
+    Route::post('/accounts/{account}/statement', [StatementController::class, 'store'])->middleware('throttle:30,1')->name('accounts.statement.store');
 
     // Transactions
     // (routes spécifiques AVANT la resource pour ne pas être capturées par {transaction})
     Route::get('/transactions/pending', [TransactionController::class, 'pending'])->name('transactions.pending');
+    Route::get('/transactions/batch', [BatchEntryController::class, 'show'])->name('transactions.batch');
+    Route::post('/transactions/notes/preview', [BatchEntryController::class, 'preview'])->middleware('throttle:30,1')->name('transactions.notes.preview');
     Route::post('/transactions/{transaction}/validate', [TransactionController::class, 'validateTransaction'])->name('transactions.validate');
     Route::get('/transactions/import', [TransactionController::class, 'showImport'])->name('transactions.import');
     Route::post('/transactions/import', [TransactionController::class, 'import'])->name('transactions.import.store');
@@ -62,13 +73,17 @@ Route::middleware('auth')->group(function () {
 
     // Cycles budgétaires
     Route::get('/budget-cycles', [BudgetCycleController::class, 'index'])->name('budget-cycles.index');
+    Route::get('/budget-cycles/{cycle}/bilan', [BudgetCycleController::class, 'review'])->name('budget-cycles.review');
     Route::post('/budget-cycles/start', [BudgetCycleController::class, 'start'])->name('budget-cycles.start');
     Route::put('/budget-cycles/active', [BudgetCycleController::class, 'updateActive'])->name('budget-cycles.update-active');
     Route::post('/budget-cycles/close', [BudgetCycleController::class, 'close'])->name('budget-cycles.close');
 
     // Objectifs
     Route::resource('goals', GoalController::class)->except(['show']);
+    Route::resource('purchases', PlannedPurchaseController::class)->only(['index', 'store', 'destroy']);
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'contribute'])->name('goals.contribute');
+    Route::post('/goals/{goal}/track', [GoalController::class, 'track'])->name('goals.track');
+    Route::delete('/goals/{goal}/track', [GoalController::class, 'untrack'])->name('goals.untrack');
 
     // Transferts
     Route::get('/transfers/import', [TransferController::class, 'showImport'])->name('transfers.import');
@@ -91,6 +106,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
     Route::delete('/profile/avatar', [ProfileController::class, 'deleteAvatar'])->name('profile.avatar.delete');
+    Route::post('/profile/sms-token', [ProfileController::class, 'issueSmsToken'])->middleware('throttle:6,1')->name('profile.sms-token.store');
+    Route::delete('/profile/sms-token', [ProfileController::class, 'revokeSmsToken'])->name('profile.sms-token.destroy');
     Route::put('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
 
     // Web Push (notifications PWA)

@@ -55,6 +55,10 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                // Module dette-qualite : opération dépointée ou pointée supprimée
+                'warning' => fn () => $request->session()->get('warning'),
+                // Module sms-iphone : jeton du Raccourci, affiché une seule fois (flash)
+                'sms_token' => fn () => $request->session()->get('sms_token'),
             ],
             'ziggy' => fn () => [
                 ...(new Ziggy)->toArray(),
@@ -74,7 +78,7 @@ class HandleInertiaRequests extends Middleware
 
     private function getCurrentBudgetPeriod(Request $request): ?string
     {
-        if (!$request->user()) {
+        if (! $request->user()) {
             return null;
         }
 

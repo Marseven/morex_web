@@ -13,6 +13,9 @@ use App\Models\Goal;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Models\Transfer;
+use App\Services\BudgetAlertService;
+use App\Services\PlannedPurchaseService;
+use App\Services\TransferService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,9 +58,12 @@ class SyncController extends Controller
             ->where('updated_at', '>', $since)
             ->get();
 
+        // Un objectif suivi change de progression sans être modifié : toujours le renvoyer (suivi-objectifs)
         $goals = Goal::withTrashed()
+            ->with('account')
             ->where('user_id', $user->id)
-            ->where('updated_at', '>', $since)
+            ->where(fn ($q) => $q->where('updated_at', '>', $since)
+                ->orWhere(fn ($q) => $q->whereNotNull('tracked_since')->whereNull('deleted_at')))
             ->get();
 
         $debts = Debt::withTrashed()
@@ -187,6 +193,16 @@ class SyncController extends Controller
                 'message' => 'Erreur lors de la synchronisation',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+
+        // Plafonds (module plafonds-alertes) : les événements étaient désactivés pendant le push.
+        // Les données sont validées : une erreur ici ne doit pas faire rejouer la synchro.
+        try {
+            app(BudgetAlertService::class)->checkUser($user);
+            app(PlannedPurchaseService::class)->releaseOrphans($user);
+            app(TransferService::class)->reconcileFees($user);
+        } catch (\Throwable $e) {
+            report($e);
         }
 
         return response()->json([
@@ -517,6 +533,7 @@ class SyncController extends Controller
 
         // Sécurité : vérifier que les FK référencées appartiennent bien à l'utilisateur (anti-IDOR)
         $this->assertForeignKeysBelongToUser($user, $data);
+        $this->assertNoReconciliationCategory($modelClass, $data, null);
 
         // Pour les comptes, s'assurer que balance = initial_balance si non fourni
         if ($modelClass === Account::class) {
@@ -535,7 +552,7 @@ class SyncController extends Controller
             $this->captureOriginalSnapshot($existingModel->id, $existingModel);
 
             // Mettre à jour l'existant au lieu de créer un doublon
-            $existingModel->fill($data);
+            $existingModel->fill($this->withoutTrackedGoalFields($existingModel, $data));
             $existingModel->save();
 
             return [
@@ -720,12 +737,17 @@ class SyncController extends Controller
 
         // Sécurité : vérifier que les FK référencées appartiennent bien à l'utilisateur (anti-IDOR)
         $this->assertForeignKeysBelongToUser($user, $data);
+        $this->assertNoReconciliationCategory($modelClass, $data, $model->category_id ?? null);
 
         // Capturer l'état AVANT modification pour pouvoir reverser l'ancien mouvement de solde
         // (transactions/transferts). Évite le double-comptage lors d'un update.
         $this->captureOriginalSnapshot($serverId, $model);
 
-        $model->fill($data);
+        $model->fill($this->withoutServerScheduleFields($model, $this->withoutTrackedGoalFields($model, $data)));
+        // Le push désactive les événements : le dépointage (module dette-qualite) est appliqué ici
+        if ($model instanceof Transaction) {
+            $model->unpointIfMaterialChange();
+        }
         $model->save();
 
         // Si était supprimé et qu'on update, on restore
@@ -739,6 +761,39 @@ class SyncController extends Controller
             'status' => 'success',
             'action' => 'updated',
         ];
+    }
+
+    /** Catégories d'écart réservées au rapprochement (module dette-qualite) ; une opération d'écart garde la sienne. */
+    private function assertNoReconciliationCategory(string $modelClass, array $data, ?string $currentCategoryId): void
+    {
+        $categoryId = is_string($data['category_id'] ?? null) ? strtolower($data['category_id']) : null;
+        if ($modelClass === Transaction::class && $categoryId !== null
+            && in_array($categoryId, Category::RECONCILIATION_IDS, true) && $categoryId !== strtolower((string) $currentCategoryId)) {
+            throw new \RuntimeException('Catégorie réservée aux écarts de rapprochement');
+        }
+    }
+
+    /**
+     * Récurrences (module recurrences-serveur) : le serveur génère les échéances et tient l'historique.
+     * Le client ne peut ni réécrire la dernière génération ni ramener l'échéance sur une occurrence déjà générée.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withoutServerScheduleFields($model, array $data): array
+    {
+        if (! $model instanceof RecurringTransaction) {
+            return $data;
+        }
+
+        unset($data['last_generated_date']);
+        $lastGenerated = $model->last_generated_date;
+        if ($lastGenerated !== null && isset($data['next_due_date'])
+            && Carbon::parse($data['next_due_date'])->toDateString() <= $lastGenerated->toDateString()) {
+            unset($data['next_due_date']);
+        }
+
+        return $data;
     }
 
     /**
@@ -789,5 +844,21 @@ class SyncController extends Controller
             'status' => 'success',
             'action' => 'deleted',
         ];
+    }
+
+    /**
+     * Objectif suivi sur un compte : le compte et la progression ne se changent que par /track
+     * (module suivi-objectifs), jamais par la synchro.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withoutTrackedGoalFields($model, array $data): array
+    {
+        if ($model instanceof Goal && $model->isTracked()) {
+            unset($data['account_id'], $data['current_amount']);
+        }
+
+        return $data;
     }
 }

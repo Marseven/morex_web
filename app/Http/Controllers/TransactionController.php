@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTransactionRequest;
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Rules\NotReconciliationCategory;
 use App\Rules\OwnedOrSystemCategory;
+use App\Services\PlannedPurchaseService;
+use App\Services\TransactionEntryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,6 +32,10 @@ class TransactionController extends Controller
             $query->where('account_id', $request->account_id);
         }
 
+        if (in_array($request->query('nature'), Category::NATURES, true)) {
+            $query->ofNature($request->query('nature'));
+        }
+
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->category_id);
         }
@@ -34,10 +44,10 @@ class TransactionController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('beneficiary', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('category', function ($q2) use ($search) {
-                      $q2->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('category', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -68,14 +78,14 @@ class TransactionController extends Controller
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
         $categories = Category::where(function ($q) use ($request) {
             $q->where('user_id', $request->user()->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
 
         return Inertia::render('Transactions/Index', [
             'transactions' => $transactions,
             'accounts' => $accounts,
             'categories' => $categories,
-            'filters' => $request->only(['type', 'account_id', 'category_id', 'start_date', 'end_date', 'search']),
+            'filters' => $request->only(['type', 'account_id', 'category_id', 'nature', 'start_date', 'end_date', 'search']),
         ]);
     }
 
@@ -84,36 +94,37 @@ class TransactionController extends Controller
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
         $categories = Category::where(function ($q) use ($request) {
             $q->where('user_id', $request->user()->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
+
+        // Achats prévus (module achats-prevus) : candidats à l'association et préremplissage depuis « Acheté »
+        $purchases = app(PlannedPurchaseService::class);
+        $planned = $purchases->openPurchases($request->user())->map->only(['id', 'name', 'estimated_amount', 'category_id'])->values();
+        $prefill = $planned->firstWhere('id', $request->query('planned_purchase_id'));
 
         return Inertia::render('Transactions/Create', [
             'accounts' => $accounts,
             'categories' => $categories,
+            'plannedPurchases' => $planned,
+            'purchaseThreshold' => PlannedPurchaseService::THRESHOLD,
+            'nextPeriodStart' => $purchases->nextPeriodStart($request->user())->toDateString(),
+            'prefill' => $prefill ? [
+                'planned_purchase_id' => $prefill['id'], 'amount' => $prefill['estimated_amount'],
+                'category_id' => $prefill['category_id'], 'beneficiary' => $prefill['name'],
+            ] : null,
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreTransactionRequest $request, TransactionEntryService $entries)
     {
-        $userId = $request->user()->id;
-        $validated = $request->validate([
-            'amount' => ['required', 'integer', 'min:1'],
-            'type' => ['required', 'in:expense,income,transfer'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
-            'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'beneficiary' => ['nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'date' => ['required', 'date'],
-            'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:account_id'],
-        ]);
+        $data = $request->safe()->except(['planned_purchase_id', 'out_of_list']);
 
-        if ($validated['type'] === 'transfer' && !isset($validated['transfer_to_account_id'])) {
-            return back()->withErrors([
-                'transfer_to_account_id' => 'Le compte de destination est requis pour un transfert.',
-            ]);
+        try {
+            $entries->record($request->user(), $data, $request->validated('planned_purchase_id'), $request->validated('out_of_list') === 'accept');
+        } catch (\DomainException) {
+            // Achat devenu indisponible entre l'affichage et l'envoi : rien n'est enregistré
+            throw ValidationException::withMessages(['planned_purchase_id' => "Cet achat prévu n'est plus disponible."]);
         }
-
-        $request->user()->transactions()->create($validated);
 
         return redirect()->route('transactions.index')
             ->with('success', 'Transaction créée avec succès.');
@@ -126,7 +137,7 @@ class TransactionController extends Controller
         $accounts = $request->user()->accounts()->orderBy('order_index')->get();
         $categories = Category::where(function ($q) use ($request) {
             $q->where('user_id', $request->user()->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })->orderBy('order_index')->get();
 
         $transaction->load(['category', 'account', 'transferToAccount']);
@@ -150,7 +161,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
             'type' => ['required', 'in:expense,income,transfer'],
-            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            'category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId), new NotReconciliationCategory($transaction->category_id)],
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'beneficiary' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -158,20 +169,28 @@ class TransactionController extends Controller
             'transfer_to_account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId}"],
         ]);
 
+        $wasPointed = $transaction->reconciled_at !== null;
         $transaction->update($validated);
 
-        return redirect()->route('transactions.index')
-            ->with('success', 'Transaction mise à jour avec succès.');
+        $redirect = redirect()->route('transactions.index')->with('success', 'Transaction mise à jour avec succès.');
+
+        // Module dette-qualite : un changement de montant, date, compte ou type dépointe l'opération
+        return $wasPointed && $transaction->reconciled_at === null
+            ? $redirect->with('warning', 'Opération dépointée : refaites le rapprochement du compte.')
+            : $redirect;
     }
 
     public function destroy(Transaction $transaction)
     {
         $this->authorize('delete', $transaction);
 
+        $wasPointed = $transaction->reconciled_at !== null;
         $transaction->delete();
 
-        return redirect()->route('transactions.index')
-            ->with('success', 'Transaction supprimée avec succès.');
+        $redirect = redirect()->route('transactions.index')->with('success', 'Transaction supprimée avec succès.');
+
+        // Module dette-qualite : supprimer une opération pointée change le solde rapproché
+        return $wasPointed ? $redirect->with('warning', 'Opération pointée supprimée : refaites le rapprochement du compte.') : $redirect;
     }
 
     /**
@@ -184,7 +203,7 @@ class TransactionController extends Controller
         $query = $request->user()->transactions()->with(['category', 'account']);
         $this->applyFilters($query, $request);
 
-        $filename = 'transactions-' . now()->format('Y-m-d') . '.csv';
+        $filename = 'transactions-'.now()->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
@@ -193,7 +212,7 @@ class TransactionController extends Controller
 
             $query->orderBy('date')->chunk(500, function ($transactions) use ($out) {
                 foreach ($transactions as $t) {
-                    fputcsv($out, [
+                    fputcsv($out, array_map([self::class, 'csvCell'], [
                         $t->date?->format('Y-m-d'),
                         $t->amount,
                         $t->type,
@@ -201,12 +220,20 @@ class TransactionController extends Controller
                         $t->description,
                         $t->category?->name,
                         $t->account?->name,
-                    ], ';');
+                    ]), ';');
                 }
             });
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** P16 : un texte commençant par =, +, -, @, tabulation ou retour chariot est préfixé d'une apostrophe. */
+    private static function csvCell(mixed $value): mixed
+    {
+        return is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)
+            ? "'".$value
+            : $value;
     }
 
     /**
@@ -236,11 +263,13 @@ class TransactionController extends Controller
             'account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'rows' => ['required', 'array', 'min:1', 'max:500'],
             'rows.*.date' => ['required', 'date'],
-            'rows.*.amount' => ['required', 'integer', 'min:1'],
+            'rows.*.amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'rows.*.type' => ['required', 'in:expense,income'],
             'rows.*.beneficiary' => ['nullable', 'string', 'max:255'],
             'rows.*.description' => ['nullable', 'string', 'max:1000'],
-            'rows.*.category_id' => ['nullable', 'uuid', new OwnedOrSystemCategory($userId)],
+            // Saisie en lot : un compte par ligne possible ; jamais une catégorie d'écart de rapprochement
+            'rows.*.account_id' => ['nullable', 'uuid', "exists:accounts,id,user_id,{$userId},deleted_at,NULL"],
+            'rows.*.category_id' => ['nullable', 'uuid', Rule::notIn(Category::RECONCILIATION_IDS), new OwnedOrSystemCategory($userId)],
         ]);
 
         DB::transaction(function () use ($validated, $userId) {
@@ -248,7 +277,7 @@ class TransactionController extends Controller
                 $tx = new Transaction([
                     'amount' => $row['amount'],
                     'type' => $row['type'],
-                    'account_id' => $validated['account_id'],
+                    'account_id' => $row['account_id'] ?? $validated['account_id'],
                     'category_id' => $row['category_id'] ?? null,
                     'beneficiary' => $row['beneficiary'] ?? null,
                     'description' => $row['description'] ?? null,
@@ -260,7 +289,7 @@ class TransactionController extends Controller
         });
 
         return redirect()->route('transactions.index')
-            ->with('success', count($validated['rows']) . ' transaction(s) importée(s).');
+            ->with('success', count($validated['rows']).' transaction(s) importée(s).');
     }
 
     /**

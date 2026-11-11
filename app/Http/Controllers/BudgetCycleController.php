@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\Category;
+use App\Services\MonthlyReviewService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -39,12 +41,11 @@ class BudgetCycleController extends Controller
                 ];
             });
 
-        // Catégories de dépense (perso + système) avec leur budget actuel,
-        // pour permettre l'ajustement au lancement d'un cycle.
-        $categories = Category::where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)->orWhereNull('user_id');
-            })
+        // Catégories de dépense de l'utilisateur avec leur budget actuel, pour l'ajustement au lancement
+        // (les catégories système, partagées, ne sont pas réglables : module bilan-mensuel).
+        $categories = Category::where('user_id', $user->id)
             ->where('type', 'expense')
+            ->where('nature', '!=', Category::NATURE_TRANSIT)
             ->orderBy('order_index')
             ->get(['id', 'name', 'budget_limit', 'color', 'icon']);
 
@@ -57,7 +58,36 @@ class BudgetCycleController extends Controller
             'categories' => $categories,
             'suggestedIncome' => $suggestedIncome,
             // Cible d'épargne (objectif financier) affichée comme repère.
-            'savingsTargetRate' => 25,
+            'savingsTargetRate' => MonthlyReviewService::SAVINGS_TARGET_RATE,
+            // Bilans accessibles (module bilan-mensuel) et proposition à préremplir depuis un bilan
+            'recentCycles' => BudgetCycle::where('user_id', $user->id)->where('status', 'closed')
+                ->orderByDesc('start_date')->limit(12)->get(['id', 'period_name', 'start_date', 'end_date'])
+                ->map(fn (BudgetCycle $c) => ['id' => $c->id, 'period_name' => $c->period_name,
+                    'start' => $c->start_date?->toDateString(), 'end' => $c->end_date?->toDateString()]),
+            'proposal' => $this->proposalFor($request),
+        ]);
+    }
+
+    /** Proposition du bilan d'un cycle de l'utilisateur, quand la page est ouverte depuis « Lancer le cycle suivant ». */
+    private function proposalFor(Request $request): ?array
+    {
+        $cycleId = $request->query('proposal');
+        if (! is_string($cycleId) || ! Str::isUuid($cycleId)) {
+            return null;
+        }
+
+        $cycle = BudgetCycle::where('user_id', $request->user()->id)->find($cycleId);
+
+        return $cycle ? app(MonthlyReviewService::class)->proposal($request->user(), $cycle) : null;
+    }
+
+    /** Bilan d'un cycle et proposition du suivant (module bilan-mensuel, design A). */
+    public function review(Request $request, BudgetCycle $cycle, MonthlyReviewService $reviews): Response
+    {
+        $this->authorize('view', $cycle);
+
+        return Inertia::render('BudgetCycles/Bilan', [
+            'review' => $reviews->review($request->user(), $cycle),
         ]);
     }
 
@@ -73,14 +103,13 @@ class BudgetCycleController extends Controller
 
         $user = $request->user();
 
-        // Appliquer les budgets ajustés par catégorie (dépenses uniquement, perso ou système)
+        // Appliquer les budgets ajustés par catégorie : dépenses de l'utilisateur uniquement.
+        // Une catégorie système est partagée entre utilisateurs (lecture seule, CLAUDE.md) : jamais modifiée ici.
         if (!empty($validated['budgets'])) {
             foreach ($validated['budgets'] as $b) {
                 Category::whereKey($b['id'])
                     ->where('type', 'expense')
-                    ->where(function ($q) use ($user) {
-                        $q->where('user_id', $user->id)->orWhereNull('user_id');
-                    })
+                    ->where('user_id', $user->id)
                     ->update(['budget_limit' => $b['budget_limit'] ?? null]);
             }
         }
@@ -102,13 +131,7 @@ class BudgetCycleController extends Controller
         // Créer le nouveau cycle
         $periodName = BudgetCycle::generatePeriodName($startDate);
 
-        $totalBudget = Category::where(function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-              ->orWhereNull('user_id');
-        })
-        ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->sum('budget_limit');
+        $totalBudget = Category::personalBudgetFor($user->id);
 
         $newCycle = new BudgetCycle([
             'start_date' => $startDate,

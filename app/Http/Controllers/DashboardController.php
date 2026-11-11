@@ -2,8 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BudgetAlert;
 use App\Models\BudgetCycle;
 use App\Models\Category;
+use App\Models\Transaction;
+use App\Models\User;
+use App\Services\BudgetAlertService;
+use App\Services\GoalProgressService;
+use App\Services\PlannedPurchaseService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -34,11 +40,14 @@ class DashboardController extends Controller
         $totalBalance = $accounts->sum('balance');
 
         // Period data
+        // Hors attente, écarts et transit (module revenus-transit) ; le pro reste compté
         $incomeForPeriod = $user->transactions()
+            ->counted()
             ->where('type', 'income')
             ->whereBetween('date', [$startDate, $endDate])
             ->sum('amount');
         $expenseForPeriod = $user->transactions()
+            ->counted()
             ->where('type', 'expense')
             ->whereBetween('date', [$startDate, $endDate])
             ->sum('amount');
@@ -60,43 +69,39 @@ class DashboardController extends Controller
             ->get();
 
         // Catégories avec budget pour la période budgétaire active
-        $budgetStartStr = $budgetStartDate->format('Y-m-d');
-        $budgetEndStr = $budgetEndDate?->format('Y-m-d');
+
+        // Plafonds (module plafonds-alertes) : même calcul que les alertes (hors en attente et écarts)
+        $alerts = app(BudgetAlertService::class);
+        [$capFrom, $capTo, $capIsCycle] = $alerts->period($user);
 
         $budgetCategories = Category::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
-              ->orWhere('is_system', true);
+                ->orWhere('is_system', true);
         })
-        ->whereNotNull('budget_limit')
-        ->where('budget_limit', '>', 0)
-        ->get()
-        ->map(function ($category) use ($user, $budgetStartStr, $budgetEndStr) {
-            $query = $user->transactions()
-                ->where('category_id', $category->id)
-                ->where('type', 'expense')
-                ->where('date', '>=', $budgetStartStr);
+            ->whereNotNull('budget_limit')
+            ->where('budget_limit', '>', 0)
+            ->where('nature', '!=', Category::NATURE_TRANSIT)
+            ->get()
+            ->map(function ($category) use ($user, $alerts, $capFrom, $capTo) {
+                $spent = $alerts->spent($user, $category->id, $capFrom, $capTo);
+                $limit = (int) $category->budget_limit;
+                $percent = (int) floor($spent * 100 / $limit);
 
-            if ($budgetEndStr) {
-                $query->where('date', '<=', $budgetEndStr);
-            }
-
-            $spent = (int) $query->sum('amount');
-
-            return [
-                'id' => $category->id,
-                'name' => $category->name,
-                'color' => $category->color,
-                'icon' => $category->icon,
-                'budget_limit' => $category->budget_limit,
-                'spent' => $spent,
-                'progress' => $category->budget_limit > 0
-                    ? min(100, ($spent / $category->budget_limit) * 100)
-                    : 0,
-            ];
-        })
-        ->sortByDesc('spent')
-        ->take(5)
-        ->values();
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'color' => $category->color,
+                    'icon' => $category->icon,
+                    'budget_limit' => $limit,
+                    'spent' => $spent,
+                    'progress' => min(100, $percent),
+                    'percent' => $percent,
+                    'status' => $percent >= 100 ? 'over' : ($percent >= 80 ? 'warning' : 'ok'),
+                    'remaining' => $limit - $spent,
+                ];
+            })
+            ->sortByDesc('percent')
+            ->values();
 
         // Dettes actives
         $activeDebts = $user->debts()
@@ -110,14 +115,88 @@ class DashboardController extends Controller
             'periodVariation' => $periodVariation,
             'incomeForPeriod' => $incomeForPeriod,
             'expenseForPeriod' => $expenseForPeriod,
+            'proExpense' => $this->proExpense($user, $startDate, $endDate),
+            'transit' => $this->transitSummary($user, $capFrom, $capTo),
+            'purchases' => $this->purchasesSummary($user),
             'accounts' => $accounts,
             'recentTransactions' => $recentTransactions,
             'activeGoals' => $activeGoals,
+            'savingsGoal' => $this->savingsGoal($user),
+            'budgetPeriod' => ['start' => $capFrom->toDateString(), 'end' => $capTo?->toDateString(), 'is_cycle' => $capIsCycle],
+            'budgetAlerts' => BudgetAlert::with('category:id,name')
+                ->where('user_id', $user->id)
+                ->where('cycle_start', '>=', $capFrom->toDateString())
+                ->latest('created_at')
+                ->limit(10)
+                ->get()
+                ->map(fn (BudgetAlert $a) => [
+                    'id' => $a->id, 'category_id' => $a->category_id, 'category' => $a->category?->name,
+                    'threshold' => $a->threshold, 'spent' => $a->spent, 'limit' => $a->limit,
+                    'created_at' => $a->created_at?->toDateString(),
+                ]),
             'activeDebts' => $activeDebts,
             'budgetCategories' => $budgetCategories,
             'currentPeriod' => $period,
             'periodLabel' => $this->getPeriodLabel($period),
         ]);
+    }
+
+    /** Carte « Achats prévus » (module achats-prevus). */
+    private function purchasesSummary(User $user): array
+    {
+        $summary = app(PlannedPurchaseService::class)->summary($user);
+        $summary['late_count'] = $summary['late']->count();
+        unset($summary['late']);
+
+        return $summary;
+    }
+
+    /** Dépenses pro de la période, comptées dans le total (null sans catégorie pro). */
+    private function proExpense(User $user, $from, $to): ?int
+    {
+        if (! $this->hasNature($user, Category::NATURE_PRO)) {
+            return null;
+        }
+
+        return (int) $user->transactions()->counted()->ofNature(Category::NATURE_PRO)
+            ->where('type', 'expense')->whereBetween('date', [$from, $to])->sum('amount');
+    }
+
+    /**
+     * Mouvements en transit du cycle (tontines, avances) : hors revenus et dépenses.
+     *
+     * @return array{out: int, in: int, net: int}|null null sans catégorie en transit
+     */
+    private function transitSummary(User $user, Carbon|\DateTimeInterface $from, ?\DateTimeInterface $to): ?array
+    {
+        if (! $this->hasNature($user, Category::NATURE_TRANSIT)) {
+            return null;
+        }
+
+        $totals = $user->transactions()
+            ->ofNature(Category::NATURE_TRANSIT)
+            ->where('status', '!=', Transaction::STATUS_PENDING)
+            ->where('date', '>=', $from->format('Y-m-d'))
+            ->when($to, fn ($q) => $q->where('date', '<=', $to->format('Y-m-d').' 23:59:59'))
+            ->selectRaw('type, SUM(amount) as total')
+            ->groupBy('type')
+            ->pluck('total', 'type');
+
+        $out = (int) ($totals['expense'] ?? 0);
+        $in = (int) ($totals['income'] ?? 0);
+
+        return ['out' => $out, 'in' => $in, 'net' => $in - $out];
+    }
+
+    /** @var array<string, list<string>> natures présentes par utilisateur, lues une fois par requête */
+    private array $natures = [];
+
+    private function hasNature(User $user, string $nature): bool
+    {
+        $this->natures[$user->id] ??= Category::where(fn ($q) => $q->where('user_id', $user->id)->orWhere('is_system', true))
+            ->where('nature', '!=', Category::NATURE_REGULAR)->distinct()->pluck('nature')->all();
+
+        return in_array($nature, $this->natures[$user->id], true);
     }
 
     private function getDateRange(string $period): array
@@ -155,5 +234,13 @@ class DashboardController extends Controller
             'year' => 'Cette année',
             default => 'Ce mois',
         };
+    }
+
+    /** Carte « Objectif » : le premier objectif actif suivi sur un compte (module suivi-objectifs). */
+    private function savingsGoal(User $user): ?array
+    {
+        $goal = $user->goals()->where('status', 'active')->whereNotNull('tracked_since')->with('account')->orderBy('target_date')->first();
+
+        return $goal ? app(GoalProgressService::class)->status($goal) : null;
     }
 }

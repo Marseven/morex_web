@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import NatureField from '@/Components/Budgets/NatureField.vue'
 
 const form = useForm({
     name: '',
@@ -8,6 +9,8 @@ const form = useForm({
     color: '#FFFFFF',
     icon: 'tag',
     budget_limit: '',
+    nature: 'regular',
+    discretionary: false,
 })
 
 const colors = ['#FFFFFF', '#71717A', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899']
@@ -64,7 +67,20 @@ const submit = () => {
                         />
                     </div>
 
-                    <div v-if="form.type === 'expense'">
+                    <NatureField v-model="form.nature" :error="form.errors.nature" />
+
+                    <div v-if="form.type === 'expense' && form.nature === 'regular'">
+                        <label class="flex items-start gap-3 min-h-[44px] py-2 cursor-pointer">
+                            <input v-model="form.discretionary" type="checkbox" class="mt-1 w-5 h-5 rounded border-theme-border" aria-describedby="discretionary-help" />
+                            <span>
+                                <span class="block text-sm text-theme-text-primary">Dépense discrétionnaire</span>
+                                <span id="discretionary-help" class="block text-xs text-theme-text-muted">Sorties, loisirs, restaurants : comptée dans le total discrétionnaire du bilan.</span>
+                            </span>
+                        </label>
+                        <p v-if="form.errors.discretionary" role="alert" class="text-xs text-red-400">{{ form.errors.discretionary }}</p>
+                    </div>
+
+                    <div v-if="form.type === 'expense' && form.nature !== 'transit'">
                         <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Budget mensuel (FCFA)</label>
                         <input
                             v-model.number="form.budget_limit"
@@ -73,7 +89,7 @@ const submit = () => {
                             class="w-full bg-theme-surface border border-theme-border rounded-md px-3 py-2 text-sm text-theme-text-primary placeholder-theme-text-muted focus:border-white focus:ring-0 outline-none"
                             placeholder="Optionnel"
                         />
-                        <p class="text-xs text-theme-text-muted mt-1">Laissez vide si pas de limite</p>
+                        <p class="text-xs text-theme-text-muted mt-1">{{ form.nature === 'pro' ? 'Plafond propre au pro' : 'Laissez vide si pas de limite' }}</p>
                     </div>
 
                     <div>

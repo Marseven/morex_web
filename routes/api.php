@@ -1,19 +1,24 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BatchEntryController;
+use App\Http\Controllers\Api\BudgetAlertController;
+use App\Http\Controllers\Api\BudgetCycleController;
 use App\Http\Controllers\Api\CategoryController;
-use App\Http\Controllers\Api\TransactionController;
-use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\DebtController;
+use App\Http\Controllers\Api\GoalController;
+use App\Http\Controllers\Api\ReconciliationController;
+use App\Http\Controllers\Api\RecurringTransactionController;
+use App\Http\Controllers\Api\StatementController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\SyncController;
-use App\Http\Controllers\Api\RecurringTransactionController;
-use App\Http\Controllers\Api\BudgetCycleController;
+use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\TransferController;
 use App\Http\Controllers\Api\WebhookController;
+use App\Http\Middleware\EnsureFullAccessToken;
+use App\Services\SmsShortcutService;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,14 +38,27 @@ Route::middleware('throttle:5,1')->group(function () {
 });
 
 // Routes protégées (nécessitent authentification)
-Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+// Raccourci iOS (module sms-iphone) : jeton complet ou jeton restreint « sms:webhook »
+Route::post('/webhook/sms', [WebhookController::class, 'sms'])
+    ->middleware(['auth:sanctum', 'abilities:'.SmsShortcutService::ABILITY, 'throttle:30,1'])
+    ->name('api.webhook.sms');
+
+Route::middleware(['auth:sanctum', 'throttle:60,1', EnsureFullAccessToken::class])->group(function () {
     // Utilisateur
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    // P15 (module dette-qualite-mobile) : nouveau jeton, l'ancien est révoqué
+    Route::post('/token/rotate', [AuthController::class, 'rotateToken'])->middleware('throttle:token-rotate')->name('api.token.rotate');
 
     // Comptes
     Route::apiResource('accounts', AccountController::class)->names('api.accounts');
     Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('api.accounts.adjust-balance');
+    Route::get('/accounts/{account}/reconciliation', [ReconciliationController::class, 'show'])->name('api.accounts.reconciliation');
+    Route::post('/accounts/{account}/reconciliations', [ReconciliationController::class, 'store'])->name('api.accounts.reconciliations.store');
+    Route::post('/accounts/{account}/statement/preview', [StatementController::class, 'preview'])->middleware('throttle:30,1')->name('api.accounts.statement.preview');
+    Route::post('/accounts/{account}/statement', [StatementController::class, 'store'])->name('api.accounts.statement.store');
+    Route::get('/budget-alerts', [BudgetAlertController::class, 'index'])->name('api.budget-alerts.index');
+    Route::post('/transactions/notes/preview', [BatchEntryController::class, 'preview'])->middleware('throttle:30,1')->name('api.transactions.notes.preview');
     Route::post('/accounts/reorder', [AccountController::class, 'reorder'])->name('api.accounts.reorder');
 
     // Catégories
@@ -54,6 +72,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Objectifs
     Route::apiResource('goals', GoalController::class)->names('api.goals');
     Route::post('/goals/{goal}/contribute', [GoalController::class, 'addContribution'])->name('api.goals.contribute');
+    Route::post('/goals/{goal}/track', [GoalController::class, 'track'])->name('api.goals.track');
+    Route::delete('/goals/{goal}/track', [GoalController::class, 'untrack'])->name('api.goals.untrack');
 
     // Dettes et créances
     Route::apiResource('debts', DebtController::class)->names('api.debts');
@@ -63,9 +83,6 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Transferts
     Route::apiResource('transfers', TransferController::class)->names('api.transfers');
     Route::post('/transfers/multi-hop', [TransferController::class, 'storeMultiHop'])->name('api.transfers.multi-hop');
-
-    // Balance Reset
-    Route::post('/accounts/balance-reset', [AccountController::class, 'balanceReset'])->name('api.accounts.balance-reset');
 
     // Transactions récurrentes
     Route::apiResource('recurring-transactions', RecurringTransactionController::class)->names('api.recurring-transactions');
@@ -82,7 +99,6 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/sync/push', [SyncController::class, 'push']);
 
     // Webhook SMS
-    Route::post('/webhook/sms', [WebhookController::class, 'sms'])->name('api.webhook.sms');
 
     // Cycles budgétaires
     Route::get('/budget-settings', [BudgetCycleController::class, 'getSettings']);

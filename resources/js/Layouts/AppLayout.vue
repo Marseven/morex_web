@@ -2,6 +2,8 @@
 import { ref, onMounted, watch, computed, h } from 'vue'
 import { Link, usePage, router } from '@inertiajs/vue3'
 import {
+    ExclamationTriangleIcon,
+    ShoppingBagIcon,
     HomeIcon,
     ArrowsRightLeftIcon,
     WalletIcon,
@@ -33,6 +35,7 @@ const navigation = [
     { name: 'Cycles', href: '/budget-cycles', icon: CalendarIcon },
     { name: 'Transferts', href: '/transfers', icon: BanknotesIcon },
     { name: 'Objectifs', href: '/goals', icon: FlagIcon },
+    { name: 'Achats prévus', href: '/purchases', icon: ShoppingBagIcon },
     { name: 'Dettes', href: '/debts', icon: CreditCardIcon },
     { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
 ]
@@ -311,6 +314,12 @@ const getInitials = (name) => {
             <div v-if="$page.props.flash?.success" class="mx-4 mt-4 lg:mx-6">
                 <div class="glass-card border-success/30 text-success px-4 py-3 text-sm">
                     {{ $page.props.flash.success }}
+                </div>
+            </div>
+            <div v-if="$page.props.flash?.warning" class="mx-4 mt-4 lg:mx-6" role="status">
+                <div class="glass-card border-warning/30 text-warning px-4 py-3 text-sm flex items-start gap-2">
+                    <ExclamationTriangleIcon class="w-5 h-5 shrink-0" aria-hidden="true" />
+                    <span>{{ $page.props.flash.warning }}</span>
                 </div>
             </div>
             <div v-if="$page.props.flash?.error" class="mx-4 mt-4 lg:mx-6">

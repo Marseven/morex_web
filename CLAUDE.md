@@ -1,206 +1,50 @@
-# Morex - Pilotez votre avenir financier
+# Morex Web — API + interface web (Laravel 11, Inertia/Vue 3)
 
-## Contexte Projet
-- **Client** : Projet personnel (Richard Mebodo)
-- **Type** : App mobile (Flutter) + Web (Laravel/Vue)
-- **Objectif** : Gestion finances personnelles alignée sur objectifs 2026
-- **Deadline** : MVP Mobile ~6 semaines
+App de finances **personnelle** de Richard : un seul utilisateur en production, pas de publication publique.
+Le web est la **source de vérité** ; le mobile (`morex_mobile`, iPhone) est un client/cache hors ligne.
 
-## Stack Technique
+## Production
+- https://morex.mebodorichard.com — Hostinger mutualisé (LiteSpeed, PHP 8.5.12), app dans `public_html/morex`.
+- Pas de CI ni de Deployer : déploiement manuel. Après chaque déploiement : `php artisan migrate`, puis les commandes de rattrapage listées dans la PR.
+- `APP_DEBUG=false` obligatoire en prod (vérifier : une route `/api/inexistante` ne doit renvoyer aucune trace).
 
-### Mobile
-- **Framework** : Flutter 3.x
-- **State** : BLoC/Cubit
-- **DB locale** : Drift (SQLite)
-- **HTTP** : Dio
-- **Architecture** : Clean Architecture
-
-### Backend
-- **Framework** : Laravel 11
-- **Auth** : Sanctum
-- **DB** : MySQL 8
-- **Hébergement** : Hostinger
-
-### Web
-- **Framework** : Vue 3 + Inertia.js
-- **CSS** : TailwindCSS
-
-## Commandes Essentielles
-
-### Flutter (Mobile)
+## Commandes
 ```bash
-# Dev
-flutter run
-
-# Build APK
-flutter build apk --release
-
-# Tests
-flutter test
-
-# Générer code Drift
-dart run build_runner build
+APP_KEY="base64:$(openssl rand -base64 32)" php artisan test   # pas de .env local : clé éphémère
+vendor/bin/pint --dirty
+pnpm dev / pnpm build                                         # jamais npm
+php artisan l5-swagger:generate                               # doc OpenAPI (attributs OA dans les contrôleurs)
 ```
 
-### Laravel (API)
-```bash
-# Dev
-php artisan serve
+## Invariants métier (ne jamais casser)
+- Montants en **FCFA entiers**, IDs en **UUID v4**.
+- Le solde d'un compte ne bouge **que** par `Account::adjustBalance()` (verrou `lockForUpdate` + ligne `balance_history`). Jamais de `update(['balance' => …])` direct.
+- Les effets sur le solde partent des événements de `Transaction::booted()`. Une transaction `pending_validation` (`Transaction::STATUS_PENDING`) ne compte pas ; elle compte à sa validation. `BudgetCycle::transactions()` l'exclut aussi.
+- Synchro (`SyncController`) : `push` désactive les événements puis rejoue les ajustements une seule fois. Un `delete` rejoué → `already_deleted`, un `create` rejoué → `linked` (traité comme un update). Conflits : dernier `updated_at` gagne.
+- SMS : `POST /api/webhook/sms` (Sanctum) → `SmsParser` → transaction en attente, dédupliquée par `sms_fingerprint` (unique par utilisateur). Sur iPhone, l'envoi passe par un Raccourci iOS (l'app ne peut pas lire les SMS).
+- Catégories système (`user_id = NULL`) : en lecture seule, jamais modifiées ni dupliquées.
+- 2FA API : `/login` renvoie un `login_token` (5 min, lié au hash du mot de passe) à présenter à `/two-factor-challenge`. Jamais de `user_id` seul.
 
-# Migrations
-php artisan migrate
-php artisan migrate:fresh --seed
+## Entités synchronisées avec le mobile
+Comptes, transactions, virements, objectifs, dettes, récurrences : créables des deux côtés.
+Catégories et cycles budgétaires : créés/calculés sur le web uniquement.
 
-# Tests
-php artisan test
+## Où regarder
+- `app/Models/{Account,Transaction,BudgetCycle}.php` — règles de solde.
+- `app/Http/Controllers/Api/` — API mobile ; `app/Http/Controllers/` — pages Inertia (`resources/js/Pages/`).
+- `app/Services/SmsParser.php` — formats SMS (Airtel Money, Moov Money, banques).
+- `app/Console/Commands/` — commandes ponctuelles (rattrapages).
+- `tests/Feature/` — un test de non-régression par bug corrigé.
 
-# Cache
-php artisan config:cache
-php artisan route:cache
-```
+## Objectifs financiers (référence au 2026-11-10)
+- Épargne Investissement : 2 000 000 FCFA au 31/12/2026, 300 000 FCFA/mois virés **le jour du salaire** (fonds d'urgence déjà atteint). L'épargne passe par des **transferts** vers « Compte Epargne » : la progression doit les compter.
+- Plafonds mensuels : Sorties/Loisirs 170 000 (une soirée club par mois) · Emilie/Courses 150 000 · Abonnements 90 000 (perso, outils pro à part) · Alimentation 110–120 000 · Dîmes ≈ 10 % des revenus.
+- Règle d'achat : tout achat > 30 000 hors de la liste prévue attend le cycle suivant.
+- Revenus : salaire fixe + freelance irrégulier ; **tontines = transit** (ni revenu ni dépense) ; un remboursement n'est pas un revenu.
+- Comptes réels : Compte Courant, Compte Bgfi Mobile, Compte Airtel Money, Portefeuille (espèces), Compte Epargne.
 
-## Structure Projet
-
-```
-morex/
-├── mobile/          # App Flutter
-├── api/             # Backend Laravel
-├── web/             # (dans api/ avec Inertia)
-└── docs/            # Documentation projet
-    ├── product-brief.md
-    ├── prd.md
-    ├── architecture.md
-    └── stories/
-```
-
-## Workflow Dev Junior
-
-**IMPORTANT** : Claude agit comme dev junior supervisé.
-
-### Avant chaque tâche
-1. Lis la story dans `docs/stories/STORY-XXX.md`
-2. Lis les fichiers référencés (architecture, PRD si besoin)
-3. Propose un plan d'implémentation
-4. **ATTENDS validation** avant de coder
-
-### Pendant le dev
-1. Implémente par étapes incrémentales
-2. Commits atomiques : `feat(morex-xxx): description`
-3. Lance les tests après chaque modification
-4. Signale tout blocage immédiatement
-
-### Après implémentation
-1. Résume les changements
-2. Liste les fichiers modifiés/créés
-3. Indique les tests ajoutés
-4. Vérifie les critères d'acceptation
-
-## Standards de Code
-
-### Flutter/Dart
-- Analyse : `flutter analyze` doit passer
-- Format : `dart format .`
-- Null safety strict
-- Nommage : camelCase pour variables, PascalCase pour classes
-
-### PHP/Laravel
-- PSR-12
-- Typed properties et return types
-- Form Requests pour validation
-- Resources pour API responses
-
-### Commits
-```
-type(scope): description
-
-Types: feat, fix, docs, style, refactor, test, chore
-Scope: mobile, api, web, docs
-```
-
-**IMPORTANT** :
-- Ne JAMAIS ajouter `Co-Authored-By:` dans les commits
-- Ne JAMAIS signer les commits (pas de --gpg-sign)
-
-## Architecture Sync (IMPORTANT)
-
-**Le Web est la SOURCE PRINCIPALE, le Mobile est un CLIENT/CACHE.**
-
-### Principe fondamental
-```
-WEB (MySQL) = Source de vérité, toutes les données vivent ici
-MOBILE (SQLite) = Cache local + stockage temporaire offline
-```
-
-### Mode ONLINE (connecté)
-- Mobile AFFICHE les données du web (via cache local)
-- Les calculs/traitements d'affichage peuvent être faits localement
-- Si une donnée est déjà traitée et stockée en ligne → juste l'afficher
-- **TOUTES les opérations CRUD vont DIRECTEMENT au serveur :**
-  ```
-  CREATE  → POST API   → succès → ajouter au cache local
-  UPDATE  → PUT API    → succès → mettre à jour cache local
-  DELETE  → DELETE API → succès → supprimer du cache local
-  ```
-- Le cache local est mis à jour APRÈS confirmation du serveur
-- Pas de stockage local préalable en mode online
-
-### Mode OFFLINE
-- La BD locale sert de **CACHE** pour afficher les données
-- Les nouvelles données sont stockées temporairement en local
-- Marquées avec `syncStatus = pending` (en attente d'envoi)
-- Aucune modification des données venues du web (read-only en cache)
-
-### Reconnexion (Sync)
-1. **Push** : Envoie UNIQUEMENT les données créées/modifiées localement
-   - Données avec `syncStatus = pending`
-   - Données SANS `server_id` (jamais envoyées au web)
-2. **Pull** : Récupère les mises à jour du web → met à jour le cache local
-
-### Catégories (cas spécial)
-- **Catégories système** : Définies sur le web (`user_id = NULL`)
-- Le mobile NE DOIT PAS créer de catégories → utiliser celles du serveur
-- À la première connexion, pull les catégories et les cache localement
-- Les catégories sont en lecture seule côté mobile
-
-### Entités synchronisées
-| Entité | Créable sur mobile | Notes |
-|--------|-------------------|-------|
-| Categories | ❌ NON | Viennent du web uniquement |
-| Accounts | ✅ OUI | Sync bidirectionnelle |
-| Transactions | ✅ OUI | Sync bidirectionnelle |
-| Goals | ✅ OUI | Sync bidirectionnelle |
-| Debts | ✅ OUI | Sync bidirectionnelle |
-| RecurringTransactions | ✅ OUI | Sync bidirectionnelle |
-| BudgetCycles | ❌ NON | Calculés sur le web |
-
-### SyncStatus (mobile)
-- `synced` (0) : Donnée venue du web, en cache, ne pas pusher
-- `pending` (1) : Donnée créée/modifiée localement, à envoyer au web
-- `conflict` (2) : Conflit détecté (rare)
-
-## Points Critiques ⚠️
-
-1. **Web = Source principale** : Toujours considérer le web comme référence
-2. **Offline-First** : Le mobile DOIT fonctionner sans connexion
-3. **Montants** : Toujours en FCFA (Integer), jamais de décimales
-4. **UUIDs** : Utiliser UUID v4 pour tous les IDs (sync-friendly)
-5. **Sécurité** : Jamais de credentials en dur
-6. **Catégories système** : Ne pas les modifier, ne pas créer de doublons
-
-## Références
-
-| Document | Chemin | Usage |
-|----------|--------|-------|
-| Product Brief | `docs/product-brief.md` | Vision & contexte |
-| PRD | `docs/prd.md` | Specs fonctionnelles |
-| Architecture | `docs/architecture.md` | Specs techniques |
-| Stories | `docs/stories/` | Tâches à implémenter |
-
-## Objectifs Financiers (Contexte métier)
-
-L'app doit aider à atteindre :
-- Fonds d'Urgence : **2 610 000 FCFA**
-- Taux d'épargne : **25%** des revenus
-- Plafond Sorties : **50 000 FCFA/mois**
-- Plafond Dons : **30 000 FCFA/mois**
-- Revenus Projets : **100%** → Investissement
+## Façon de travailler
+- Socle MDF (`~/.claude`) : mode Express pour un bug, `/cadrage` puis `/module` pour une évolution. Plan courant : `docs/plan.md`.
+- Commits conventionnels en anglais, scopes `api`, `web`, `sync`. Richard est l'unique auteur : aucune attribution IA.
+- Branches `fix/…`, `feat/…`, `docs/…` depuis `main` (pas de `develop` sur ce dépôt), PR vers `main`.
+- Une PR qui change un contrat d'API se livre avec la PR mobile correspondante.

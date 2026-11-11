@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transfer;
+use App\Services\TransferService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -10,6 +11,13 @@ use Inertia\Response;
 
 class TransferController extends Controller
 {
+    /** Module transferts-frais : messages des frais. */
+    private const FEE_MESSAGES = [
+        'fee.min' => 'Les frais ne peuvent pas être négatifs.',
+        'fee.lte' => 'Les frais ne peuvent pas dépasser le montant.',
+        'rows.*.fee.lte' => 'Les frais ne peuvent pas dépasser le montant.',
+    ];
+
     public function index(Request $request): Response
     {
         $query = $request->user()->transfers()
@@ -19,7 +27,7 @@ class TransferController extends Controller
             $accountId = $request->account_id;
             $query->where(function ($q) use ($accountId) {
                 $q->where('from_account_id', $accountId)
-                  ->orWhere('to_account_id', $accountId);
+                    ->orWhere('to_account_id', $accountId);
             });
         }
 
@@ -51,24 +59,24 @@ class TransferController extends Controller
 
         return Inertia::render('Transfers/Create', [
             'accounts' => $accounts,
+            'lastFees' => app(TransferService::class)->lastFeesByPair($request->user()), // module transferts-frais
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, TransferService $transfers)
     {
         $userId = $request->user()->id;
 
         $validated = $request->validate([
             'from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:from_account_id'],
-            'amount' => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
+            'fee' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['required', 'date'],
-        ]);
+        ], self::FEE_MESSAGES);
 
-        $transfer = new Transfer($validated);
-        $transfer->user_id = $userId;
-        $transfer->save();
+        $transfers->create($request->user(), $validated);
 
         return redirect()->route('transfers.index')
             ->with('success', 'Transfert créé avec succès.');
@@ -89,40 +97,40 @@ class TransferController extends Controller
     /**
      * Crée en masse des transferts depuis un relevé importé.
      */
-    public function import(Request $request)
+    public function import(Request $request, TransferService $transfers)
     {
         $userId = $request->user()->id;
 
         $validated = $request->validate([
             'rows' => ['required', 'array', 'min:1', 'max:500'],
             'rows.*.date' => ['required', 'date'],
-            'rows.*.amount' => ['required', 'integer', 'min:1'],
+            'rows.*.amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'rows.*.from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'rows.*.to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'rows.*.description' => ['nullable', 'string', 'max:1000'],
-        ]);
+            'rows.*.fee' => ['nullable', 'integer', 'min:0', 'lte:rows.*.amount'],
+        ], self::FEE_MESSAGES);
 
-        DB::transaction(function () use ($validated, $userId) {
+        DB::transaction(function () use ($validated, $request, $transfers) {
             foreach ($validated['rows'] as $row) {
                 // Un transfert doit relier deux comptes distincts.
                 if ($row['from_account_id'] === $row['to_account_id']) {
                     continue;
                 }
 
-                $transfer = new Transfer([
+                $transfers->create($request->user(), [
                     'from_account_id' => $row['from_account_id'],
                     'to_account_id' => $row['to_account_id'],
                     'amount' => $row['amount'],
+                    'fee' => (int) ($row['fee'] ?? 0),
                     'description' => $row['description'] ?? null,
                     'date' => $row['date'],
                 ]);
-                $transfer->user_id = $userId;
-                $transfer->save();
             }
         });
 
         return redirect()->route('transfers.index')
-            ->with('success', count($validated['rows']) . ' transfert(s) importé(s).');
+            ->with('success', count($validated['rows']).' transfert(s) importé(s).');
     }
 
     public function edit(Request $request, Transfer $transfer): Response
@@ -142,7 +150,7 @@ class TransferController extends Controller
         ]);
     }
 
-    public function update(Request $request, Transfer $transfer)
+    public function update(Request $request, Transfer $transfer, TransferService $transfers)
     {
         $this->authorize('update', $transfer);
 
@@ -151,22 +159,23 @@ class TransferController extends Controller
         $validated = $request->validate([
             'from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:from_account_id'],
-            'amount' => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
+            'fee' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['required', 'date'],
-        ]);
+        ], self::FEE_MESSAGES);
 
-        $transfer->update($validated);
+        $transfers->update($transfer, $validated + ['fee' => (int) ($validated['fee'] ?? 0)]);
 
         return redirect()->route('transfers.index')
             ->with('success', 'Transfert modifié avec succès.');
     }
 
-    public function destroy(Request $request, Transfer $transfer)
+    public function destroy(Request $request, Transfer $transfer, TransferService $transfers)
     {
         $this->authorize('delete', $transfer);
 
-        $transfer->delete();
+        $transfers->delete($transfer);
 
         return redirect()->route('transfers.index')
             ->with('success', 'Transfert supprimé.');

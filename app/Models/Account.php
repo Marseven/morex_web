@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ReconciliationService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -76,6 +77,11 @@ class Account extends Model
         return $this->hasMany(Transfer::class, 'from_account_id');
     }
 
+    public function reconciliations(): HasMany
+    {
+        return $this->hasMany(Reconciliation::class);
+    }
+
     public function incomingTransfers(): HasMany
     {
         return $this->hasMany(Transfer::class, 'to_account_id');
@@ -116,7 +122,7 @@ class Account extends Model
                 'updated_at' => now(),
             ]);
 
-            BalanceHistory::create([
+            BalanceHistory::forceCreate([
                 'account_id' => $this->id,
                 'type' => $type,
                 'amount' => abs($delta),
@@ -125,6 +131,8 @@ class Account extends Model
                 'reference_type' => $refType,
                 'reference_id' => $refId,
                 'description' => $desc,
+                // Horloge de l'application (et non CURRENT_TIMESTAMP de la base) : cohérent avec les dates métier
+                'created_at' => now(),
             ]);
 
             $this->balance = $newBalance;
@@ -136,12 +144,9 @@ class Account extends Model
      * Ajuste le solde réel du compte directement (ajustement manuel).
      * Crée une entrée d'ajustement dans le journal.
      */
+    /** Atteint le solde voulu par une opération d'écart tracée (module rapprochement, RM-1). */
     public function adjustToBalance(int $desiredBalance): void
     {
-        $delta = $desiredBalance - $this->balance;
-
-        if ($delta !== 0) {
-            $this->adjustBalance($delta, 'adjustment', 'manual', null, 'Ajustement manuel du solde');
-        }
+        app(ReconciliationService::class)->adjustTo($this, $desiredBalance);
     }
 }

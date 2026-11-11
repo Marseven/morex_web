@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import ReconciledBadge from '@/Components/ReconciledBadge.vue'
 import { WalletIcon, PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
 import { ref } from 'vue'
 
@@ -105,6 +106,7 @@ const submitAdjust = () => {
                             <p class="text-xs text-theme-text-muted truncate">
                                 {{ accountTypeLabels[account.type] || account.type }}<span v-if="account.is_default"> · Par défaut</span>
                             </p>
+                            <ReconciledBadge :account-id="account.id" :last-reconciled-at="account.last_reconciled_at" class="mt-1 min-h-[44px] sm:min-h-0" />
                         </div>
                         <div class="flex flex-col items-end flex-shrink-0">
                             <span class="text-sm font-medium text-theme-text-primary whitespace-nowrap">{{ formatAmount(account.balance) }} FCFA</span>
@@ -142,6 +144,7 @@ const submitAdjust = () => {
                                     <div>
                                         <p class="text-sm text-theme-text-primary">{{ account.name }}</p>
                                         <span v-if="account.is_default" class="text-xs text-theme-text-muted">Par défaut</span>
+                                        <div><ReconciledBadge :account-id="account.id" :last-reconciled-at="account.last_reconciled_at" /></div>
                                     </div>
                                 </div>
                             </td>
@@ -154,6 +157,18 @@ const submitAdjust = () => {
                             </td>
                             <td class="px-4 py-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
+                                    <Link
+                                        :href="`/accounts/${account.id}/reconcile`"
+                                        class="text-xs text-theme-text-secondary hover:text-theme-text-primary"
+                                    >
+                                        Rapprocher
+                                    </Link>
+                                    <Link
+                                        :href="`/accounts/${account.id}/statement`"
+                                        class="text-xs text-theme-text-secondary hover:text-theme-text-primary"
+                                    >
+                                        Relevé
+                                    </Link>
                                     <button
                                         @click="openAdjust(account)"
                                         class="text-xs text-theme-text-secondary hover:text-theme-text-primary"

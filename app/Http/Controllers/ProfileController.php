@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\SmsShortcutService;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -21,10 +23,35 @@ class ProfileController extends Controller
         $user = $request->user();
         $twoFactorData = $this->getTwoFactorData($user);
 
+        // Jeton du Raccourci affiché une fois : l'historique du navigateur est chiffré (pas de réaffichage par « Retour »)
+        if ($request->session()->has('sms_token')) {
+            Inertia::encryptHistory();
+        }
+
         return Inertia::render('Profile/Edit', [
             'user' => $user->only('id', 'name', 'email', 'phone', 'avatar', 'theme'),
             'twoFactor' => $twoFactorData,
+            // Module sms-iphone : état du jeton du Raccourci (jamais le jeton lui-même)
+            'smsShortcut' => app(SmsShortcutService::class)->status($user),
+            'smsWebhookUrl' => route('api.webhook.sms'),
         ]);
+    }
+
+    /** Raccourci SMS : nouveau jeton, montré une seule fois par message flash. */
+    public function issueSmsToken(Request $request, SmsShortcutService $shortcut): RedirectResponse
+    {
+        // Une session volée ne suffit pas : le mot de passe est redemandé (revue de sécurité)
+        $request->validate(['password' => ['required', 'current_password']]);
+
+        return back()->with('sms_token', $shortcut->issue($request->user()))
+            ->with('success', 'Jeton du Raccourci créé. Copiez-le maintenant.');
+    }
+
+    public function revokeSmsToken(Request $request, SmsShortcutService $shortcut): RedirectResponse
+    {
+        $shortcut->revoke($request->user());
+
+        return back()->with('success', 'Jeton du Raccourci révoqué.');
     }
 
     protected function getTwoFactorData($user): array
@@ -37,8 +64,8 @@ class ProfileController extends Controller
         ];
 
         // If 2FA is being set up (secret exists but not confirmed)
-        if ($user->two_factor_secret && !$user->two_factor_confirmed_at) {
-            $google2fa = new Google2FA();
+        if ($user->two_factor_secret && ! $user->two_factor_confirmed_at) {
+            $google2fa = new Google2FA;
             $secret = decrypt($user->two_factor_secret);
 
             $qrCodeUrl = $google2fa->getQRCodeUrl(
@@ -49,7 +76,7 @@ class ProfileController extends Controller
 
             $renderer = new ImageRenderer(
                 new RendererStyle(200),
-                new SvgImageBackEnd()
+                new SvgImageBackEnd
             );
             $writer = new Writer($renderer);
 
@@ -69,7 +96,7 @@ class ProfileController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $request->user()->id],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$request->user()->id],
             'phone' => ['nullable', 'string', 'max:20'],
         ]);
 
@@ -88,6 +115,8 @@ class ProfileController extends Controller
         $request->user()->update([
             'password' => Hash::make($validated['password']),
         ]);
+        // Nouveau mot de passe : tous les jetons (app iPhone, Raccourci SMS) sont révoqués
+        $request->user()->tokens()->delete();
 
         return back()->with('success', 'Mot de passe mis à jour avec succès.');
     }

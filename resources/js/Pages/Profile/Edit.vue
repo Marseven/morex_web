@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SmsShortcutCard from '@/Components/Profile/SmsShortcutCard.vue'
 import { Head, useForm, router, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { UserIcon, ShieldCheckIcon, BellIcon } from '@heroicons/vue/24/outline'
@@ -8,6 +9,8 @@ import { pushSupported, isSubscribed, subscribeToPush, unsubscribeFromPush } fro
 const props = defineProps({
     user: { type: Object, required: true },
     twoFactor: { type: Object, default: () => ({ enabled: false, qrCodeSvg: null, secret: null, recoveryCodes: null }) },
+    smsShortcut: { type: Object, default: () => ({ active: false }) },
+    smsWebhookUrl: { type: String, default: '' },
 })
 
 const page = usePage()
@@ -500,6 +503,9 @@ const isSettingUp2FA = computed(() => {
             </div>
 
             <!-- Theme -->
+            <!-- Raccourci SMS (module sms-iphone) -->
+            <SmsShortcutCard :status="smsShortcut" :webhook-url="smsWebhookUrl" />
+
             <div class="glass-card p-6">
                 <h2 class="text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-4">Apparence</h2>
 

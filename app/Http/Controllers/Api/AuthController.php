@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ApiTokenRotator;
 use App\Services\TwoFactorLoginToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 use OpenApi\Attributes as OA;
 
 class AuthController extends Controller
@@ -235,6 +237,8 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
+        // Les jetons encore en délai de grâce après une rotation (prédécesseurs) tombent avec la déconnexion
+        app(ApiTokenRotator::class)->revokeGracePeriodTokens($request->user());
 
         return response()->json([
             'message' => 'Déconnexion réussie.',
@@ -274,5 +278,21 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    /** Rotation du jeton d'API (module dette-qualite-mobile, P15) : voir ApiTokenRotator. */
+    public function rotateToken(Request $request, ApiTokenRotator $rotator): JsonResponse
+    {
+        $current = $request->user()->currentAccessToken();
+        // Seul un vrai jeton d'API se tourne (jamais une session web)
+        abort_unless($current instanceof PersonalAccessToken, 403);
+
+        $new = $rotator->rotate($request->user(), $current);
+        abort_if($new === null, 401, 'Jeton déjà renouvelé.');
+
+        return response()->json([
+            'token' => $new->plainTextToken,
+            'expires_at' => $new->accessToken->expires_at?->toIso8601String(),
+        ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\BudgetSettings;
 use App\Models\Category;
+use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,7 +72,7 @@ class BudgetCycleController extends Controller
         $activeCycle = $cycles->firstWhere('status', 'active');
 
         // Si pas de cycle actif, en créer un automatiquement
-        if (!$activeCycle) {
+        if (! $activeCycle) {
             $activeCycle = $this->createDefaultCycle($request->user());
         } else {
             // Mettre à jour les totaux du cycle actif
@@ -93,7 +94,7 @@ class BudgetCycleController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$cycle) {
+        if (! $cycle) {
             $cycle = $this->createDefaultCycle($request->user());
         } else {
             $cycle->updateTotals();
@@ -102,17 +103,18 @@ class BudgetCycleController extends Controller
         // Récupérer les dépenses par catégorie pour ce cycle
         $categoriesWithSpent = Category::where(function ($q) use ($request) {
             $q->where('user_id', $request->user()->id)
-              ->orWhereNull('user_id');
+                ->orWhereNull('user_id');
         })
-        ->where('type', 'expense')
-        ->withSum(['transactions as spent_this_cycle' => function ($q) use ($cycle) {
-            $q->where('type', 'expense')
-              ->where('date', '>=', $cycle->start_date);
-            if ($cycle->end_date) {
-                $q->where('date', '<=', $cycle->end_date);
-            }
-        }], 'amount')
-        ->get();
+            ->where('type', 'expense')
+            ->withSum(['transactions as spent_this_cycle' => function ($q) use ($cycle) {
+                $q->where('type', 'expense')
+                    ->where('status', '!=', Transaction::STATUS_PENDING) // module dette-qualite
+                    ->where('date', '>=', $cycle->start_date);
+                if ($cycle->end_date) {
+                    $q->where('date', '<=', $cycle->end_date);
+                }
+            }], 'amount')
+            ->get();
 
         return response()->json([
             'cycle' => $cycle,
@@ -152,13 +154,7 @@ class BudgetCycleController extends Controller
         // Créer le nouveau cycle
         $periodName = $validated['period_name'] ?? BudgetCycle::generatePeriodName($startDate);
 
-        $totalBudget = Category::where(function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-              ->orWhereNull('user_id');
-        })
-        ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->sum('budget_limit');
+        $totalBudget = Category::personalBudgetFor($user->id);
 
         $newCycle = new BudgetCycle([
             'start_date' => $startDate,
@@ -190,7 +186,7 @@ class BudgetCycleController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$cycle) {
+        if (! $cycle) {
             return response()->json([
                 'message' => 'Aucun cycle actif à clôturer.',
             ], 404);
@@ -237,7 +233,7 @@ class BudgetCycleController extends Controller
         $user = $request->user();
         $settings = BudgetSettings::where('user_id', $user->id)->first();
 
-        if (!$settings || !$settings->auto_detect_salary) {
+        if (! $settings || ! $settings->auto_detect_salary) {
             return response()->json(['should_trigger' => false]);
         }
 
@@ -249,17 +245,17 @@ class BudgetCycleController extends Controller
         }
 
         $transactionDate = Carbon::parse($transaction->date);
-        if (!$settings->isInSalaryWindow($transactionDate)) {
+        if (! $settings->isInSalaryWindow($transactionDate)) {
             return response()->json(['should_trigger' => false]);
         }
 
         // Vérifier si c'est dans la catégorie/compte salaire (si configuré)
-        $matchesCategory = !$settings->salary_category_id ||
+        $matchesCategory = ! $settings->salary_category_id ||
             $transaction->category_id === $settings->salary_category_id;
-        $matchesAccount = !$settings->salary_account_id ||
+        $matchesAccount = ! $settings->salary_account_id ||
             $transaction->account_id === $settings->salary_account_id;
 
-        if (!$matchesCategory || !$matchesAccount) {
+        if (! $matchesCategory || ! $matchesAccount) {
             return response()->json(['should_trigger' => false]);
         }
 
@@ -289,13 +285,7 @@ class BudgetCycleController extends Controller
             $startDate = $today->copy()->subMonth()->setDay(min($startDay, $today->copy()->subMonth()->daysInMonth));
         }
 
-        $totalBudget = Category::where(function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-              ->orWhereNull('user_id');
-        })
-        ->where('type', 'expense')
-        ->whereNotNull('budget_limit')
-        ->sum('budget_limit');
+        $totalBudget = Category::personalBudgetFor($user->id);
 
         $cycle = new BudgetCycle([
             'start_date' => $startDate,
@@ -344,6 +334,7 @@ class BudgetCycleController extends Controller
         }
 
         $remaining = $cycle->total_budget - $cycle->total_spent;
+
         return max(0, (int) floor($remaining / $daysRemaining));
     }
 }

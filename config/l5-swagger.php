@@ -65,9 +65,10 @@ return [
              * Middleware allows to prevent unexpected access to API documentation
              */
             'middleware' => [
-                'api' => [],
+                // Documentation réservée à l'utilisateur connecté (socle-prod) : elle décrit toute la surface d'attaque.
+                'api' => ['web', 'auth'],
                 'asset' => [],
-                'docs' => [],
+                'docs' => ['web', 'auth'],
                 'oauth2_callback' => [],
             ],
 

@@ -38,7 +38,7 @@ class CategoryTest extends TestCase
 
         $response->assertInertia(fn ($page) => $page
             ->component('Budgets/Index')
-            ->has('categories', 5)
+            ->has('categories', 5 + $this->visibleSystemCategories())
         );
     }
 
@@ -51,7 +51,7 @@ class CategoryTest extends TestCase
         $response = $this->actingAs($this->user)->get('/budgets');
 
         $response->assertInertia(fn ($page) => $page
-            ->has('categories', 2)
+            ->has('categories', 2 + $this->visibleSystemCategories())
         );
     }
 
@@ -224,5 +224,11 @@ class CategoryTest extends TestCase
 
         $response->assertStatus(403);
         $this->assertDatabaseHas('categories', ['id' => $category->id]);
+    }
+
+    /** Catégories système créées par migration (frais bancaires…) : la page Budgets les affiche aussi. */
+    private function visibleSystemCategories(): int
+    {
+        return Category::where('is_system', true)->whereNotIn('id', Category::RECONCILIATION_IDS)->count();
     }
 }

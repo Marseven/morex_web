@@ -104,7 +104,12 @@ class RecurringTransaction extends Model
             'description' => $this->description ?? "Transaction récurrente: {$this->frequency_label}",
             'date' => $this->next_due_date,
         ]);
-        $transaction->user_id = $this->user_id;
+        // Lien d'idempotence (module recurrences-serveur) : jamais posé par une saisie
+        $transaction->forceFill([
+            'user_id' => $this->user_id,
+            'recurring_transaction_id' => $this->id,
+            'occurrence_date' => $this->next_due_date->toDateString(),
+        ]);
         $transaction->save();
 
         return $transaction;
@@ -113,7 +118,8 @@ class RecurringTransaction extends Model
     /**
      * Calculate and update the next due date
      */
-    public function updateNextDueDate(): void
+    /** @param bool $consume false quand l'échéance existait déjà (rejeu) : l'occurrence n'est pas décomptée deux fois */
+    public function updateNextDueDate(bool $consume = true): void
     {
         $this->last_generated_date = $this->next_due_date->copy();
 
@@ -121,16 +127,16 @@ class RecurringTransaction extends Model
             'daily' => $this->next_due_date->copy()->addDay(),
             'weekly' => $this->next_due_date->copy()->addWeek(),
             'biweekly' => $this->next_due_date->copy()->addWeeks(2),
-            'monthly' => $this->calculateNextMonthlyDate(),
-            'quarterly' => $this->next_due_date->copy()->addMonths(3),
-            'yearly' => $this->next_due_date->copy()->addYear(),
+            'monthly' => $this->addMonthsAnchored(1),
+            'quarterly' => $this->addMonthsAnchored(3),
+            'yearly' => $this->addMonthsAnchored(12),
             default => $this->next_due_date->copy()->addMonth(),
         };
 
         $this->next_due_date = $nextDate;
 
         // Decrement remaining occurrences if set
-        if ($this->remaining_occurrences !== null) {
+        if ($consume && $this->remaining_occurrences !== null) {
             $this->remaining_occurrences--;
             if ($this->remaining_occurrences <= 0) {
                 $this->is_active = false;
@@ -146,18 +152,15 @@ class RecurringTransaction extends Model
     }
 
     /**
-     * Calculate the next monthly due date, respecting day_of_month
+     * Ajoute des mois sans débordement, en gardant le jour d'ancrage (day_of_month, sinon le jour de départ).
+     * Exemple : ancrage 31 → 31/01, 28/02, 31/03 (jamais de mois sauté ni de dérive au 28).
      */
-    private function calculateNextMonthlyDate(): \Carbon\Carbon
+    private function addMonthsAnchored(int $months): \Carbon\Carbon
     {
-        $nextMonth = $this->next_due_date->copy()->addMonth();
+        $anchor = $this->day_of_month ?? $this->start_date?->day ?? $this->next_due_date->day;
+        $next = $this->next_due_date->copy()->startOfMonth()->addMonthsNoOverflow($months);
 
-        if ($this->day_of_month) {
-            $targetDay = min($this->day_of_month, $nextMonth->daysInMonth);
-            $nextMonth->setDay($targetDay);
-        }
-
-        return $nextMonth;
+        return $next->setDay(min($anchor, $next->daysInMonth));
     }
 
     /**

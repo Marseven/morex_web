@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,8 @@ class Transaction extends Model
         return [
             'amount' => 'integer',
             'date' => 'date',
+            'reconciled_at' => 'datetime',
+            'occurrence_date' => 'date',
         ];
     }
 
@@ -53,6 +56,51 @@ class Transaction extends Model
     }
 
     public const STATUS_PENDING = 'pending_validation';
+
+    /** Champs qui changent le solde rapproché : les modifier dépointe l'opération (module dette-qualite). */
+    public const MATERIAL_FIELDS = ['amount', 'type', 'account_id', 'transfer_to_account_id', 'date', 'status'];
+
+    /** Dépointe une opération rapprochée dont un champ matériel change ; vrai si elle vient d'être dépointée. */
+    public function unpointIfMaterialChange(): bool
+    {
+        if ($this->reconciled_at === null || ! $this->isDirty(self::MATERIAL_FIELDS)) {
+            return false;
+        }
+        $this->reconciled_at = null;
+
+        return true;
+    }
+
+    /**
+     * Opérations comptées dans les revenus et dépenses (module revenus-transit, RM-1) :
+     * hors attente, hors écarts de rapprochement, hors catégories en transit. Le pro reste compté.
+     */
+    public function scopeCounted(Builder $query): Builder
+    {
+        return $query->where('status', '!=', self::STATUS_PENDING)
+            ->where(fn (Builder $q) => $q->whereNull('category_id')->orWhere(fn (Builder $q) => $q
+                ->whereNotIn('category_id', Category::RECONCILIATION_IDS)
+                ->whereNotIn('category_id', self::categoryIdsOfNature(Category::NATURE_TRANSIT))));
+    }
+
+    /** Dépenses perso : hors pro (RM-2). À combiner avec counted() (BudgetCycle::transactions() l'applique déjà). */
+    public function scopePersonal(Builder $query): Builder
+    {
+        return $query
+            ->where(fn (Builder $q) => $q->whereNull('category_id')
+                ->orWhereNotIn('category_id', self::categoryIdsOfNature(Category::NATURE_PRO)));
+    }
+
+    public function scopeOfNature(Builder $query, string $nature): Builder
+    {
+        return $query->whereIn('category_id', self::categoryIdsOfNature($nature));
+    }
+
+    /** Sous-requête : une catégorie supprimée garde sa nature pour les opérations passées. */
+    private static function categoryIdsOfNature(string $nature): Builder
+    {
+        return Category::withTrashed()->select('id')->where('nature', $nature);
+    }
 
     /**
      * Une transaction en attente de validation (import SMS) ne compte ni dans le
@@ -84,19 +132,34 @@ class Transaction extends Model
 
     protected static function booted(): void
     {
-        $updateBudgetCycle = function (Transaction $transaction) {
-            if (in_array($transaction->type, ['expense', 'income'])) {
-                $activeCycle = BudgetCycle::where('user_id', $transaction->user_id)
-                    ->where('status', 'active')
-                    ->whereDate('start_date', '<=', $transaction->date)
-                    ->where(function ($q) use ($transaction) {
-                        $q->whereNull('end_date')
-                            ->orWhereDate('end_date', '>=', $transaction->date);
-                    })
-                    ->first();
-                $activeCycle?->updateTotals();
+        // Recalcule les cycles qui contiennent les dates touchées, une seule fois chacun : totaux complets
+        // pour le cycle actif, dépensé seul pour un cycle clôturé (son budget reste celui de la clôture).
+        // P12 (module dette-qualite) : l'ancienne date d'une opération déplacée est aussi recalculée.
+        $refreshCyclesAt = function (Transaction $transaction, array $dates) {
+            $types = [$transaction->type, $transaction->getOriginal('type')];
+            $dates = array_values(array_unique(array_filter(array_map(
+                fn ($d) => $d ? \Carbon\Carbon::parse($d)->toDateString() : null, $dates))));
+            if ($dates === [] || ! array_intersect($types, ['expense', 'income'])) {
+                return;
             }
+            BudgetCycle::where('user_id', $transaction->user_id)
+                ->where(function ($q) use ($dates) {
+                    foreach ($dates as $date) {
+                        $q->orWhere(fn ($c) => $c->whereDate('start_date', '<=', $date)
+                            ->where(fn ($e) => $e->whereNull('end_date')->orWhereDate('end_date', '>=', $date)));
+                    }
+                })
+                ->get()
+                ->each(fn (BudgetCycle $cycle) => $cycle->status === 'active' ? $cycle->updateTotals() : $cycle->refreshSpent());
         };
+        $updateBudgetCycle = function (Transaction $transaction) use ($refreshCyclesAt) {
+            $refreshCyclesAt($transaction, [$transaction->date, $transaction->wasChanged('date') ? $transaction->getOriginal('date') : null]);
+        };
+
+        // Ne rien renvoyer : un false renvoyé par « updating » annulerait la mise à jour
+        static::updating(function (Transaction $transaction): void {
+            $transaction->unpointIfMaterialChange();
+        });
 
         /**
          * Applique les ajustements de solde pour une transaction (source + destination pour les transferts).
@@ -190,7 +253,10 @@ class Transaction extends Model
                 $reverseOldAdjustments($transaction);
             }
 
-            $updateBudgetCycle($transaction);
+            // Une modification cosmétique (libellé, pointage) ne touche pas aux cycles
+            if ($transaction->wasChanged(['amount', 'type', 'date', 'status', 'account_id', 'category_id'])) {
+                $updateBudgetCycle($transaction);
+            }
         });
 
         static::deleted(function (Transaction $transaction) use ($updateBudgetCycle, $applyAdjustments) {

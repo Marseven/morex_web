@@ -17,6 +17,7 @@ class AccountController extends Controller
             ->withSum(['transactions as expense_total' => fn($q) => $q->where('type', 'expense')], 'amount')
             ->withSum(['transactions as transfers_out_total' => fn($q) => $q->where('type', 'transfer')], 'amount')
             ->withSum(['incomingTransfers as transfers_in_total'], 'amount')
+            ->withMax('reconciliations as last_reconciled_at', 'reconciled_at')
             ->orderBy('order_index')
             ->get()
             ->map(function ($account) {
@@ -119,7 +120,8 @@ class AccountController extends Controller
         $this->authorize('update', $account);
 
         $validated = $request->validate([
-            'balance' => ['required', 'integer'],
+            // Même borne que le rapprochement : évite le débordement et les écarts absurdes
+            'balance' => ['required', 'integer', 'between:-1000000000000,1000000000000'],
         ]);
 
         $account->adjustToBalance($validated['balance']);
