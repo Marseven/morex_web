@@ -31,6 +31,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Rotation du jeton (module dette-qualite-mobile) : compteur propre, distinct du throttle du groupe API
+        RateLimiter::for('token-rotate', fn (Request $request) => Limit::perMinute(6)->by('token-rotate:'.($request->user()?->id ?: $request->ip())));
+
         // Garde-fou : un APP_DEBUG=true oublié dans le .env de production exposerait traces et chemins.
         if ($this->app->environment('production')) {
             config(['app.debug' => false]);
@@ -38,9 +41,6 @@ class AppServiceProvider extends ServiceProvider
 
         // Plafonds (module plafonds-alertes) : toute dépense confirmée recalcule le plafond de sa catégorie.
         // La synchro désactive ces événements et vérifie tout l'utilisateur après validation.
-        // Rotation du jeton (module dette-qualite-mobile) : compteur propre, distinct du throttle du groupe API
-        RateLimiter::for('token-rotate', fn (Request $request) => Limit::perMinute(6)->by('token-rotate:'.($request->user()?->id ?: $request->ip())));
-
         // Un cycle créé, clôturé ou supprimé change la période des plafonds
         BudgetCycle::saved(fn () => app(BudgetAlertService::class)->forgetPeriods());
         BudgetCycle::deleted(fn () => app(BudgetAlertService::class)->forgetPeriods());

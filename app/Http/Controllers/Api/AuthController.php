@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ApiTokenRotator;
 use App\Services\TwoFactorLoginToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 use OpenApi\Attributes as OA;
 
 class AuthController extends Controller
@@ -276,25 +278,19 @@ class AuthController extends Controller
         return null;
     }
 
-    /**
-     * Rotation du jeton d'API (module dette-qualite-mobile, P15) : un nouveau jeton de mêmes capacités,
-     * puis révocation de l'ancien. Un jeton volé ne survit pas à la rotation suivante de l'app.
-     */
-    public function rotateToken(Request $request): JsonResponse
+    /** Rotation du jeton d'API (module dette-qualite-mobile, P15) : voir ApiTokenRotator. */
+    public function rotateToken(Request $request, ApiTokenRotator $rotator): JsonResponse
     {
         $current = $request->user()->currentAccessToken();
-        $abilities = $current instanceof \Laravel\Sanctum\PersonalAccessToken ? $current->abilities : ['*'];
+        // Seul un vrai jeton d'API se tourne (jamais une session web)
+        abort_unless($current instanceof PersonalAccessToken, 403);
 
-        $new = $request->user()->createToken('api-token', $abilities);
-        if ($current instanceof \Laravel\Sanctum\PersonalAccessToken) {
-            $current->delete();
-        }
-
-        $minutes = config('sanctum.expiration');
+        $new = $rotator->rotate($request->user(), $current);
+        abort_if($new === null, 401, 'Jeton déjà renouvelé.');
 
         return response()->json([
             'token' => $new->plainTextToken,
-            'expires_at' => $minutes ? now()->addMinutes((int) $minutes)->toIso8601String() : null,
+            'expires_at' => $new->accessToken->expires_at?->toIso8601String(),
         ]);
     }
 }
