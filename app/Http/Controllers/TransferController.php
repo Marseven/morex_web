@@ -104,7 +104,7 @@ class TransferController extends Controller
         $validated = $request->validate([
             'rows' => ['required', 'array', 'min:1', 'max:500'],
             'rows.*.date' => ['required', 'date'],
-            'rows.*.amount' => ['required', 'integer', 'min:1'],
+            'rows.*.amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'rows.*.from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'rows.*.to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'rows.*.description' => ['nullable', 'string', 'max:1000'],

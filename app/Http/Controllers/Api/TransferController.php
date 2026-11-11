@@ -70,7 +70,7 @@ class TransferController extends Controller
             'hops' => ['required', 'array', 'min:1'],
             'hops.*.from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'hops.*.to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'hops.*.amount' => ['required', 'integer', 'min:1'],
+            'hops.*.amount' => ['required', 'integer', 'min:1', 'max:999999999999'], // multi-sauts : sans frais
             'hops.*.description' => ['nullable', 'string', 'max:1000'],
             'hops.*.date' => ['required', 'date'],
         ]);
@@ -118,7 +118,8 @@ class TransferController extends Controller
         $validated = $request->validate([
             'from_account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'to_account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'amount' => ['sometimes', 'integer', 'min:1', 'max:999999999999'],
+            // Sans « fee », le montant ne peut pas descendre sous les frais actuels (RM-3)
+            'amount' => ['sometimes', 'integer', 'min:'.max(1, $request->has('fee') ? 1 : (int) $transfer->fee), 'max:999999999999'],
             // Frais bornés par le montant envoyé, sinon par le montant actuel (module transferts-frais)
             'fee' => ['sometimes', 'integer', 'min:0', 'max:'.(int) $request->input('amount', $transfer->amount)],
             'description' => ['nullable', 'string', 'max:1000'],

@@ -50,7 +50,7 @@ const noFee = () => {
                     inputmode="numeric"
                     min="0"
                     :aria-invalid="localError ? 'true' : 'false'"
-                    aria-describedby="transfer-fee-help transfer-fee-error"
+                    :aria-describedby="localError ? 'transfer-fee-help transfer-fee-error' : 'transfer-fee-help'"
                     class="flex-1 min-h-11 bg-theme-surface border rounded-md px-3 py-2 text-base text-theme-text-primary focus:border-white focus:ring-0 outline-none"
                     :class="localError ? 'border-danger' : 'border-theme-border'"
                     @input="emit('touched')"

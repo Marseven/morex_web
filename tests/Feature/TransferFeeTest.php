@@ -133,8 +133,9 @@ class TransferFeeTest extends TestCase
         $this->withdraw(fee: 500);
         $this->withdraw(fee: 700);
 
-        $this->assertSame(700, $this->service->suggestedFee($this->user, $this->airtel->id, $this->wallet->id));
-        $this->assertSame(0, $this->service->suggestedFee($this->user, $this->wallet->id, $this->airtel->id));
+        $fees = $this->service->lastFeesByPair($this->user);
+        $this->assertSame(700, $fees["{$this->airtel->id}:{$this->wallet->id}"]);
+        $this->assertArrayNotHasKey("{$this->wallet->id}:{$this->airtel->id}", $fees);
     }
 
     public function test_web_store_validates_the_fee(): void
@@ -222,5 +223,64 @@ class TransferFeeTest extends TestCase
 
         $this->actingAs($this->user)->get('/transfers/create')
             ->assertInertia(fn ($page) => $page->where("lastFees.{$this->airtel->id}:{$this->wallet->id}", 700));
+    }
+
+    // --- Revue de code ---
+
+    public function test_restoring_a_transfer_restores_its_fee(): void
+    {
+        $transfer = $this->withdraw();
+        $this->service->delete($transfer);
+
+        Transfer::withTrashed()->find($transfer->id)->restore();
+
+        $this->assertSame([149500, 60000], $this->balances());
+        $this->assertNotNull($transfer->fresh()->feeTransaction);
+    }
+
+    public function test_deleting_the_fee_expense_by_hand_zeroes_the_transfer_fee(): void
+    {
+        $transfer = $this->withdraw();
+
+        $this->actingAs($this->user)->delete("/transactions/{$transfer->fee_transaction_id}");
+
+        $this->assertSame([0, null], [$transfer->fresh()->fee, $transfer->fresh()->fee_transaction_id]);
+        $this->service->update($transfer->fresh(), ['description' => 'Retrait marché']);
+        $this->assertSame([150000, 60000], $this->balances()); // aucun débit caché
+    }
+
+    public function test_editing_the_fee_expense_updates_the_transfer_fee(): void
+    {
+        $transfer = $this->withdraw();
+
+        $transfer->feeTransaction->update(['amount' => 650]);
+
+        $this->assertSame(650, $transfer->fresh()->fee);
+    }
+
+    public function test_the_sync_keeps_fees_aligned(): void
+    {
+        $bgfi = Account::factory()->for($this->user)->withBalance(300000)->create(['name' => 'BGFI']);
+        $transfer = $this->withdraw();
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/sync/push', ['changes' => [
+            ['type' => 'transfer', 'action' => 'update', 'server_id' => $transfer->id, 'local_id' => 't1',
+                'data' => ['from_account_id' => $bgfi->id, 'date' => '2026-11-10'], 'updated_at' => now()->addMinute()->toIso8601String()],
+            ['type' => 'transaction', 'action' => 'update', 'server_id' => $transfer->fee_transaction_id, 'local_id' => 'f1',
+                'data' => ['amount' => 700], 'updated_at' => now()->addMinute()->toIso8601String()],
+        ]])->assertOk();
+
+        $fee = $transfer->fresh()->feeTransaction;
+        $this->assertSame([$bgfi->id, '2026-11-10', 700], [$fee->account_id, $fee->date->toDateString(), $transfer->fresh()->fee]);
+        $this->assertSame(249300, (int) $bgfi->fresh()->balance);
+    }
+
+    public function test_the_api_refuses_an_amount_below_the_current_fee(): void
+    {
+        $transfer = $this->withdraw(amount: 50000, fee: 500);
+        Sanctum::actingAs($this->user);
+
+        $this->putJson("/api/transfers/{$transfer->id}", ['amount' => 400])->assertUnprocessable();
     }
 }

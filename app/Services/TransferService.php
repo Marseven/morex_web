@@ -48,18 +48,35 @@ final class TransferService
     public function delete(Transfer $transfer): void
     {
         DB::transaction(function () use ($transfer) {
-            $transfer->feeTransaction?->delete();
+            // Le transfert d'abord : la dépense supprimée ensuite garde son lien (restauration possible)
             $transfer->delete();
+            $transfer->feeTransaction?->delete();
         });
     }
 
-    public function suggestedFee(User $user, string $fromAccountId, string $toAccountId): int
+    /** Restauration d'un transfert : ses frais reviennent avec lui (événement Transfer::restored). */
+    public function restoreFee(Transfer $transfer): void
     {
-        return (int) Transfer::where('user_id', $user->id)
-            ->where('from_account_id', $fromAccountId)
-            ->where('to_account_id', $toAccountId)
-            ->latest('date')->latest('created_at')
-            ->value('fee');
+        $fee = $transfer->fee_transaction_id ? Transaction::withTrashed()->find($transfer->fee_transaction_id) : null;
+        if ($fee?->trashed()) {
+            $fee->restore();
+        }
+    }
+
+    /** La dépense de frais supprimée à la main : le transfert n'a plus de frais (aucun débit recréé en silence). */
+    public function onFeeTransactionDeleted(Transaction $transaction): void
+    {
+        Transfer::where('fee_transaction_id', $transaction->id)->get()
+            ->each(fn (Transfer $t) => $t->forceFill(['fee' => 0, 'fee_transaction_id' => null])->saveQuietly());
+    }
+
+    /** La dépense de frais modifiée à la main : le transfert suit son montant. */
+    public function onFeeTransactionUpdated(Transaction $transaction): void
+    {
+        if ($transaction->wasChanged('amount')) {
+            Transfer::where('fee_transaction_id', $transaction->id)
+                ->update(['fee' => (int) $transaction->amount]);
+        }
     }
 
     /**
@@ -77,13 +94,42 @@ final class TransferService
             ->all();
     }
 
-    /** Synchro (événements désactivés) : les frais d'un transfert supprimé sont supprimés après coup, avec leurs effets. */
-    public function releaseOrphanFees(User $user): void
+    /**
+     * Synchro (événements désactivés) : réaligne transferts et dépenses de frais après coup, avec leurs effets.
+     * - transfert supprimé : sa dépense de frais est supprimée (le lien reste pour une restauration) ;
+     * - dépense supprimée sur l'iPhone : les frais du transfert passent à 0 ;
+     * - transfert déplacé (compte source, date) : la dépense suit ; montant de la dépense modifié : le transfert suit.
+     */
+    public function reconcileFees(User $user): void
     {
-        Transfer::onlyTrashed()->where('user_id', $user->id)->whereNotNull('fee_transaction_id')->get()
+        Transfer::withTrashed()->where('user_id', $user->id)->whereNotNull('fee_transaction_id')->get()
             ->each(function (Transfer $transfer) {
-                Transaction::find($transfer->fee_transaction_id)?->delete();
-                $transfer->forceFill(['fee_transaction_id' => null])->saveQuietly();
+                $fee = Transaction::withTrashed()->find($transfer->fee_transaction_id);
+
+                if ($transfer->trashed()) {
+                    if ($fee !== null && ! $fee->trashed()) {
+                        $fee->delete();
+                    }
+
+                    return;
+                }
+
+                if ($fee === null || $fee->trashed()) {
+                    $transfer->forceFill(['fee' => 0, 'fee_transaction_id' => null])->saveQuietly();
+
+                    return;
+                }
+
+                $moved = array_filter([
+                    'account_id' => $fee->account_id !== $transfer->from_account_id ? $transfer->from_account_id : null,
+                    'date' => $fee->date->toDateString() !== $transfer->date->toDateString() ? $transfer->date : null,
+                ]);
+                if ($moved !== []) {
+                    $fee->update($moved);
+                }
+                if ((int) $fee->amount !== (int) $transfer->fee) {
+                    $transfer->forceFill(['fee' => (int) $fee->amount])->saveQuietly();
+                }
             });
     }
 

@@ -200,7 +200,7 @@ class SyncController extends Controller
         try {
             app(BudgetAlertService::class)->checkUser($user);
             app(PlannedPurchaseService::class)->releaseOrphans($user);
-            app(TransferService::class)->releaseOrphanFees($user);
+            app(TransferService::class)->reconcileFees($user);
         } catch (\Throwable $e) {
             report($e);
         }

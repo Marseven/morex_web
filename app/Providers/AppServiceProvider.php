@@ -5,8 +5,10 @@ namespace App\Providers;
 use App\Contracts\PushNotifier;
 use App\Models\BudgetCycle;
 use App\Models\Transaction;
+use App\Models\Transfer;
 use App\Services\BudgetAlertService;
 use App\Services\PlannedPurchaseService;
+use App\Services\TransferService;
 use App\Services\WebPushNotifier;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -52,6 +54,11 @@ class AppServiceProvider extends ServiceProvider
                 app(PlannedPurchaseService::class)->releaseFor($t);
             }
         });
+
+        // Frais de transfert (module transferts-frais) : transfert et dépense liée restent alignés
+        Transaction::deleted(fn (Transaction $t) => app(TransferService::class)->onFeeTransactionDeleted($t));
+        Transaction::updated(fn (Transaction $t) => app(TransferService::class)->onFeeTransactionUpdated($t));
+        Transfer::restored(fn (Transfer $t) => app(TransferService::class)->restoreFee($t));
 
         Transaction::saved(function (Transaction $transaction) {
             $relevant = $transaction->wasRecentlyCreated
