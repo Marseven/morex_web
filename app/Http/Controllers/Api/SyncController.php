@@ -15,6 +15,7 @@ use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Services\BudgetAlertService;
 use App\Services\PlannedPurchaseService;
+use App\Services\TransferService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -199,6 +200,7 @@ class SyncController extends Controller
         try {
             app(BudgetAlertService::class)->checkUser($user);
             app(PlannedPurchaseService::class)->releaseOrphans($user);
+            app(TransferService::class)->releaseOrphanFees($user);
         } catch (\Throwable $e) {
             report($e);
         }

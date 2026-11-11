@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TransferResource;
 use App\Models\Transfer;
+use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -40,19 +41,20 @@ class TransferController extends Controller
         return TransferResource::collection($transfers);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, TransferService $transfers): JsonResponse
     {
         $userId = $request->user()->id;
 
         $validated = $request->validate([
             'from_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'to_account_id' => ['required', 'uuid', "exists:accounts,id,user_id,{$userId}", 'different:from_account_id'],
-            'amount' => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
+            'fee' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['required', 'date'],
         ]);
 
-        $transfer = $request->user()->transfers()->create($validated);
+        $transfer = $transfers->create($request->user(), $validated);
 
         return response()->json(
             new TransferResource($transfer->load(['fromAccount', 'toAccount'])),
@@ -107,7 +109,7 @@ class TransferController extends Controller
         return new TransferResource($transfer->load(['fromAccount', 'toAccount']));
     }
 
-    public function update(Request $request, Transfer $transfer): TransferResource
+    public function update(Request $request, Transfer $transfer, TransferService $transfers): TransferResource
     {
         $this->authorize('update', $transfer);
 
@@ -116,21 +118,23 @@ class TransferController extends Controller
         $validated = $request->validate([
             'from_account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
             'to_account_id' => ['sometimes', 'uuid', "exists:accounts,id,user_id,{$userId}"],
-            'amount' => ['sometimes', 'integer', 'min:1'],
+            'amount' => ['sometimes', 'integer', 'min:1', 'max:999999999999'],
+            // Frais bornés par le montant envoyé, sinon par le montant actuel (module transferts-frais)
+            'fee' => ['sometimes', 'integer', 'min:0', 'max:'.(int) $request->input('amount', $transfer->amount)],
             'description' => ['nullable', 'string', 'max:1000'],
             'date' => ['sometimes', 'date'],
         ]);
 
-        $transfer->update($validated);
+        $transfer = $transfers->update($transfer, $validated);
 
         return new TransferResource($transfer->fresh()->load(['fromAccount', 'toAccount']));
     }
 
-    public function destroy(Request $request, Transfer $transfer): JsonResponse
+    public function destroy(Request $request, Transfer $transfer, TransferService $transfers): JsonResponse
     {
         $this->authorize('delete', $transfer);
 
-        $transfer->delete();
+        $transfers->delete($transfer);
 
         return response()->json(null, 204);
     }
