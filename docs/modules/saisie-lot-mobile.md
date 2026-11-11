@@ -1,4 +1,4 @@
-# Module saisie-lot-mobile (2 ter)                  statut : en cours · 2026-11-12
+# Module saisie-lot-mobile (2 ter)                  statut : livré · 2026-11-12
 
 **Conclusion** : l'écran de **saisie en lot** arrive sur l'iPhone. Je colle mes notes du jour (« 1500 taxi », « 22500+12000 night club »). Le serveur les analyse avec l'API du module 2 bis (`POST /api/transactions/notes/preview`, déjà livrée). Je vérifie les lignes proposées (montant, catégorie obligatoire, compte, date), puis j'enregistre. Les opérations sont créées **localement**, par le même cas d'usage que la saisie unitaire, puis partent au serveur par la synchro habituelle : les soldes, les plafonds et les achats prévus suivent comme pour toute saisie.
 
@@ -40,3 +40,14 @@
 3. Analyse hors connexion (parseur embarqué) ? → *Hypothèse : non, le serveur reste l'unique moteur.*
 
 **Hors module** : analyse hors connexion, dictée vocale, saisie en lot sur le widget iOS.
+
+## Livré (2 ter)
+- **iPhone** (`morex_mobile`, `feat/saisie-lot-mobile`) :
+  - `BatchEntryRemoteDataSource` appelle `POST /api/transactions/notes/preview` (hors connexion : message, notes conservées ; 422 : message du serveur) ;
+  - `BatchEntryCubit` gère l'analyse, la modification et le retrait de lignes, puis l'enregistrement : une création par ligne via `CreateTransactionUseCase`, en local, la synchro suit. Une ligne en échec reste à reprendre, les autres sont enregistrées ;
+  - `BatchEntryPage` (route `/transactions/batch`, bouton « Saisie en lot » dans la liste) : notes, date de référence, compte par défaut ; lignes avec catégorie obligatoire, compte, doublon possible, ligne non comprise ; total et bouton d'enregistrement.
+- **Serveur** : aucun changement (API du module 2 bis).
+- **Tests** : `batch_entry_cubit_test`, 6 tests. Suite mobile : 95 réussis. Les 4 échecs restants sont les tests périmés de `main`, corrigés par la PR mobile du module 7b. Analyse : aucun nouveau problème.
+- **Non vérifié** :
+  - écran sur simulateur ou iPhone réel (aucun test d'interface automatisé) ;
+  - affichage avec Dynamic Type agrandi.
