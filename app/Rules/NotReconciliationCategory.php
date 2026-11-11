@@ -18,7 +18,9 @@ final class NotReconciliationCategory implements ValidationRule
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (is_string($value) && in_array($value, Category::RECONCILIATION_IDS, true) && $value !== $this->currentCategoryId) {
+        // Insensible à la casse : MySQL (collation *_ci) retrouverait un UUID écrit en majuscules
+        $value = is_string($value) ? strtolower($value) : $value;
+        if (is_string($value) && in_array($value, Category::RECONCILIATION_IDS, true) && $value !== strtolower((string) $this->currentCategoryId)) {
             $fail('Cette catégorie est réservée aux écarts de rapprochement.');
         }
     }

@@ -764,9 +764,9 @@ class SyncController extends Controller
     /** Catégories d'écart réservées au rapprochement (module dette-qualite) ; une opération d'écart garde la sienne. */
     private function assertNoReconciliationCategory(string $modelClass, array $data, ?string $currentCategoryId): void
     {
-        $categoryId = $data['category_id'] ?? null;
-        if ($modelClass === Transaction::class && is_string($categoryId)
-            && in_array($categoryId, Category::RECONCILIATION_IDS, true) && $categoryId !== $currentCategoryId) {
+        $categoryId = is_string($data['category_id'] ?? null) ? strtolower($data['category_id']) : null;
+        if ($modelClass === Transaction::class && $categoryId !== null
+            && in_array($categoryId, Category::RECONCILIATION_IDS, true) && $categoryId !== strtolower((string) $currentCategoryId)) {
             throw new \RuntimeException('Catégorie réservée aux écarts de rapprochement');
         }
     }

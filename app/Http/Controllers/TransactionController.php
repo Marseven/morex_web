@@ -184,10 +184,13 @@ class TransactionController extends Controller
     {
         $this->authorize('delete', $transaction);
 
+        $wasPointed = $transaction->reconciled_at !== null;
         $transaction->delete();
 
-        return redirect()->route('transactions.index')
-            ->with('success', 'Transaction supprimée avec succès.');
+        $redirect = redirect()->route('transactions.index')->with('success', 'Transaction supprimée avec succès.');
+
+        // Module dette-qualite : supprimer une opération pointée change le solde rapproché
+        return $wasPointed ? $redirect->with('warning', 'Opération pointée supprimée : refaites le rapprochement du compte.') : $redirect;
     }
 
     /**

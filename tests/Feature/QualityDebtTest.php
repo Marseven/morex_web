@@ -199,4 +199,36 @@ class QualityDebtTest extends TestCase
             ->assertRedirect('/transactions');
         $this->assertSame(1, Transaction::count());
     }
+
+    // --- Revue de sécurité ---
+
+    public function test_an_uppercase_reconciliation_category_is_refused_too(): void
+    {
+        $upper = strtoupper(Category::RECONCILIATION_EXPENSE_ID);
+        $this->actingAs($this->user)->post('/transactions', ['amount' => 5000, 'type' => 'expense', 'category_id' => $upper,
+            'account_id' => $this->account->id, 'date' => now()->toDateString()])->assertSessionHasErrors('category_id');
+
+        $tx = $this->spend(5000);
+        Sanctum::actingAs($this->user);
+        $this->postJson('/api/sync/push', ['changes' => [[
+            'type' => 'transaction', 'action' => 'update', 'server_id' => $tx->id, 'local_id' => 't1',
+            'data' => ['category_id' => $upper], 'updated_at' => now()->addMinute()->toIso8601String(),
+        ]]])->assertOk()->assertJsonPath('results.errors.0.status', 'error');
+    }
+
+    public function test_moving_a_pointed_operation_back_to_pending_unpoints_it(): void
+    {
+        $tx = $this->reconciled();
+
+        $tx->update(['status' => Transaction::STATUS_PENDING]);
+
+        $this->assertNull($tx->fresh()->reconciled_at);
+    }
+
+    public function test_deleting_a_pointed_operation_warns_on_the_web(): void
+    {
+        $tx = $this->reconciled();
+
+        $this->actingAs($this->user)->delete("/transactions/{$tx->id}")->assertSessionHas('warning');
+    }
 }

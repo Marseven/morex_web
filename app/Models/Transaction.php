@@ -58,7 +58,7 @@ class Transaction extends Model
     public const STATUS_PENDING = 'pending_validation';
 
     /** Champs qui changent le solde rapproché : les modifier dépointe l'opération (module dette-qualite). */
-    public const MATERIAL_FIELDS = ['amount', 'type', 'account_id', 'transfer_to_account_id', 'date'];
+    public const MATERIAL_FIELDS = ['amount', 'type', 'account_id', 'transfer_to_account_id', 'date', 'status'];
 
     /** Dépointe une opération rapprochée dont un champ matériel change ; vrai si elle vient d'être dépointée. */
     public function unpointIfMaterialChange(): bool

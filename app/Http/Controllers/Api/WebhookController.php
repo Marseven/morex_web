@@ -128,6 +128,7 @@ class WebhookController extends Controller
         }
         $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $source);
 
-        return $user->accounts()->whereRaw("LOWER(name) LIKE ? ESCAPE '!'", ["%{$escaped}%"])->value('id');
+        return $user->accounts()->whereRaw("LOWER(name) LIKE ? ESCAPE '!'", ["%{$escaped}%"])
+            ->orderBy('created_at')->value('id'); // plusieurs correspondances : toujours la même
     }
 }
