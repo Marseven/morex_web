@@ -104,7 +104,12 @@ class RecurringTransaction extends Model
             'description' => $this->description ?? "Transaction récurrente: {$this->frequency_label}",
             'date' => $this->next_due_date,
         ]);
-        $transaction->user_id = $this->user_id;
+        // Lien d'idempotence (module recurrences-serveur) : jamais posé par une saisie
+        $transaction->forceFill([
+            'user_id' => $this->user_id,
+            'recurring_transaction_id' => $this->id,
+            'occurrence_date' => $this->next_due_date->toDateString(),
+        ]);
         $transaction->save();
 
         return $transaction;
@@ -113,7 +118,8 @@ class RecurringTransaction extends Model
     /**
      * Calculate and update the next due date
      */
-    public function updateNextDueDate(): void
+    /** @param bool $consume false quand l'échéance existait déjà (rejeu) : l'occurrence n'est pas décomptée deux fois */
+    public function updateNextDueDate(bool $consume = true): void
     {
         $this->last_generated_date = $this->next_due_date->copy();
 
@@ -130,7 +136,7 @@ class RecurringTransaction extends Model
         $this->next_due_date = $nextDate;
 
         // Decrement remaining occurrences if set
-        if ($this->remaining_occurrences !== null) {
+        if ($consume && $this->remaining_occurrences !== null) {
             $this->remaining_occurrences--;
             if ($this->remaining_occurrences <= 0) {
                 $this->is_active = false;

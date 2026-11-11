@@ -31,6 +31,7 @@ class Transaction extends Model
             'amount' => 'integer',
             'date' => 'date',
             'reconciled_at' => 'datetime',
+            'occurrence_date' => 'date',
         ];
     }
 

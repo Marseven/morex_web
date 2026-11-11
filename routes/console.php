@@ -18,3 +18,9 @@ Schedule::command('backup:database')
     ->dailyAt('03:00')
     ->timezone(config('app.timezone'))
     ->withoutOverlapping();
+
+// Opérations récurrentes générées par le serveur (module recurrences-serveur), idempotent.
+Schedule::command('recurrences:generate')
+    ->dailyAt('06:00')
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping();
