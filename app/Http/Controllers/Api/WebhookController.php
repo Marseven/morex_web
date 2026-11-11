@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Transaction;
 use App\Services\SmsParser;
 use Illuminate\Database\UniqueConstraintViolationException;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -53,16 +54,7 @@ class WebhookController extends Controller
                 ], 403);
             }
         }
-        if (! $accountId) {
-            // Try to find a matching account by name
-            $source = strtolower($result['source'] ?? '');
-            $account = $user->accounts()
-                ->where(function ($q) use ($source) {
-                    $q->whereRaw('LOWER(name) LIKE ?', ["%{$source}%"]);
-                })
-                ->first();
-            $accountId = $account?->id;
-        }
+        $accountId ??= self::accountIdForSource($user, $result['source'] ?? null);
 
         if (! $accountId) {
             // Fall back to default account
@@ -122,5 +114,20 @@ class WebhookController extends Controller
             'duplicate' => true,
             'transaction_id' => $transaction->id,
         ]);
+    }
+
+    /**
+     * P13 (module dette-qualite) : un compte n'est retrouvé par son nom qu'avec une source non vide,
+     * jokers LIKE échappés. Sans source, l'appelant retombe sur le compte par défaut.
+     */
+    public static function accountIdForSource(User $user, ?string $source): ?string
+    {
+        $source = mb_strtolower(trim((string) $source));
+        if ($source === '') {
+            return null;
+        }
+        $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $source);
+
+        return $user->accounts()->whereRaw("LOWER(name) LIKE ? ESCAPE '!'", ["%{$escaped}%"])->value('id');
     }
 }
