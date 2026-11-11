@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\SmsParser;
 use Illuminate\Database\UniqueConstraintViolationException;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
