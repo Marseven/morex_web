@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Transaction;
 use App\Services\SmsParser;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +20,7 @@ class WebhookController extends Controller
             'account_id' => ['nullable', 'uuid'],
         ]);
 
-        $parser = new SmsParser();
+        $parser = new SmsParser;
         $result = $parser->parse($validated['message'], $validated['sender'] ?? null);
 
         if ($result === null) {
@@ -31,21 +32,28 @@ class WebhookController extends Controller
 
         $user = $request->user();
 
+        // Un même SMS (renvoi, double lecture) ne crée qu'une transaction
+        $fingerprint = hash('sha256', mb_strtolower(trim((string) ($validated['sender'] ?? '')))."\n".trim($validated['message']));
+        $existing = $this->findBySmsFingerprint($user->id, $fingerprint);
+        if ($existing) {
+            return $this->duplicateResponse($existing);
+        }
+
         // Determine account: use provided account_id or try to match by source
         // Sécurité : le compte fourni DOIT appartenir à l'utilisateur (anti-IDOR)
         $accountId = null;
-        if (!empty($validated['account_id'])) {
+        if (! empty($validated['account_id'])) {
             $accountId = $user->accounts()
                 ->whereKey($validated['account_id'])
                 ->value('id');
-            if (!$accountId) {
+            if (! $accountId) {
                 return response()->json([
                     'message' => 'Compte invalide.',
                     'parsed' => true,
                 ], 403);
             }
         }
-        if (!$accountId) {
+        if (! $accountId) {
             // Try to find a matching account by name
             $source = strtolower($result['source'] ?? '');
             $account = $user->accounts()
@@ -56,14 +64,14 @@ class WebhookController extends Controller
             $accountId = $account?->id;
         }
 
-        if (!$accountId) {
+        if (! $accountId) {
             // Fall back to default account
             $account = $user->accounts()->where('is_default', true)->first()
                 ?? $user->accounts()->first();
             $accountId = $account?->id;
         }
 
-        if (!$accountId) {
+        if (! $accountId) {
             return response()->json([
                 'message' => 'Aucun compte disponible.',
                 'parsed' => true,
@@ -76,12 +84,19 @@ class WebhookController extends Controller
             'type' => $result['is_income'] ? 'income' : 'expense',
             'account_id' => $accountId,
             'beneficiary' => $result['beneficiary'],
-            'description' => "SMS {$result['source']}" . ($result['reference'] ?? ''),
+            'description' => "SMS {$result['source']}".($result['reference'] ?? ''),
             'date' => now()->toDateString(),
-            'status' => 'pending_validation',
+            'status' => Transaction::STATUS_PENDING,
         ]);
         $transaction->user_id = $user->id;
-        $transaction->save();
+        $transaction->sms_fingerprint = $fingerprint;
+
+        try {
+            $transaction->save();
+        } catch (UniqueConstraintViolationException) {
+            // Deux envois simultanés du même SMS : l'index unique tranche
+            return $this->duplicateResponse($this->findBySmsFingerprint($user->id, $fingerprint));
+        }
 
         return response()->json([
             'message' => 'Transaction creee en attente de validation.',
@@ -89,5 +104,23 @@ class WebhookController extends Controller
             'transaction_id' => $transaction->id,
             'result' => $result,
         ], 201);
+    }
+
+    private function findBySmsFingerprint(int $userId, string $fingerprint): ?Transaction
+    {
+        return Transaction::withTrashed()
+            ->where('user_id', $userId)
+            ->where('sms_fingerprint', $fingerprint)
+            ->first();
+    }
+
+    private function duplicateResponse(Transaction $transaction): JsonResponse
+    {
+        return response()->json([
+            'message' => 'SMS deja enregistre.',
+            'parsed' => true,
+            'duplicate' => true,
+            'transaction_id' => $transaction->id,
+        ]);
     }
 }
