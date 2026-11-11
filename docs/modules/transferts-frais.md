@@ -1,4 +1,4 @@
-# Module transferts-frais (3c)                      statut : en cours · 2026-11-12
+# Module transferts-frais (3c)                      statut : livré · 2026-11-12
 
 **Conclusion** : un transfert entre deux comptes peut porter des **frais**, par exemple :
 - retrait Airtel Money → Portefeuille, 50 000 + 500 de frais ;
@@ -51,3 +51,31 @@ Le compte source baisse du montant plus les frais, le compte destination reçoit
 3. Saisie des frais sur l'iPhone ? → *Hypothèse : non, avec l'écran mobile des transferts. Les frais saisis sur le web arrivent sur l'iPhone par la synchro, comme une dépense ordinaire.*
 
 **Hors module** : grille de frais, rapprochement des transferts dans les relevés, écran mobile.
+
+## Livré (3c)
+- **Données** : migration réversible `transfers.fee` et `fee_transaction_id` (`nullOnDelete`).
+- **Service** : `TransferService` (création, modification, suppression, frais proposés par couple, réalignement) ; un transfert et ses frais sont enregistrés dans une même transaction.
+- **Alignement transfert et dépense de frais** : la dépense reste une opération ordinaire.
+  - La supprimer à la main met les frais du transfert à 0 : aucun débit n'est recréé en silence.
+  - Modifier son montant met à jour les frais du transfert.
+  - Restaurer le transfert restaure ses frais.
+  - Après chaque synchro (événements désactivés), `reconcileFees` réaligne compte, date et montant.
+- **Web** (direction A) :
+  - `TransferFeeField` dans Nouveau et Modifier, avec pré-remplissage par couple de comptes, « Sans frais », effet sur les soldes en direct et erreurs à côté du champ ;
+  - frais affichés dans la liste ;
+  - 6ᵉ colonne `frais` à l'import, avec le total des frais.
+- **API** :
+  - `fee` accepté et renvoyé ;
+  - en modification, le montant ne peut pas descendre sous les frais actuels ;
+  - multi-sauts sans frais (écart avec l'analyse).
+- **Tests** : `TransferFeeTest`, 20 tests. Suite complète : 579 au vert.
+- **Vérifié dans le navigateur**, au format iPhone, sur une instance locale jetable :
+  - frais pré-remplis à 500 et effet affiché « Airtel −50 500 · Portefeuille +50 000 » ;
+  - erreur « Les frais (60 000) ne peuvent pas dépasser le montant (50 000) » ;
+  - « frais 500 FCFA » dans la liste.
+- **Revue de code, points hauts corrigés** : restauration sans frais, dépense supprimée à la main (frais fantômes et débit recréé), transfert déplacé par la synchro.
+- **Revue de code, points moyens corrigés** : montant API sous les frais, bornage des montants (import, multi-sauts), tests.
+- **Revue de code, points bas corrigés** : `aria-describedby` et `suggestedFee` inutilisée supprimée.
+- **Non vérifié** :
+  - MySQL réel ;
+  - modification de la dépense de frais depuis l'iPhone (couverte par un test de synchro, pas sur l'appareil).
