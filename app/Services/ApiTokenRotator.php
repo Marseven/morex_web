@@ -41,6 +41,15 @@ final class ApiTokenRotator
         });
     }
 
+    /** Révoque les jetons d'un utilisateur encore en délai de grâce (appelé à la déconnexion). */
+    public function revokeGracePeriodTokens(User $user): void
+    {
+        $user->tokens()
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now()->addMinutes(self::GRACE_MINUTES))
+            ->delete();
+    }
+
     /** Échéance absolue du jeton : la sienne, sinon création + durée Sanctum, sinon aucune. */
     private function absoluteExpiry(PersonalAccessToken $token): ?CarbonInterface
     {

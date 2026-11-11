@@ -95,4 +95,17 @@ class TokenRotationTest extends TestCase
 
         $this->assertSame(2, $user->tokens()->count()); // l'ancien en grâce, un seul nouveau
     }
+
+    public function test_logout_also_revokes_the_token_in_grace_period(): void
+    {
+        $user = User::factory()->create();
+        $old = $user->createToken('api-token')->plainTextToken;
+        $new = $this->withToken($old)->postJson('/api/token/rotate')->assertOk()->json('token');
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($new)->postJson('/api/logout')->assertOk();
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($old)->getJson('/api/user')->assertUnauthorized();
+    }
 }

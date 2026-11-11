@@ -237,6 +237,8 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
+        // Les jetons encore en délai de grâce après une rotation (prédécesseurs) tombent avec la déconnexion
+        app(ApiTokenRotator::class)->revokeGracePeriodTokens($request->user());
 
         return response()->json([
             'message' => 'Déconnexion réussie.',
