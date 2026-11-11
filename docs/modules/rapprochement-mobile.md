@@ -1,4 +1,4 @@
-# Module rapprochement-mobile (4 bis)               statut : en cours · 2026-11-12
+# Module rapprochement-mobile (4 bis)               statut : livré · 2026-11-12
 
 **Conclusion** : le **rapprochement d'un compte** arrive sur l'iPhone, branché sur l'API du module 4, sans changement serveur.
 1. Je tape le solde réel lu dans l'app Airtel ou BGFI.
@@ -44,3 +44,23 @@ L'écart devient une opération tracée, créée par le serveur sous verrou, pui
 3. Rappel hebdomadaire de rapprochement (notification) ? → *Hypothèse : non dans ce module.*
 
 **Hors module** : rapprochement hors connexion, rappel, pointage des transferts (hors V1 au module 4).
+
+## Livré (4 bis)
+- **iPhone** (`morex_mobile`, `feat/rapprochement-mobile`) :
+  - `ReconciliationRemoteDataSource` lit l'état du compte et envoie le rapprochement. Les champs financiers sont obligatoires, et une réponse inattendue devient une erreur lisible ;
+  - `ReconciliationCubit` :
+    - synchronise avant le chargement et après la validation ; une synchro préalable en échec **bloque la validation**, avec un bouton « Réessayer » ;
+    - toutes les cases sont cochées par défaut, et une recharge garde le choix des opérations déjà vues ;
+    - calcule l'aperçu de l'écart avec la formule du web ;
+    - gère les erreurs (hors connexion, `INVALID_RECONCILIATION`) en conservant la saisie ;
+  - `ReconciliationPage` (`/accounts/:id/reconcile`, bouton « Rapprocher » sur la fiche du compte) : solde du relevé en FCFA entiers, dernier rapprochement, opérations à cocher avec un libellé parlé, barre fixe « Écart · Valider », confirmation avant tout écart non nul, pas de retour pendant l'envoi.
+- **Écart avec l'analyse** : le badge « Rapproché il y a N j » n'est pas sur la fiche du compte (la base locale n'a pas cette date) ; la date du dernier rapprochement est affichée sur la page de rapprochement.
+- **Tests** : `reconciliation_cubit_test`, 13 tests. Suite mobile : 102 réussis (4 échecs existants de `main`, corrigés par la PR du module 7b). Analyse : aucun nouveau problème.
+- **Revue de code, points hauts corrigés** : écran figé sur une réponse inattendue ; retour ou rechargement pendant l'envoi ; synchro en échec invisible.
+- **Revue de code, points moyens corrigés** :
+  - saisie décimale (« 1500,50 » lu comme 150 050) ;
+  - champs obligatoires ;
+  - double confirmation ;
+  - lecture VoiceOver en double ;
+  - cases des nouvelles opérations.
+- **Non vérifié** : écran sur simulateur ou iPhone réel.
