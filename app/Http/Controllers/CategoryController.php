@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\Category;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -41,10 +42,11 @@ class CategoryController extends Controller
             ->withSum(['transactions as spent_cycle' => function ($q) use ($user, $startDateStr, $endDateStr) {
                 $q->where('user_id', $user->id)
                     ->where('type', 'expense')
+                    ->where('status', '!=', Transaction::STATUS_PENDING) // module dette-qualite
                     ->where('date', '>=', $startDateStr);
                 // Borne haute : end_date du cycle, sinon aujourd'hui (un cycle ouvert ne doit
                 // pas compter de transactions datées dans le futur, ex. récurrences générées).
-                $q->where('date', '<=', $endDateStr ?? now()->format('Y-m-d'));
+                $q->whereDate('date', '<=', $endDateStr ?? now()->format('Y-m-d'));
             }], 'amount')
             ->orderBy('type')
             ->orderBy('order_index')

@@ -7,6 +7,7 @@ use App\Models\BudgetClosure;
 use App\Models\BudgetCycle;
 use App\Models\BudgetSettings;
 use App\Models\Category;
+use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -107,6 +108,7 @@ class BudgetCycleController extends Controller
         ->where('type', 'expense')
         ->withSum(['transactions as spent_this_cycle' => function ($q) use ($cycle) {
             $q->where('type', 'expense')
+              ->where('status', '!=', Transaction::STATUS_PENDING) // module dette-qualite
               ->where('date', '>=', $cycle->start_date);
             if ($cycle->end_date) {
                 $q->where('date', '<=', $cycle->end_date);

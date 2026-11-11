@@ -102,6 +102,7 @@ class Category extends Model
 
         return (int) $this->transactions()
             ->where('type', 'expense')
+            ->where('status', '!=', Transaction::STATUS_PENDING)
             ->whereYear('date', now()->year)
             ->whereMonth('date', now()->month)
             ->sum('amount');
