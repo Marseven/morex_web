@@ -99,6 +99,7 @@ class CategoryController extends Controller
             'color' => ['nullable', 'string', 'max:7'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
             'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
+            'discretionary' => ['sometimes', 'boolean'],
         ]);
 
         $maxOrder = $request->user()->categories()->max('order_index') ?? -1;
@@ -132,6 +133,7 @@ class CategoryController extends Controller
             'color' => ['nullable', 'string', 'max:7'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
             'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
+            'discretionary' => ['sometimes', 'boolean'],
         ]);
 
         $category->update($validated);

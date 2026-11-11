@@ -46,6 +46,7 @@ class Category extends Model
         'name',
         'type',
         'nature',
+        'discretionary',
         'icon',
         'color',
         'parent_id',
@@ -59,6 +60,7 @@ class Category extends Model
             'order_index' => 'integer',
             'is_system' => 'boolean',
             'budget_limit' => 'integer',
+            'discretionary' => 'boolean',
         ];
     }
 

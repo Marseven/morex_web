@@ -78,6 +78,7 @@ class CategoryController extends Controller
             'parent_id' => ['nullable', 'uuid', 'exists:categories,id'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
             'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
+            'discretionary' => ['sometimes', 'boolean'],
         ]);
 
         $maxOrder = $request->user()->categories()->max('order_index') ?? -1;
@@ -152,6 +153,7 @@ class CategoryController extends Controller
             'parent_id' => ['nullable', 'uuid', 'exists:categories,id'],
             'budget_limit' => ['nullable', 'integer', 'min:0'],
             'nature' => ['sometimes', 'string', Rule::in(Category::NATURES)],
+            'discretionary' => ['sometimes', 'boolean'],
             'order_index' => ['sometimes', 'integer'],
         ]);
 

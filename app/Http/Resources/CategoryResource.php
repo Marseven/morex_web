@@ -14,6 +14,7 @@ class CategoryResource extends JsonResource
             'name' => $this->name,
             'type' => $this->type,
             'nature' => $this->nature ?? 'regular',
+            'discretionary' => (bool) $this->discretionary,
             'icon' => $this->icon,
             'color' => $this->color,
             'parent_id' => $this->parent_id,

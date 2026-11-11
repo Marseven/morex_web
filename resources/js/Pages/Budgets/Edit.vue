@@ -14,6 +14,7 @@ const form = useForm({
     icon: props.category.icon || 'tag',
     budget_limit: props.category.budget_limit || '',
     nature: props.category.nature || 'regular',
+    discretionary: !!props.category.discretionary,
 })
 
 const colors = ['#FFFFFF', '#71717A', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899']
@@ -70,6 +71,17 @@ const submit = () => {
                     </div>
 
                     <NatureField v-model="form.nature" :error="form.errors.nature" />
+
+                    <div v-if="form.type === 'expense' && form.nature === 'regular'">
+                        <label class="flex items-start gap-3 min-h-[44px] py-2 cursor-pointer">
+                            <input v-model="form.discretionary" type="checkbox" class="mt-1 w-5 h-5 rounded border-theme-border" aria-describedby="discretionary-help" />
+                            <span>
+                                <span class="block text-sm text-theme-text-primary">Dépense discrétionnaire</span>
+                                <span id="discretionary-help" class="block text-xs text-theme-text-muted">Sorties, loisirs, restaurants : comptée dans le total discrétionnaire du bilan.</span>
+                            </span>
+                        </label>
+                        <p v-if="form.errors.discretionary" role="alert" class="text-xs text-red-400">{{ form.errors.discretionary }}</p>
+                    </div>
 
                     <div v-if="form.type === 'expense' && form.nature !== 'transit'">
                         <label class="block text-xs font-medium text-theme-text-secondary uppercase tracking-wider mb-2">Budget mensuel (FCFA)</label>
