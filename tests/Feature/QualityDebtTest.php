@@ -231,4 +231,46 @@ class QualityDebtTest extends TestCase
 
         $this->actingAs($this->user)->delete("/transactions/{$tx->id}")->assertSessionHas('warning');
     }
+
+    // --- Revue de code ---
+
+    public function test_the_unpoint_warning_reaches_the_page(): void
+    {
+        $tx = $this->reconciled();
+
+        $this->actingAs($this->user)->followingRedirects()->put("/transactions/{$tx->id}", [
+            'amount' => 12000, 'type' => 'expense', 'category_id' => $this->food->id,
+            'account_id' => $this->account->id, 'date' => now()->toDateString(),
+        ])->assertInertia(fn ($page) => $page->where('flash.warning', 'Opération dépointée : refaites le rapprochement du compte.'));
+    }
+
+    public function test_a_transfer_without_destination_keeps_its_message(): void
+    {
+        $this->actingAs($this->user)->post('/transactions', ['amount' => 5000, 'type' => 'transfer', 'account_id' => $this->account->id, 'date' => now()->toDateString()])
+            ->assertSessionHasErrors(['transfer_to_account_id' => 'Le compte de destination est requis pour un transfert.']);
+    }
+
+    public function test_the_last_day_of_the_budget_period_is_counted(): void
+    {
+        $cycle = new BudgetCycle(['start_date' => '2026-10-25', 'end_date' => '2026-11-24', 'period_name' => 'Nov', 'status' => 'active']);
+        $cycle->user_id = $this->user->id;
+        $cycle->save();
+        $this->spend(7000, ['date' => '2026-11-24']);
+
+        $this->actingAs($this->user)->get('/budgets')
+            ->assertInertia(fn ($page) => $page->where('categories', fn ($cats) => collect($cats)->firstWhere('id', $this->food->id)['spent_this_month'] === 7000));
+    }
+
+    public function test_a_cosmetic_edit_does_not_recompute_cycles(): void
+    {
+        $cycle = new BudgetCycle(['start_date' => '2026-11-01', 'period_name' => 'Nov', 'status' => 'active']);
+        $cycle->user_id = $this->user->id;
+        $cycle->save();
+        $tx = $this->spend(7000);
+
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        $tx->update(['description' => 'Marché']);
+
+        $this->assertFalse(collect(\Illuminate\Support\Facades\DB::getQueryLog())->contains(fn ($q) => str_contains($q['query'], 'budget_cycles')));
+    }
 }

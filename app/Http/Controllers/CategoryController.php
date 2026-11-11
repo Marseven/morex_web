@@ -46,7 +46,8 @@ class CategoryController extends Controller
                     ->where('date', '>=', $startDateStr);
                 // Borne haute : end_date du cycle, sinon aujourd'hui (un cycle ouvert ne doit
                 // pas compter de transactions datées dans le futur, ex. récurrences générées).
-                $q->whereDate('date', '<=', $endDateStr ?? now()->format('Y-m-d'));
+                // Borne haute exclusive au lendemain : indexable et juste quel que soit le stockage de l'heure
+                $q->where('date', '<', \Carbon\Carbon::parse($endDateStr ?? now()->format('Y-m-d'))->addDay()->toDateString());
             }], 'amount')
             ->orderBy('type')
             ->orderBy('order_index')

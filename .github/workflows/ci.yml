@@ -68,7 +68,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
 
       # Seulement les fichiers de la PR : le code ancien n'est pas encore au format (pas de reformatage massif)
-      - run: vendor/bin/pint --test --diff="origin/$BASE_REF"
+      - run: vendor/bin/pint --test --diff="$(git merge-base HEAD "origin/$BASE_REF")"
         env:
           BASE_REF: ${{ github.base_ref }}
 

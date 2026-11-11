@@ -132,23 +132,28 @@ class Transaction extends Model
 
     protected static function booted(): void
     {
-        // Recalcule le cycle qui contient une date : totaux complets pour le cycle actif,
-        // dépensé seul pour un cycle clôturé (son budget reste celui de la clôture). P12 : ancienne et nouvelle date.
-        $refreshCycleAt = function (Transaction $transaction, $date) {
-            if ($date === null || ! in_array($transaction->type, ['expense', 'income']) && ! in_array($transaction->getOriginal('type'), ['expense', 'income'])) {
+        // Recalcule les cycles qui contiennent les dates touchées, une seule fois chacun : totaux complets
+        // pour le cycle actif, dépensé seul pour un cycle clôturé (son budget reste celui de la clôture).
+        // P12 (module dette-qualite) : l'ancienne date d'une opération déplacée est aussi recalculée.
+        $refreshCyclesAt = function (Transaction $transaction, array $dates) {
+            $types = [$transaction->type, $transaction->getOriginal('type')];
+            $dates = array_values(array_unique(array_filter(array_map(
+                fn ($d) => $d ? \Carbon\Carbon::parse($d)->toDateString() : null, $dates))));
+            if ($dates === [] || ! array_intersect($types, ['expense', 'income'])) {
                 return;
             }
             BudgetCycle::where('user_id', $transaction->user_id)
-                ->whereDate('start_date', '<=', $date)
-                ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $date))
+                ->where(function ($q) use ($dates) {
+                    foreach ($dates as $date) {
+                        $q->orWhere(fn ($c) => $c->whereDate('start_date', '<=', $date)
+                            ->where(fn ($e) => $e->whereNull('end_date')->orWhereDate('end_date', '>=', $date)));
+                    }
+                })
                 ->get()
                 ->each(fn (BudgetCycle $cycle) => $cycle->status === 'active' ? $cycle->updateTotals() : $cycle->refreshSpent());
         };
-        $updateBudgetCycle = function (Transaction $transaction) use ($refreshCycleAt) {
-            $refreshCycleAt($transaction, $transaction->date);
-            if ($transaction->wasChanged('date')) {
-                $refreshCycleAt($transaction, $transaction->getOriginal('date'));
-            }
+        $updateBudgetCycle = function (Transaction $transaction) use ($refreshCyclesAt) {
+            $refreshCyclesAt($transaction, [$transaction->date, $transaction->wasChanged('date') ? $transaction->getOriginal('date') : null]);
         };
 
         // Ne rien renvoyer : un false renvoyé par « updating » annulerait la mise à jour
@@ -248,7 +253,10 @@ class Transaction extends Model
                 $reverseOldAdjustments($transaction);
             }
 
-            $updateBudgetCycle($transaction);
+            // Une modification cosmétique (libellé, pointage) ne touche pas aux cycles
+            if ($transaction->wasChanged(['amount', 'type', 'date', 'status', 'account_id', 'category_id'])) {
+                $updateBudgetCycle($transaction);
+            }
         });
 
         static::deleted(function (Transaction $transaction) use ($updateBudgetCycle, $applyAdjustments) {
