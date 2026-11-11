@@ -1,4 +1,4 @@
-# Module sms-iphone (3b)                            statut : en cours · 2026-11-12
+# Module sms-iphone (3b)                            statut : livré · 2026-11-12
 
 **Conclusion** : les SMS bancaires arrivent par un **Raccourci iOS** (automatisation « Message reçu ») qui les envoie au webhook. Deux changements :
 1. **Le SMS passe par le moteur de rapprochement du module 3a.** S'il correspond à une opération déjà saisie (dans vos notes du jour), il la **pointe**, au lieu de créer une opération en attente qui ferait doublon. Sinon, il crée l'opération en attente, comme aujourd'hui.
@@ -54,3 +54,32 @@ Un guide pas à pas configure le Raccourci.
 3. La section Profil sans étape de design ? → *Hypothèse : oui, une carte simple dans le style du Profil.*
 
 **Hors module** : lecture des frais dans les SMS (aucun format n'en donne aujourd'hui), écran mobile, rapprochement des transferts (module 3c).
+
+## Livré (3b)
+- **Jeton du Raccourci** :
+  - `SmsShortcutService` crée un jeton `sms-shortcut` à capacité unique `sms:webhook`, un seul actif ;
+  - la création demande le mot de passe, et le jeton s'affiche une fois (flash, historique chiffré par `Inertia::encryptHistory`) ;
+  - il est révocable dans le Profil, et changer de mot de passe révoque tous les jetons ;
+  - il échappe à l'expiration globale de Sanctum (`authenticateAccessTokensUsing`).
+- **Cloisonnement** : `EnsureFullAccessToken` donne 403 au jeton du Raccourci sur toute l'API ; le webhook est sorti du groupe (`abilities:sms:webhook`, throttle 30/min).
+- **Rapprochement** : `SmsReconciler` passe le SMS dans le moteur du module 3a.
+  - **Seule une correspondance au montant exact pointe l'opération** ; un écart (frais possibles) crée l'opération en attente, et les frais se valident dans l'app.
+  - La ligne de relevé est enregistrée en source `sms`, avec la référence `sms:<TID ou empreinte>`. L'import du vrai relevé la reconnaît, et un SMS renvoyé est un doublon.
+  - Avec le jeton restreint, la réponse est minimale (sans identifiant ni contenu analysé).
+- **Web** : carte « Raccourci SMS » du Profil (création avec mot de passe, copie, remplacement, révocation, dernier SMS reçu). **Guide** : `docs/raccourci-sms.md`.
+- **Tests** : `SmsShortcutTest`, 15 tests. Suite complète : 593 au vert.
+- **Vérifié dans le navigateur**, au format iPhone : le jeton s'affiche une fois, puis la carte n'indique plus que « Jeton actif » après rechargement.
+- **Revue de sécurité, point haut corrigé** : des frais confirmés pouvaient naître d'un SMS (faux ou mal apparié).
+- **Revue de sécurité, points moyens corrigés** : référence SMS qui bloquait l'import du relevé ; émission sans mot de passe et jetons survivant à un changement de mot de passe.
+- **Revue de sécurité, points bas corrigés** : jeton dans l'historique du navigateur ; réponse trop bavarde. Écarté : la liste de refus du middleware, qui reste ciblée sur la capacité `sms:webhook` (les jetons de l'app ont `*`).
+- **Revue de code, corrigé** :
+  - le jeton expirait au bout de 30 jours ;
+  - un SMS sans référence renvoyé le lendemain faisait doublon ;
+  - la source était un état mutable ;
+  - le texte annonçait « aucune autre donnée ».
+- **Écarts avec l'analyse** : pointage au montant exact seulement ; mot de passe demandé.
+- **Reste ouvert** :
+  - `WebhookController::sms` reste long, à extraire dans un service ;
+  - la désactivation de la 2FA ne révoque pas les jetons ;
+  - `SESSION_ENCRYPT` est à activer en production (fichier `.env`, à faire par Richard).
+- **Non vérifié** : le Raccourci sur l'iPhone réel, que vous configurez à l'aide du guide.
