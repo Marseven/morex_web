@@ -1,4 +1,4 @@
-# Module achats-prevus (5d)                         statut : en cours · 2026-11-11
+# Module achats-prevus (5d)                         statut : livré · 2026-11-11
 
 **Conclusion** : une **liste d'achats prévus** par cycle (nom, montant estimé, catégorie). La règle « tout achat de plus de 30 000 hors liste attend le cycle suivant » devient visible à deux endroits :
 - **à la saisie web** : une dépense de 30 000 ou plus sans achat prévu associé déclenche un avertissement, avec deux choix : « Reporter au cycle suivant » (l'achat est ajouté à la liste du cycle suivant, rien n'est dépensé) ou « Acheter quand même » ;
@@ -57,3 +57,42 @@ Rien n'est bloqué : l'app rend l'écart visible, elle n'interdit pas.
 3. Faut-il l'avertissement sur l'iPhone ? → *Hypothèse : oui, mais avec l'écran mobile, dans un module à part (API comprise).*
 
 **Hors module** : API et écran iPhone, report automatique, liste partagée, prix suivis en ligne.
+
+## Livré (5d)
+- **Données** : migration réversible `planned_purchases` (soft delete, `transaction_id` unique, index `user_id, status, planned_for`).
+- **Service** : `PlannedPurchaseService`, qui couvre :
+  - la période et le cycle suivant ;
+  - prévoir et reporter ;
+  - le lien, par mise à jour gardée contre les envois simultanés ;
+  - « acheter quand même » et la règle du seuil ;
+  - les dépenses hors liste ;
+  - le résumé ;
+  - la libération d'un achat quand son opération est supprimée ou retypée, y compris après une synchro.
+- **Web** :
+  - page `/purchases` (direction A), avec une entrée de menu ;
+  - bloc `PurchaseCheck` dans la saisie d'opération (association, report, acheter quand même, garde à l'envoi) ;
+  - carte `PlannedPurchasesCard` sur le tableau de bord.
+- **Tests** : `PlannedPurchaseTest`, 29 tests. Suite complète : 497 au vert.
+- **Vérifié dans le navigateur**, au format iPhone, sur une instance locale jetable :
+  - « Acheté » pré-remplit la saisie et lie l'achat ;
+  - une dépense de 60 000 sans achat prévu affiche « Hors liste », et l'enregistrement sans choix renvoie le focus sur le bloc ;
+  - la carte affiche « 2/2 faits · 1 hors liste · 1 en retard ».
+- **Corrigé pendant la vérification** : les dates partaient en UTC (« Fait le 10/11 », report affiché dans le cycle courant). Elles sont maintenant envoyées en Y-m-d.
+- **Revue de code, points hauts corrigés** :
+  - double lien en cas d'envois simultanés ;
+  - erreur 500 quand l'achat devient indisponible entre l'affichage et l'envoi, remplacée par un message ;
+  - achat resté « acheté » après la suppression de son opération.
+- **Revue de code, points moyens corrigés** :
+  - comptes hors liste calculés en SQL ;
+  - liste « en retard » limitée ;
+  - borne de période sur les achats hors liste assumés ;
+  - tests ajoutés.
+- **Écart avec l'analyse** : la règle ne s'applique qu'aux catégories courantes, et « acheter quand même » ne laisse aucune trace sous le seuil.
+- **Hors module** (dette existante, signalée par la revue) :
+  - `TransactionController::store` sans Form Request ni service ;
+  - requêtes dans les contrôleurs.
+
+  À traiter au module 7.
+- **Non vérifié** :
+  - MySQL réel ;
+  - saisie depuis l'iPhone : l'avertissement viendra avec l'écran mobile.
