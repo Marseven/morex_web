@@ -17,14 +17,14 @@ const props = defineProps({
 })
 
 const formatAmount = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
-const shortDate = (iso) => iso ? new Date(`${String(iso).slice(0, 10)}T00:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : ''
+const shortDate = (iso) => iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : ''
 const periodLabel = computed(() => {
     if (!props.period) return ''
     if (props.period.end) return `${props.period.is_cycle ? 'Cycle' : 'Mois'} jusqu'au ${shortDate(props.period.end)}`
     return `Cycle depuis le ${shortDate(props.period.start)}`
 })
 
-const inPeriod = (p) => !props.period?.end || String(p.planned_for).slice(0, 10) <= props.period.end
+const inPeriod = (p) => !props.period?.end || p.planned_for <= props.period.end
 const current = computed(() => props.purchases.filter((p) => !p.unplanned && inPeriod(p)))
 const upcoming = computed(() => props.purchases.filter((p) => !p.unplanned && !inPeriod(p)))
 const assumed = computed(() => props.purchases.filter((p) => p.unplanned))
@@ -132,10 +132,10 @@ const buyHref = (p) => `/transactions/create?planned_purchase_id=${p.id}`
                 <h2 id="current-title" class="text-xs font-medium uppercase tracking-wider text-theme-text-secondary">Ce cycle</h2>
                 <div v-for="p in current" :key="p.id" class="glass-card p-4 space-y-2">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-sm text-theme-text-primary">{{ p.name }} <span v-if="p.category" class="text-theme-text-muted">· {{ p.category.name }}</span></span>
-                        <span class="text-sm text-theme-text-primary">{{ formatAmount(p.transaction?.amount ?? p.estimated_amount) }}</span>
+                        <span class="text-sm text-theme-text-primary">{{ p.name }} <span v-if="p.category" class="text-theme-text-muted">· {{ p.category }}</span></span>
+                        <span class="text-sm text-theme-text-primary">{{ formatAmount(p.spent ?? p.estimated_amount) }}</span>
                     </div>
-                    <p v-if="p.status === 'bought'" class="inline-flex items-center gap-1 text-xs text-success"><CheckIcon class="w-4 h-4" aria-hidden="true" /> Fait le {{ shortDate(p.transaction?.date ?? p.bought_at) }}</p>
+                    <p v-if="p.status === 'bought'" class="inline-flex items-center gap-1 text-xs text-success"><CheckIcon class="w-4 h-4" aria-hidden="true" /> Fait le {{ shortDate(p.bought_on) }}</p>
                     <div v-else class="flex gap-2">
                         <Link :href="buyHref(p)" class="flex-1 inline-flex items-center justify-center min-h-[44px] rounded-md border border-theme-border text-sm text-theme-text-primary">Acheté</Link>
                         <button type="button" @click="cancel(p)" class="flex-1 min-h-[44px] rounded-md border border-theme-border text-sm text-theme-text-secondary">Annuler</button>
@@ -147,7 +147,7 @@ const buyHref = (p) => `/transactions/create?planned_purchase_id=${p.id}`
             <section v-if="outOfList.length || assumed.length" aria-labelledby="out-title" class="space-y-2">
                 <h2 id="out-title" class="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-warning"><ExclamationTriangleIcon class="w-4 h-4" aria-hidden="true" /> Hors liste ({{ outOfList.length + assumed.length }})</h2>
                 <div v-for="t in outOfList" :key="t.id" class="glass-card p-4 flex items-center justify-between gap-2">
-                    <span class="text-sm text-theme-text-primary">{{ t.beneficiary || t.description || 'Dépense' }} <span class="text-theme-text-muted">· {{ shortDate(t.date) }}</span></span>
+                    <span class="text-sm text-theme-text-primary">{{ t.label }} <span class="text-theme-text-muted">· {{ shortDate(t.date) }}</span></span>
                     <span class="text-sm text-theme-text-primary">{{ formatAmount(t.amount) }}</span>
                 </div>
                 <div v-for="p in assumed" :key="p.id" class="glass-card p-4 flex items-center justify-between gap-2">

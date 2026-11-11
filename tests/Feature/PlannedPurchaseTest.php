@@ -272,4 +272,17 @@ class PlannedPurchaseTest extends TestCase
                 ->where('purchases.out_of_list_total', 60000)
             );
     }
+
+    public function test_the_page_sends_local_dates_not_utc(): void
+    {
+        $this->service->postpone($this->user, ['name' => 'Sac', 'estimated_amount' => 30000]);
+        $this->service->link($this->plan('Livre', 12000), $this->spend(12000));
+
+        $this->actingAs($this->user)->get('/purchases')
+            ->assertInertia(fn ($page) => $page
+                ->where('purchases.0.planned_for', '2026-11-01')
+                ->where('purchases.0.bought_on', '2026-11-11')
+                ->where('purchases.1.planned_for', '2026-12-01')
+            );
+    }
 }

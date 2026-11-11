@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePlannedPurchaseRequest;
 use App\Models\Category;
 use App\Models\PlannedPurchase;
+use App\Models\Transaction;
 use App\Services\PlannedPurchaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,9 +31,12 @@ final class PlannedPurchaseController extends Controller
                 ->where('status', '!=', PlannedPurchase::STATUS_CANCELLED)
                 ->where('planned_for', '>=', $from->toDateString())
                 ->orderBy('planned_for')->orderBy('created_at')
-                ->limit(100)->get(),
-            'outOfList' => $this->purchases->outOfList($user)->load('category:id,name')->take(50)->values(),
-            'late' => $summary['late']->load('category:id,name'),
+                ->limit(100)->get()->map(fn (PlannedPurchase $p) => $this->row($p)),
+            'outOfList' => $this->purchases->outOfList($user)->take(50)->map(fn (Transaction $t) => [
+                'id' => $t->id, 'amount' => $t->amount, 'label' => $t->beneficiary ?: ($t->description ?: 'Dépense'),
+                'date' => $t->date->toDateString(),
+            ])->values(),
+            'late' => $summary['late']->load('category:id,name')->map(fn (PlannedPurchase $p) => $this->row($p)),
             'summary' => collect($summary)->except('late'),
             'period' => ['start' => $from->toDateString(), 'end' => $to?->toDateString(), 'is_cycle' => $isCycle],
             'nextStart' => $this->purchases->nextPeriodStart($user)->toDateString(),
@@ -42,6 +46,21 @@ final class PlannedPurchaseController extends Controller
                 ->orderBy('order_index')->get(['id', 'name']),
             'threshold' => PlannedPurchaseService::THRESHOLD,
         ]);
+    }
+
+    /**
+     * Dates en Y-m-d (fuseau de l'app) : une date sérialisée en UTC recule d'un jour à Libreville.
+     *
+     * @return array<string, mixed>
+     */
+    private function row(PlannedPurchase $p): array
+    {
+        return [
+            'id' => $p->id, 'name' => $p->name, 'estimated_amount' => $p->estimated_amount,
+            'category' => $p->category?->name, 'planned_for' => $p->planned_for->toDateString(),
+            'status' => $p->status, 'unplanned' => $p->unplanned,
+            'spent' => $p->transaction?->amount, 'bought_on' => $p->transaction?->date?->toDateString(),
+        ];
     }
 
     public function store(StorePlannedPurchaseRequest $request): RedirectResponse
