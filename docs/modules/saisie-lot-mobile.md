@@ -47,7 +47,19 @@
   - `BatchEntryCubit` gère l'analyse, la modification et le retrait de lignes, puis l'enregistrement : une création par ligne via `CreateTransactionUseCase`, en local, la synchro suit. Une ligne en échec reste à reprendre, les autres sont enregistrées ;
   - `BatchEntryPage` (route `/transactions/batch`, bouton « Saisie en lot » dans la liste) : notes, date de référence, compte par défaut ; lignes avec catégorie obligatoire, compte, doublon possible, ligne non comprise ; total et bouton d'enregistrement.
 - **Serveur** : aucun changement (API du module 2 bis).
-- **Tests** : `batch_entry_cubit_test`, 6 tests. Suite mobile : 95 réussis. Les 4 échecs restants sont les tests périmés de `main`, corrigés par la PR mobile du module 7b. Analyse : aucun nouveau problème.
+- **Revue de code, points hauts corrigés** :
+  - les ids locaux et serveur diffèrent : le compte par défaut part en id serveur, et les suggestions reviennent en ids locaux (inconnu → à choisir) ;
+  - plus rien ne bouge pendant l'enregistrement, et aucun double enregistrement n'est possible ;
+  - une exception ne fige plus l'écran ;
+  - montant, libellé et sens sont modifiables par ligne ;
+  - les catégories système (écarts, frais) sont exclues des choix.
+- **Revue de code, points moyens corrigés** :
+  - lignes non comprises conservées ;
+  - notes vidées après l'enregistrement, pour qu'une nouvelle analyse ne crée pas de doublon ;
+  - libellé du bouton selon le blocage ;
+  - `Semantics` par ligne et bouton à hauteur minimale ;
+  - garde `mounted`.
+- **Tests** : `batch_entry_cubit_test`, 13 tests. Suite mobile : 102 réussis. Les 4 échecs restants sont les tests périmés de `main`, corrigés par la PR mobile du module 7b. Analyse : aucun nouveau problème.
 - **Non vérifié** :
   - écran sur simulateur ou iPhone réel (aucun test d'interface automatisé) ;
   - affichage avec Dynamic Type agrandi.
