@@ -1,16 +1,19 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import TransferFeeField from '@/Components/Transfers/TransferFeeField.vue'
 
 const props = defineProps({
     accounts: { type: Array, default: () => [] },
+    lastFees: { type: Object, default: () => ({}) },
 })
 
 const form = useForm({
     from_account_id: props.accounts[0]?.id || '',
     to_account_id: props.accounts[1]?.id || '',
     amount: '',
+    fee: 0,
     description: '',
     date: new Date().toISOString().split('T')[0],
 })
@@ -22,6 +25,19 @@ const toAccounts = computed(() => {
 const fromAccounts = computed(() => {
     return props.accounts.filter(acc => acc.id !== form.to_account_id)
 })
+
+// Frais proposés (module transferts-frais) : ceux du dernier transfert du même couple, tant qu'ils ne sont pas modifiés
+const feeTouched = ref(false)
+const feeSuggested = ref(false)
+const suggestFee = () => {
+    if (feeTouched.value) return
+    const last = props.lastFees[`${form.from_account_id}:${form.to_account_id}`]
+    form.fee = last ?? 0
+    feeSuggested.value = !!last
+}
+watch(() => [form.from_account_id, form.to_account_id], suggestFee, { immediate: true })
+const fromAccount = computed(() => props.accounts.find(a => a.id === form.from_account_id) || null)
+const toAccount = computed(() => props.accounts.find(a => a.id === form.to_account_id) || null)
 
 const submit = () => {
     form.post('/transfers')
@@ -94,6 +110,18 @@ const submit = () => {
                             </option>
                         </select>
                     </div>
+
+                    <!-- Frais (module transferts-frais) -->
+                    <TransferFeeField
+                        v-model="form.fee"
+                        :amount="form.amount"
+                        :from-account="fromAccount"
+                        :to-account="toAccount"
+                        :suggested="feeSuggested"
+                        :editing="false"
+                        :error="form.errors.fee"
+                        @touched="feeTouched = true; feeSuggested = false"
+                    />
 
                     <!-- Date -->
                     <div>

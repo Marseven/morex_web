@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import TransferFeeField from '@/Components/Transfers/TransferFeeField.vue'
 
 const props = defineProps({
     transfer: { type: Object, required: true },
@@ -15,6 +16,7 @@ const form = useForm({
     from_account_id: props.transfer.from_account_id,
     to_account_id: props.transfer.to_account_id,
     amount: props.transfer.amount,
+    fee: props.transfer.fee ?? 0,
     description: props.transfer.description || '',
     date: toDateInput(props.transfer.date),
 })
@@ -26,6 +28,9 @@ const toAccounts = computed(() => {
 const fromAccounts = computed(() => {
     return props.accounts.filter(acc => acc.id !== form.to_account_id)
 })
+
+const fromAccount = computed(() => props.accounts.find(a => a.id === form.from_account_id) || null)
+const toAccount = computed(() => props.accounts.find(a => a.id === form.to_account_id) || null)
 
 const submit = () => {
     form.put(`/transfers/${props.transfer.id}`)
@@ -98,6 +103,18 @@ const submit = () => {
                             </option>
                         </select>
                     </div>
+
+                    <!-- Frais (module transferts-frais) -->
+                    <TransferFeeField
+                        v-model="form.fee"
+                        :amount="form.amount"
+                        :from-account="fromAccount"
+                        :to-account="toAccount"
+                        :suggested="false"
+                        :editing="true"
+                        :error="form.errors.fee"
+                        @touched="() => {}"
+                    />
 
                     <!-- Date -->
                     <div>

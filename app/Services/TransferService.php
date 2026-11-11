@@ -62,6 +62,21 @@ final class TransferService
             ->value('fee');
     }
 
+    /**
+     * RM-4 pour l'écran : derniers frais par couple « source:destination » (les 200 derniers transferts suffisent).
+     *
+     * @return array<string, int>
+     */
+    public function lastFeesByPair(User $user): array
+    {
+        return Transfer::where('user_id', $user->id)
+            ->latest('date')->latest('created_at')->limit(200)
+            ->get(['from_account_id', 'to_account_id', 'fee'])
+            ->unique(fn (Transfer $t) => $t->from_account_id.':'.$t->to_account_id)
+            ->mapWithKeys(fn (Transfer $t) => [$t->from_account_id.':'.$t->to_account_id => (int) $t->fee])
+            ->all();
+    }
+
     /** Synchro (événements désactivés) : les frais d'un transfert supprimé sont supprimés après coup, avec leurs effets. */
     public function releaseOrphanFees(User $user): void
     {

@@ -214,4 +214,13 @@ class TransferFeeTest extends TestCase
         $this->assertSame(500, $transfer->fresh()->fee);
         $this->assertSame([149500, 60000], $this->balances());
     }
+
+    public function test_the_entry_form_receives_the_last_fee_of_each_pair(): void
+    {
+        $this->withdraw(fee: 500);
+        $this->withdraw(fee: 700);
+
+        $this->actingAs($this->user)->get('/transfers/create')
+            ->assertInertia(fn ($page) => $page->where("lastFees.{$this->airtel->id}:{$this->wallet->id}", 700));
+    }
 }

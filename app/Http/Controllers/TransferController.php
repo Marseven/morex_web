@@ -59,6 +59,7 @@ class TransferController extends Controller
 
         return Inertia::render('Transfers/Create', [
             'accounts' => $accounts,
+            'lastFees' => app(TransferService::class)->lastFeesByPair($request->user()), // module transferts-frais
         ]);
     }
 
