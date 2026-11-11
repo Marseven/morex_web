@@ -154,12 +154,23 @@ final class StatementMatcher
     {
         $query = StatementLine::where('account_id', $account->id);
 
-        return $entry->reference !== null
-            ? $query->whereIn('external_ref', [$entry->reference, SmsReconciler::REFERENCE_PREFIX.$entry->reference])->exists()
-            : $query->whereBetween('date', [$entry->date, $entry->date.' 23:59:59'])
-                ->where('amount', $entry->amount)
-                ->get(['label'])
-                ->contains(fn (StatementLine $l) => Str::lower((string) $l->label) === Str::lower((string) $entry->label));
+        if ($entry->reference !== null) {
+            // Une ligne venue d'un SMS (« sms:<TID> ») ne vaut doublon que pour le même montant, à ±1 jour :
+            // un SMS forgé ne peut pas faire passer une autre ligne du relevé pour déjà importée.
+            return (clone $query)->where('external_ref', $entry->reference)->exists()
+                || (clone $query)->where('external_ref', SmsReconciler::REFERENCE_PREFIX.$entry->reference)
+                    ->where('amount', $entry->amount)
+                    ->whereBetween('date', [
+                        CarbonImmutable::parse($entry->date)->subDays(self::DAY_TOLERANCE)->toDateString(),
+                        CarbonImmutable::parse($entry->date)->addDays(self::DAY_TOLERANCE)->toDateString().' 23:59:59',
+                    ])
+                    ->exists();
+        }
+
+        return $query->whereBetween('date', [$entry->date, $entry->date.' 23:59:59'])
+            ->where('amount', $entry->amount)
+            ->get(['label'])
+            ->contains(fn (StatementLine $l) => Str::lower((string) $l->label) === Str::lower((string) $entry->label));
     }
 
     private function suggestedCategory(Account $account, StatementEntry $entry): ?string

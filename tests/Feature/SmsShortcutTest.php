@@ -214,4 +214,16 @@ class SmsShortcutTest extends TestCase
 
         $this->assertSame(0, $this->user->tokens()->count());
     }
+
+    public function test_a_forged_sms_reference_cannot_hide_a_different_statement_line(): void
+    {
+        $this->noted(15500);
+        $this->postSms($this->shortcutToken())->assertOk(); // SMS « PP261112.1400.A00001 » de 15 500
+
+        // Vraie ligne de relevé portant la même référence, mais d'un autre montant : elle doit rester importable
+        $entry = new \App\DTOs\StatementEntry(0, now()->toDateString(), -98000, 0, 'LOYER', 'PP261112.1400.A00001', 'ok', '');
+        $row = app(\App\Services\StatementMatcher::class)->match($this->airtel, [$entry])['lines'][0];
+
+        $this->assertNotSame('already_imported', $row['status']);
+    }
 }
